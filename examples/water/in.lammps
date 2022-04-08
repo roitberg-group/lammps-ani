@@ -7,15 +7,15 @@ atom_style      atomic
 neighbor        2.0 bin
 neigh_modify    every 10 delay 0 check no
 
-read_data   	water-5.lmp
-mass     		1 15.999
-mass		    2 1.008
+read_data       water.lmp
+mass            1 15.999
+mass            2 1.008
 mass            3 1.008
 
 # load the plugin
 # plugin load ani_plugin.so
 
-pair_style      ani 5.1 ani2x_cuda.pt cuda
+pair_style      ani 5.1 ../../models/ani2x_cuda.pt cuda
 pair_coeff      * *
 
 velocity        all create 330.0 4928459

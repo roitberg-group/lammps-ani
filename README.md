@@ -75,8 +75,7 @@ python save_ani.py                 # you will get an ani2x_cuda.pt
 ## Run example
 make sure `LAMMPS_PLUGIN_PATH` and `lammps_root` are set correctly
 ```
-export UCX_NET_DEVICES=mlx5_0:1
 cp ani2x_cuda.pt example/water/
 cd example/water/
-mpirun -np 8 ${lammps_root}/build/lmp_mpi -in in.plugin.lammps
+mpirun -np 8 ${lammps_root}/build/lmp_mpi -in in.small.lammps
 ```

@@ -7,7 +7,6 @@
 #include "ani.h"
 
 ANI::ANI(const std::string& model_file, int local_rank) : device(local_rank == -1 ? torch::kCPU: torch::kCUDA, local_rank) {
-  std::cout << device << std::endl;
   try {
     model = torch::jit::load(model_file, device);
     std::cout << "Successfully loaded the model on " << device << std::endl;

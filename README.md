@@ -11,7 +11,7 @@ export CMAKE_CUDA_ARCHITECTURES="7.5;8.0"
 
 Build PyTorch from master branch: https://github.com/pytorch/pytorch#from-source
 
-You could skip this step by using `conda activate /red/nvidia-ai/roitberg-group/lmp`
+You could skip this step by using `conda activate /blue/roitberg/apps/cuda114/`
 ```bash
 cd /some/path
 git clone --recursive https://github.com/pytorch/pytorch
@@ -43,39 +43,37 @@ make -j
 
 ## Build lammps-ani
 ```bash
-cd /some/path
-
-# lammps-ani
-git clone git@github.com:roitberg-group/sp2022-hackathon.git
-cd sp2022-hackathon/
-
 # build torchani
+cd /some/path
 git clone git@github.com:roitberg-group/torchani_sandbox.git
 cd torchani_sandbox
 git checkout withnbrlist
-# skip the following line if you are using `conda activate /red/nvidia-ai/roitberg-group/lmp`
+# skip the following line if you are using `conda activate /blue/roitberg/apps/cuda114/`
 python setup.py develop --ext
 cd ..
 
+# lammps-ani
+cd /some/path
+git clone git@github.com:roitberg-group/lammps-ani.git
 cp torchani_sandbox/torchani/csrc/* lammps-ani/ani_csrc/
-
 cd lammps-ani
 mkdir build; cd build
 cmake -DLAMMPS_HEADER_DIR=${lammps_root}/src -DCMAKE_PREFIX_PATH="$(python -c 'import torch.utils; print(torch.utils.cmake_prefix_path)')"  ..
 make -j
 export LAMMPS_PLUGIN_PATH=${PWD}
 
-cd ..
+# export a torchscript model
+cd ../models
 pip install torchvision --no-deps  # in case for import error
 pip install h5py                   # in case for import error
 python save_ani.py                 # you will get an ani2x_cuda.pt
+cd ..
 ```
-
 
 ## Run example
 make sure `LAMMPS_PLUGIN_PATH` and `lammps_root` are set correctly
 ```
-cp ani2x_cuda.pt example/water/
-cd example/water/
-mpirun -np 8 ${lammps_root}/build/lmp_mpi -in in.small.lammps
+export LAMMPS_PLUGIN_PATH=/blue/roitberg/apps/lammps-ani/build/
+cd examples/water/
+mpirun -np 8 ${lammps_root}/build/lmp_mpi -in in.lammps
 ```

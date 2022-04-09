@@ -1,5 +1,6 @@
 # LAMMPS-ANI
-A plugin to run torchani on LAMMPS.
+A plugin to run torchani on LAMMPS.  
+On hipergator, the compiled program and a working example script could be found at `/blue/roitberg/apps/lammps-ani/examples/water/submit.sh`
 
 ## Requirement
 Run an interactive session

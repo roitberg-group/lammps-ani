@@ -160,42 +160,20 @@ int test_ani2x_withnbr(int argc, const char *argv[]) {
   std::vector<int64_t> atom_index12 = {1,  2,  3,  5,  8,  8, 18,  2, 16, 15, 16,  9, 10,  9, 12, 14, 12,  6, 3,
                                        0,  0,  4,  4,  6,  7, 19,  1, 15, 17, 17, 10, 11, 11, 14, 13, 13,  7, 5};
 
-  std::vector<float> diff_vector = {-0.1000,  0.7490,  0.5870,
-                                    0.5450, -0.6170,  0.4880,
-                                    0.0950,  0.8780, -0.3700,
-                                    -0.6700,  0.9830, -0.9350,
-                                    -0.3680,  0.6630, -0.5840,
-                                    0.3790,  0.9720, -1.0970,
-                                    0.5950,  0.7230, -0.1990,
-                                    0.6450, -1.3660, -0.0990,
-                                    -0.3270,  0.6550,  0.6180,
-                                    -0.9420, -0.1630,  0.0450,
-                                    -1.2690,  0.4920,  0.6630,
-                                    0.7050,  0.5570, -0.3300,
-                                    -0.7300, -1.2960, -0.2780,
-                                    -0.0250, -0.7390, -0.6080,
-                                    -0.5100, -0.4890,  0.6460,
-                                    0.6700,  1.3380, -0.2340,
-                                    0.1600,  0.8490,  0.4120,
-                                    0.7470,  0.3090, -0.5130,
-                                    0.7650, -0.1050,  0.5650};
-
-  std::vector<float> distances = {0.9569, 0.9570, 0.9575, 1.5131, 0.9571, 1.5139, 0.9573,
-                                  1.5139, 0.9581, 0.9571, 1.5139, 0.9572, 1.5132, 0.9573,
-                                  0.9574, 1.5146, 0.9572, 0.9574, 0.9568};
-
   std::vector<int64_t> ghost_index = {};
 
   // run the model
   double out_energy = 0;
   double out_energy_ref = -534.0368641268269;
+  double energy_err;
   int ntotal = species.size();
   std::vector<float> out_force (ntotal * 3);
-  int npairs = distances.size();
-  ani.compute(out_energy, out_force, species, coords, npairs, atom_index12.data(), diff_vector.data(), distances.data(), ghost_index);
-  std::cout << "First call : energy " << out_energy << std::endl;
+  int npairs = atom_index12.size() / 2;
+  ani.compute(out_energy, out_force, species, coords, npairs, atom_index12.data(), ghost_index);
+  energy_err = abs(out_energy - out_energy_ref);
+  std::cout << "First call : energy " << out_energy << ", error: " << energy_err << std::endl;
   std::cout << "First call : force " << out_force[0] << ", " << out_force[1] << ", " << out_force[2] << std::endl;
-  TORCH_CHECK(abs(out_energy - out_energy_ref) < 1e-5, "Wrong Energy");
+  TORCH_CHECK(energy_err < 1e-5, "Wrong Energy");
   std::cout << std::endl;
 
   // set a ghost atom
@@ -205,10 +183,10 @@ int test_ani2x_withnbr(int argc, const char *argv[]) {
   out_energy_ref = -533.4612861349258;
   for (auto& f : out_force) {f = 0.f;}
   // run again
-  ani.compute(out_energy, out_force, species, coords, npairs, atom_index12.data(), diff_vector.data(), distances.data(), ghost_index);
-  std::cout << "Second call: energy " << out_energy << std::endl;
+  ani.compute(out_energy, out_force, species, coords, npairs, atom_index12.data(), ghost_index);
+  std::cout << "Second call: energy " << out_energy << ", error: " << energy_err << std::endl;
   std::cout << "Second call: force " << out_force[0] << ", " << out_force[1] << ", " << out_force[2] << std::endl;
-  TORCH_CHECK(abs(out_energy - out_energy_ref) < 1e-5, "Wrong Energy");
+  TORCH_CHECK(energy_err < 1e-5, "Wrong Energy");
 
   return 0;
 }

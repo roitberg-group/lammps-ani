@@ -33,8 +33,6 @@ PairANI::PairANI(LAMMPS *lmp) : Pair(lmp)
   writedata = 0;
   npairs_max = 0;
   atom_index12 = nullptr;
-  diff_vector = nullptr;
-  distances = nullptr;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -46,8 +44,6 @@ PairANI::~PairANI()
     memory->destroy(cutsq);
   }
   memory->destroy(atom_index12);
-  memory->destroy(diff_vector);
-  memory->destroy(distances);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -90,8 +86,6 @@ void PairANI::compute(int eflag, int vflag)
     // every time grow 2 times larger to avoid grow too frequently
     npairs_max = npairs * 2;
     memory->grow(atom_index12, 2 * npairs_max, "pair:atom_index12");
-    memory->grow(diff_vector, npairs_max * 3, "pair:diff_vector");
-    memory->grow(distances, npairs_max, "pair:distances");
   }
 
   // species and coordinates
@@ -111,39 +105,22 @@ void PairANI::compute(int eflag, int vflag)
   int ipair = 0;
   for (int ii = 0; ii < inum; ii++) {
     int i = ilist[ii];
-    double xtmp = x[i][0];
-    double ytmp = x[i][1];
-    double ztmp = x[i][2];
     int *jlist = firstneigh[i];
     int jnum = numneigh[i];
 
     for (int jj = 0; jj < jnum; jj++) {
       int j = jlist[jj];
 
-      double delx = xtmp - x[j][0];
-      double dely = ytmp - x[j][1];
-      double delz = ztmp - x[j][2];
-      double rsq = delx * delx + dely * dely + delz * delz;
-      double r = sqrt(rsq);
-
       // atom_index12
       atom_index12[npairs * 0 + ipair] = i;
       atom_index12[npairs * 1 + ipair] = j;
-
-      // diff vector saved in float32
-      diff_vector[ipair * 3 + 0] = delx;
-      diff_vector[ipair * 3 + 1] = dely;
-      diff_vector[ipair * 3 + 2] = delz;
-
-      // distances
-      distances[ipair] = r;
 
       ipair++;
     }
   }
 
   // run ani model
-  ani.compute(out_energy, out_force, species, coordinates, npairs, atom_index12, diff_vector, distances, ghost_index);
+  ani.compute(out_energy, out_force, species, coordinates, npairs, atom_index12, ghost_index);
 
   // write out force
   for (int ii = 0; ii < ntotal; ii++) {

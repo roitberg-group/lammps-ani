@@ -20,7 +20,7 @@ ANI::ANI(const std::string& model_file, int local_rank) : device(local_rank == -
 // instead of writing to per atom energy.
 void ANI::compute(double& out_energy, std::vector<float>& out_force,
                   std::vector<int64_t>& species, std::vector<float>& coordinates,
-                  int npairs_half, int64_t* atom_index12, float* diff_vector, float* distances,
+                  int npairs_half, int64_t* atom_index12,
                   std::vector<int64_t>& ghost_index) {
   int ntotal = species.size();
   int nghost = ghost_index.size();
@@ -28,21 +28,23 @@ void ANI::compute(double& out_energy, std::vector<float>& out_force,
   // output tensor
   auto out_force_t = torch::from_blob(out_force.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat32));
   // input tensor
-  auto species_t = torch::from_blob(species.data(), {1, ntotal}, torch::dtype(torch::kLong));
-  auto coordinates_t = torch::from_blob(coordinates.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat32));
-  auto atom_index12_t = torch::from_blob(atom_index12, {2, npairs_half}, torch::dtype(torch::kLong));
-  auto diff_vector_t = torch::from_blob(diff_vector, {npairs_half, 3}, torch::dtype(torch::kFloat32));
-  auto distances_t = torch::from_blob(distances, {npairs_half}, torch::dtype(torch::kFloat32));
-  auto ghost_index_t = torch::from_blob(ghost_index.data(), {nghost}, torch::dtype(torch::kLong));
+  auto species_t = torch::from_blob(species.data(), {1, ntotal}, torch::dtype(torch::kLong)).to(device);
+  auto coordinates_t = torch::from_blob(coordinates.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat32)).to(device);
+  auto atom_index12_t = torch::from_blob(atom_index12, {2, npairs_half}, torch::dtype(torch::kLong)).to(device);
+  auto ghost_index_t = torch::from_blob(ghost_index.data(), {nghost}, torch::dtype(torch::kLong)).to(device);
+
+  // perform calculation of diff and dist on device
+  auto diff_vector_t = coordinates_t.squeeze(0).index({atom_index12_t[0]}) - coordinates_t.squeeze(0).index({atom_index12_t[1]});
+  auto distances_t = diff_vector_t.norm(2, -1);
 
   // pack forward inputs
   std::vector<torch::jit::IValue> inputs;
-  inputs.push_back(species_t.to(device));
-  inputs.push_back(coordinates_t.to(device).requires_grad_(true));
-  inputs.push_back(atom_index12_t.to(device));
-  inputs.push_back(diff_vector_t.to(device));
-  inputs.push_back(distances_t.to(device));
-  inputs.push_back(ghost_index_t.to(device));
+  inputs.push_back(species_t);
+  inputs.push_back(coordinates_t.requires_grad_(true));
+  inputs.push_back(atom_index12_t);
+  inputs.push_back(diff_vector_t);
+  inputs.push_back(distances_t);
+  inputs.push_back(ghost_index_t);
 
   // run ani model
   auto energy_force = model.forward(inputs).toTuple();

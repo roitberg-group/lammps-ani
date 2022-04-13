@@ -1,10 +1,11 @@
 # LAMMPS-ANI
-A plugin to run torchani on LAMMPS.
+A plugin to run torchani on LAMMPS.  
+On hipergator, the compiled program and a working example script could be found at `/blue/roitberg/apps/lammps-ani/examples/water/submit.sh`
 
 ## Requirement
 Run an interactive session
 ```
-srun --partition=hpg-ai --reservation=hackathon --account=nvidia-ai --qos=nvidia-ai --gpus=8 --nodes=1 --ntasks=8 --cpus-per-task=25 --mem=80gb -t 10:00:00 --pty /bin/bash -i
+srun --qos=roitberg --account=roitberg --nodes=1 --ntasks=2 --cpus-per-task=2 --mem=20gb --gres=gpu:2 --partition=hpg-ai -t 10:00:00 --pty /bin/bash -i
 module load cuda/11.4.3 gcc/9.3.0 openmpi/4.0.5 cmake/3.21.3 git/2.30.1
 export CMAKE_CUDA_ARCHITECTURES="7.5;8.0"
 ```

@@ -34,6 +34,10 @@ class PairANI : public Pair {
   double cutoff;
   int local_rank;
   ANI ani;
+  int64_t* atom_index12;
+  float* diff_vector;
+  float* distances;
+  int npairs_max;
 
   virtual void allocate();
 };

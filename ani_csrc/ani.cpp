@@ -20,20 +20,19 @@ ANI::ANI(const std::string& model_file, int local_rank) : device(local_rank == -
 // instead of writing to per atom energy.
 void ANI::compute(double& out_energy, std::vector<float>& out_force,
                   std::vector<int64_t>& species, std::vector<float>& coordinates,
-                  std::vector<int64_t>& atom_index12, std::vector<float>& diff_vector,
-                  std::vector<float>& distances, std::vector<int64_t>& ghost_index) {
+                  int npairs_half, int64_t* atom_index12, float* diff_vector, float* distances,
+                  std::vector<int64_t>& ghost_index) {
   int ntotal = species.size();
   int nghost = ghost_index.size();
-  int npairs_half = distances.size();
 
   // output tensor
   auto out_force_t = torch::from_blob(out_force.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat32));
   // input tensor
   auto species_t = torch::from_blob(species.data(), {1, ntotal}, torch::dtype(torch::kLong));
   auto coordinates_t = torch::from_blob(coordinates.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat32));
-  auto atom_index12_t = torch::from_blob(atom_index12.data(), {2, npairs_half}, torch::dtype(torch::kLong));
-  auto diff_vector_t = torch::from_blob(diff_vector.data(), {npairs_half, 3}, torch::dtype(torch::kFloat32));
-  auto distances_t = torch::from_blob(distances.data(), {npairs_half}, torch::dtype(torch::kFloat32));
+  auto atom_index12_t = torch::from_blob(atom_index12, {2, npairs_half}, torch::dtype(torch::kLong));
+  auto diff_vector_t = torch::from_blob(diff_vector, {npairs_half, 3}, torch::dtype(torch::kFloat32));
+  auto distances_t = torch::from_blob(distances, {npairs_half}, torch::dtype(torch::kFloat32));
   auto ghost_index_t = torch::from_blob(ghost_index.data(), {nghost}, torch::dtype(torch::kLong));
 
   // pack forward inputs

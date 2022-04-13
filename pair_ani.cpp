@@ -31,6 +31,10 @@ using namespace LAMMPS_NS;
 PairANI::PairANI(LAMMPS *lmp) : Pair(lmp)
 {
   writedata = 0;
+  npairs_max = 0;
+  atom_index12 = nullptr;
+  diff_vector = nullptr;
+  distances = nullptr;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -41,6 +45,9 @@ PairANI::~PairANI()
     memory->destroy(setflag);
     memory->destroy(cutsq);
   }
+  memory->destroy(atom_index12);
+  memory->destroy(diff_vector);
+  memory->destroy(distances);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -76,11 +83,16 @@ void PairANI::compute(int eflag, int vflag)
   // ani model inputs
   std::vector<int64_t> species(ntotal);
   std::vector<float> coordinates(ntotal * 3);
-  std::vector<int64_t> atom_index12(2 * npairs);
-  std::vector<float> diff_vector(npairs * 3);
-  std::vector<float> distances(npairs);
   // TODO cuaev could remove neighborlist if atom_i index is larger than nlocal
   std::vector<int64_t> ghost_index(nghost);
+
+  if (npairs > npairs_max) {
+    // every time grow 2 times larger to avoid grow too frequently
+    npairs_max = npairs * 2;
+    memory->grow(atom_index12, 2 * npairs_max, "pair:atom_index12");
+    memory->grow(diff_vector, npairs_max * 3, "pair:diff_vector");
+    memory->grow(distances, npairs_max, "pair:distances");
+  }
 
   // species and coordinates
   for (int ii = 0; ii < ntotal; ii++) {
@@ -131,7 +143,7 @@ void PairANI::compute(int eflag, int vflag)
   }
 
   // run ani model
-  ani.compute(out_energy, out_force, species, coordinates, atom_index12, diff_vector, distances, ghost_index);
+  ani.compute(out_energy, out_force, species, coordinates, npairs, atom_index12, diff_vector, distances, ghost_index);
 
   // write out force
   for (int ii = 0; ii < ntotal; ii++) {

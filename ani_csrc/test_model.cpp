@@ -191,7 +191,8 @@ int test_ani2x_withnbr(int argc, const char *argv[]) {
   double out_energy_ref = -534.0368641268269;
   int ntotal = species.size();
   std::vector<float> out_force (ntotal * 3);
-  ani.compute(out_energy, out_force, species, coords, atom_index12, diff_vector, distances, ghost_index);
+  int npairs = distances.size();
+  ani.compute(out_energy, out_force, species, coords, npairs, atom_index12.data(), diff_vector.data(), distances.data(), ghost_index);
   std::cout << "First call : energy " << out_energy << std::endl;
   std::cout << "First call : force " << out_force[0] << ", " << out_force[1] << ", " << out_force[2] << std::endl;
   TORCH_CHECK(abs(out_energy - out_energy_ref) < 1e-5, "Wrong Energy");
@@ -204,7 +205,7 @@ int test_ani2x_withnbr(int argc, const char *argv[]) {
   out_energy_ref = -533.4612861349258;
   for (auto& f : out_force) {f = 0.f;}
   // run again
-  ani.compute(out_energy, out_force, species, coords, atom_index12, diff_vector, distances, ghost_index);
+  ani.compute(out_energy, out_force, species, coords, npairs, atom_index12.data(), diff_vector.data(), distances.data(), ghost_index);
   std::cout << "Second call: energy " << out_energy << std::endl;
   std::cout << "Second call: force " << out_force[0] << ", " << out_force[1] << ", " << out_force[2] << std::endl;
   TORCH_CHECK(abs(out_energy - out_energy_ref) < 1e-5, "Wrong Energy");

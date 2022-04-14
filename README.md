@@ -54,7 +54,6 @@ python setup.py develop --ext
 cd ..
 
 # lammps-ani
-cd /some/path
 git clone git@github.com:roitberg-group/lammps-ani.git
 cp torchani_sandbox/torchani/csrc/* lammps-ani/ani_csrc/
 cd lammps-ani

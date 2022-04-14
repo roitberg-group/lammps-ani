@@ -62,5 +62,4 @@ void ANI::compute(double& out_energy, std::vector<float>& out_force,
   // write energy and force out
   out_energy = energy.item<double>();
   out_force_t.copy_(force);
-
 }

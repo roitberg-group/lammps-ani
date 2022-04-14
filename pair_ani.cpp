@@ -196,7 +196,7 @@ void PairANI::settings(int narg, char **arg)
   } else {
     local_rank = -1;
   }
-  // printf("local rank is %d \n", local_rank);
+
   if (device_str != "cpu" && device_str != "cuda") {
     std::cerr << "2nd argument must be <cpu/cuda>\n";
   }

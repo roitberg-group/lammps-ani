@@ -31,6 +31,9 @@ using namespace LAMMPS_NS;
 PairANI::PairANI(LAMMPS *lmp) : Pair(lmp)
 {
   writedata = 0;
+  // default energy conversion factor:
+  // for setting "units real", convert from Hartree to Kcal/mol
+  econvert = 627.5094738898777;
   npairs_max = 0;
   atom_index12 = nullptr;
 }
@@ -124,12 +127,12 @@ void PairANI::compute(int eflag, int vflag)
 
   // write out force
   for (int ii = 0; ii < ntotal; ii++) {
-    f[ii][0] = out_force[ii * 3 + 0];
-    f[ii][1] = out_force[ii * 3 + 1];
-    f[ii][2] = out_force[ii * 3 + 2];
+    f[ii][0] = out_force[ii * 3 + 0] * econvert;
+    f[ii][1] = out_force[ii * 3 + 1] * econvert;
+    f[ii][2] = out_force[ii * 3 + 2] * econvert;
   }
 
-  if (eflag) eng_vdwl += out_energy;
+  if (eflag) eng_vdwl += out_energy * econvert;
 }
 
 /* ----------------------------------------------------------------------

@@ -49,9 +49,10 @@ void ANI::compute(double& out_energy, std::vector<float>& out_force,
   // run ani model
   auto energy_force = model.forward(inputs).toTuple();
 
-  // extract energy and force
-  auto energy = energy_force->elements()[0].toTensor();
-  auto force = energy_force->elements()[1].toTensor();
+  // extract energy and force from model outputs,
+  // and convert the unit to kcal/mol
+  auto energy = energy_force->elements()[0].toTensor() * hartree2kcalmol;
+  auto force = energy_force->elements()[1].toTensor() * hartree2kcalmol;
 
   // write energy and force out
   out_energy = energy.item<double>();

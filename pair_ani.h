@@ -34,7 +34,6 @@ class PairANI : public Pair {
   double cutoff;
   int local_rank;
   ANI ani;
-  double econvert;
   int64_t* atom_index12;
   int npairs_max;
 

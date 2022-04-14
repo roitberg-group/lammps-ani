@@ -6,6 +6,8 @@
 #include <cstdint>
 #include <vector>
 
+constexpr float hartree2kcalmol = 627.5094738898777;
+
 class ANI {
 public:
   torch::jit::script::Module model;

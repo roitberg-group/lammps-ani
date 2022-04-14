@@ -19,6 +19,7 @@
 #include "force.h"
 #include "memory.h"
 #include "neigh_list.h"
+#include "update.h"
 #include <cmath>
 #include <cstring>
 #include <vector>
@@ -31,11 +32,12 @@ using namespace LAMMPS_NS;
 PairANI::PairANI(LAMMPS *lmp) : Pair(lmp)
 {
   writedata = 0;
-  // default energy conversion factor:
-  // for setting "units real", convert from Hartree to Kcal/mol
-  econvert = 627.5094738898777;
   npairs_max = 0;
   atom_index12 = nullptr;
+  // require real units, ani model will return energy in kcal/mol
+  if (strcmp(update->unit_style, "real") != 0) {
+    error->all(FLERR, "Pair ani requires real units");
+  }
 }
 
 /* ---------------------------------------------------------------------- */
@@ -127,12 +129,12 @@ void PairANI::compute(int eflag, int vflag)
 
   // write out force
   for (int ii = 0; ii < ntotal; ii++) {
-    f[ii][0] = out_force[ii * 3 + 0] * econvert;
-    f[ii][1] = out_force[ii * 3 + 1] * econvert;
-    f[ii][2] = out_force[ii * 3 + 2] * econvert;
+    f[ii][0] = out_force[ii * 3 + 0];
+    f[ii][1] = out_force[ii * 3 + 1];
+    f[ii][2] = out_force[ii * 3 + 2];
   }
 
-  if (eflag) eng_vdwl += out_energy * econvert;
+  if (eflag) eng_vdwl += out_energy;
 }
 
 /* ----------------------------------------------------------------------

@@ -7,7 +7,7 @@ boundary       p p p
 atom_style     atomic
 
 neighbor        2.0 bin
-neigh_modify    every 10 delay 0 check no
+neigh_modify    every 10 delay 0 check yes
 
 # Atom Definition
 read_data      water-200k.data
@@ -19,7 +19,7 @@ pair_coeff      * *
 
 # Settings: temperature at 1000 K, timestep (0.5 fs)
 velocity       all create 1000 4928459 rot yes mom yes dist gaussian
-fix            ensemble all nvt temp 1000 1000 100 tchain 1
+fix            ensemble all langevin 300 300 100 12345
 timestep       0.5
 
 # Output: dump atom positions every 0.5 ps and log info every 0.5 ps

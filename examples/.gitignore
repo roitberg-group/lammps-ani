@@ -1,0 +1,5 @@
+log.lammps
+*.final
+*.xyz
+*.log
+*.dump

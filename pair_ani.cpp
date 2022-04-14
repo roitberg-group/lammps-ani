@@ -18,6 +18,7 @@
 #include "error.h"
 #include "force.h"
 #include "memory.h"
+#include "neighbor.h"
 #include "neigh_list.h"
 #include "update.h"
 #include <cmath>
@@ -32,6 +33,7 @@ using namespace LAMMPS_NS;
 PairANI::PairANI(LAMMPS *lmp) : Pair(lmp)
 {
   writedata = 0;
+  npairs = 0;
   npairs_max = 0;
   atom_index12 = nullptr;
   // require real units, ani model will return energy in kcal/mol
@@ -70,13 +72,6 @@ void PairANI::compute(int eflag, int vflag)
   int *numneigh = list->numneigh;
   int **firstneigh = list->firstneigh;
 
-  // calculate the total number of pairs
-  int npairs = 0;
-  for (int ii = 0; ii < inum; ii++) {
-    npairs += numneigh[ii];
-  }
-  // std::cout << "nlocal :" << nlocal << " nghost :" << nghost << " npairs : " << npairs << std::endl;
-
   // ani model outputs
   double out_energy;
   std::vector<float> out_force(ntotal * 3);
@@ -86,12 +81,6 @@ void PairANI::compute(int eflag, int vflag)
   std::vector<float> coordinates(ntotal * 3);
   // TODO cuaev could remove neighborlist if atom_i index is larger than nlocal
   std::vector<int64_t> ghost_index(nghost);
-
-  if (npairs > npairs_max) {
-    // every time grow 2 times larger to avoid grow too frequently
-    npairs_max = npairs * 2;
-    memory->grow(atom_index12, 2 * npairs_max, "pair:atom_index12");
-  }
 
   // species and coordinates
   for (int ii = 0; ii < ntotal; ii++) {
@@ -106,26 +95,42 @@ void PairANI::compute(int eflag, int vflag)
     ghost_index[ii] = ii + nlocal;
   }
 
-  // loop over neighbors of local atoms
-  int ipair = 0;
-  for (int ii = 0; ii < inum; ii++) {
-    int i = ilist[ii];
-    int *jlist = firstneigh[i];
-    int jnum = numneigh[i];
+  int ago = neighbor->ago;
 
-    for (int jj = 0; jj < jnum; jj++) {
-      int j = jlist[jj];
+  if (ago == 0) {
+    // calculate the total number of pairs in current domain
+    npairs = 0;
+    for (int ii = 0; ii < inum; ii++) {
+      npairs += numneigh[ii];
+    }
 
-      // atom_index12
-      atom_index12[npairs * 0 + ipair] = i;
-      atom_index12[npairs * 1 + ipair] = j;
+    if (npairs > npairs_max) {
+      // every time grow 1.5 times larger to avoid reallocate too frequently
+      npairs_max = npairs * 1.5;
+      memory->grow(atom_index12, 2 * npairs_max, "pair:atom_index12");
+    }
 
-      ipair++;
+    // loop over neighbors of local atoms
+    int ipair = 0;
+    for (int ii = 0; ii < inum; ii++) {
+      int i = ilist[ii];
+      int *jlist = firstneigh[i];
+      int jnum = numneigh[i];
+
+      for (int jj = 0; jj < jnum; jj++) {
+        int j = jlist[jj];
+        atom_index12[npairs * 0 + ipair] = i;
+        atom_index12[npairs * 1 + ipair] = j;
+        ipair++;
+      }
     }
   }
 
+  // std::cout << "ago: " << ago << ", nlocal :" << nlocal << ", nghost :" <<
+  // nghost << ", npairs : " << npairs << std::endl;
+
   // run ani model
-  ani.compute(out_energy, out_force, species, coordinates, npairs, atom_index12, ghost_index);
+  ani.compute(out_energy, out_force, species, coordinates, npairs, atom_index12, ghost_index, ago);
 
   // write out force
   for (int ii = 0; ii < ntotal; ii++) {

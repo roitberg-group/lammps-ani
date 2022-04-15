@@ -136,11 +136,15 @@ def save_ani2x_model():
                              device=device)
     ghost_index = torch.tensor([])
     # ghost_index = torch.tensor([19])
+    torch.set_printoptions(precision=10)
     energy, force = ani2x_loaded(species, coordinates, atom_index12, diff_vector, distances, ghost_index)
     print("energy: ", energy.shape, energy.item(), energy.dtype)
     print("force : ", force.shape, force.dtype)
 
     energy_ref, force_ref = ani2x_ref()
+    print("energy_ref: ", energy_ref.shape, energy_ref.item(), energy_ref.dtype)
+    print("force_ref: ", force_ref.shape, force_ref.dtype)
+
     # hard-coded floating values above loss some accuracy
     threshold = 1e-4
     energy_err = torch.abs(torch.max(energy_ref.cpu() - energy.cpu()))

@@ -12,6 +12,7 @@ class ANI {
 public:
   torch::jit::script::Module model;
   torch::Device device;
+  torch::Tensor atom_index12_t;
 
   ANI() : device(torch::kCPU) {};
   ANI(const std::string& model_file, int local_rank);
@@ -19,7 +20,8 @@ public:
   void compute(double& out_energy, std::vector<float>& out_force,
                std::vector<int64_t>& species, std::vector<float>& coordinates,
                int npairs_half, int64_t* atom_index12,
-               std::vector<int64_t>& ghost_index);
+               std::vector<int64_t>& ghost_index,
+               int ago=0);
 };
 
 #endif

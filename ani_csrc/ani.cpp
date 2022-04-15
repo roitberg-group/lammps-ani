@@ -21,7 +21,8 @@ ANI::ANI(const std::string& model_file, int local_rank) : device(local_rank == -
 void ANI::compute(double& out_energy, std::vector<float>& out_force,
                   std::vector<int64_t>& species, std::vector<float>& coordinates,
                   int npairs_half, int64_t* atom_index12,
-                  std::vector<int64_t>& ghost_index) {
+                  std::vector<int64_t>& ghost_index,
+                  int ago) {
   int ntotal = species.size();
   int nghost = ghost_index.size();
 
@@ -30,8 +31,12 @@ void ANI::compute(double& out_energy, std::vector<float>& out_force,
   // input tensor
   auto species_t = torch::from_blob(species.data(), {1, ntotal}, torch::dtype(torch::kLong)).to(device);
   auto coordinates_t = torch::from_blob(coordinates.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat32)).to(device);
-  auto atom_index12_t = torch::from_blob(atom_index12, {2, npairs_half}, torch::dtype(torch::kLong)).to(device);
   auto ghost_index_t = torch::from_blob(ghost_index.data(), {nghost}, torch::dtype(torch::kLong)).to(device);
+
+  // atom_index12_t is cached on GPU and only needs to be updated when neigh_list rebuild
+  if (ago == 0) {
+    atom_index12_t = torch::from_blob(atom_index12, {2, npairs_half}, torch::dtype(torch::kLong)).to(device);
+  }
 
   // perform calculation of diff and dist on device
   auto diff_vector_t = coordinates_t.squeeze(0).index({atom_index12_t[0]}) - coordinates_t.squeeze(0).index({atom_index12_t[1]});
@@ -57,5 +62,4 @@ void ANI::compute(double& out_energy, std::vector<float>& out_force,
   // write energy and force out
   out_energy = energy.item<double>();
   out_force_t.copy_(force);
-
 }

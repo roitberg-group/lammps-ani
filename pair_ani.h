@@ -35,7 +35,8 @@ class PairANI : public Pair {
   int local_rank;
   ANI ani;
   int64_t* atom_index12;
-  int npairs_max;
+  int npairs;            // number of pairs in the current domain before neigh_list rebuild
+  int npairs_max;        // if exceed this max number the allocated atom_index12 needs to grow
 
   virtual void allocate();
 };

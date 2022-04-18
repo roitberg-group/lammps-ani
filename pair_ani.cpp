@@ -134,9 +134,9 @@ void PairANI::compute(int eflag, int vflag)
 
   // write out force
   for (int ii = 0; ii < ntotal; ii++) {
-    f[ii][0] = out_force[ii * 3 + 0];
-    f[ii][1] = out_force[ii * 3 + 1];
-    f[ii][2] = out_force[ii * 3 + 2];
+    f[ii][0] += out_force[ii * 3 + 0];
+    f[ii][1] += out_force[ii * 3 + 1];
+    f[ii][2] += out_force[ii * 3 + 2];
   }
 
   if (eflag) eng_vdwl += out_energy;

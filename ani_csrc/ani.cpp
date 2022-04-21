@@ -21,20 +21,20 @@ ANI::ANI(const std::string& model_file, int local_rank) : device(local_rank == -
 void ANI::compute(double& out_energy, std::vector<float>& out_force,
                   std::vector<int64_t>& species, std::vector<float>& coordinates,
                   int npairs_half, int64_t* atom_index12,
-                  std::vector<int64_t>& ghost_index,
-                  int ago) {
+                  int nlocal, int ago) {
   int ntotal = species.size();
-  int nghost = ghost_index.size();
 
   // output tensor
   auto out_force_t = torch::from_blob(out_force.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat32));
   // input tensor
-  auto species_t = torch::from_blob(species.data(), {1, ntotal}, torch::dtype(torch::kLong)).to(device);
   auto coordinates_t = torch::from_blob(coordinates.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat32)).to(device);
-  auto ghost_index_t = torch::from_blob(ghost_index.data(), {nghost}, torch::dtype(torch::kLong)).to(device);
 
   // atom_index12_t is cached on GPU and only needs to be updated when neigh_list rebuild
   if (ago == 0) {
+    species_t = torch::from_blob(species.data(), {1, ntotal}, torch::dtype(torch::kLong)).to(device);
+    species_ghost_as_padding_t = species_t.detach().clone();
+    // equivalent to: species_ghost_as_padding[:, nlocal:] = -1
+    species_ghost_as_padding_t.index_put_({torch::indexing::Slice(), torch::indexing::Slice(nlocal, torch::indexing::None)}, -1);
     atom_index12_t = torch::from_blob(atom_index12, {2, npairs_half}, torch::dtype(torch::kLong)).to(device);
   }
 
@@ -49,7 +49,7 @@ void ANI::compute(double& out_energy, std::vector<float>& out_force,
   inputs.push_back(atom_index12_t);
   inputs.push_back(diff_vector_t);
   inputs.push_back(distances_t);
-  inputs.push_back(ghost_index_t);
+  inputs.push_back(species_ghost_as_padding_t);
 
   // run ani model
   auto energy_force = model.forward(inputs).toTuple();

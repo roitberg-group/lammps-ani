@@ -79,25 +79,22 @@ void PairANI::compute(int eflag, int vflag)
   // ani model inputs
   std::vector<int64_t> species(ntotal);
   std::vector<float> coordinates(ntotal * 3);
-  // TODO cuaev could remove neighborlist if atom_i index is larger than nlocal
-  std::vector<int64_t> ghost_index(nghost);
 
-  // species and coordinates
+  // coordinates
   for (int ii = 0; ii < ntotal; ii++) {
-    species[ii] = type[ii] - 1; // lammps type from 1 to n
     coordinates[ii * 3 + 0] = x[ii][0];
     coordinates[ii * 3 + 1] = x[ii][1];
     coordinates[ii * 3 + 2] = x[ii][2];
   }
 
-  // currently ghost_index is just an array from nlocal to ntotal - 1
-  for (int ii = 0; ii < nghost; ii++) {
-    ghost_index[ii] = ii + nlocal;
-  }
-
   int ago = neighbor->ago;
 
   if (ago == 0) {
+    // species
+    for (int ii = 0; ii < ntotal; ii++) {
+      species[ii] = type[ii] - 1; // lammps type from 1 to n
+    }
+
     // calculate the total number of pairs in current domain
     npairs = 0;
     for (int ii = 0; ii < inum; ii++) {
@@ -130,7 +127,7 @@ void PairANI::compute(int eflag, int vflag)
   // nghost << ", npairs : " << npairs << std::endl;
 
   // run ani model
-  ani.compute(out_energy, out_force, species, coordinates, npairs, atom_index12, ghost_index, ago);
+  ani.compute(out_energy, out_force, species, coordinates, npairs, atom_index12, nlocal, ago);
 
   // write out force
   for (int ii = 0; ii < ntotal; ii++) {

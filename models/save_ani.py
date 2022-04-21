@@ -51,7 +51,7 @@ class ANI2x(torch.nn.Module):
         self.energy_shifter = ani2x.energy_shifter
 
     @torch.jit.export
-    def forward(self, species, coordinates, atom_index12, diff_vector, distances, ghost_index=torch.tensor([])):
+    def forward(self, species, coordinates, atom_index12, diff_vector, distances, species_ghost_as_padding):
         if not self.aev_computer.cuaev_is_initialized:
             self.aev_computer._init_cuaev_computer()
             self.aev_computer.cuaev_is_initialized = True
@@ -60,13 +60,8 @@ class ANI2x(torch.nn.Module):
         # when use ghost_index and mnp, the input system must be a single molecule
         assert species.shape[0] == 1, "Currently only support inference for single molecule"
         aev = self.aev_computer._compute_cuaev_with_nbrlist(species, coordinates, atom_index12, diff_vector, distances)
-        # make sure species is not changed, so could be reused between iteration (TODO)
-        species_set_ghost = species.detach().clone()
-        # TODO set ghost atoms, could be optimized
-        if ghost_index.shape[0]:
-            species_set_ghost[:, ghost_index] = -1
         # run neural networks
-        species_energies = self.neural_networks((species_set_ghost, aev))
+        species_energies = self.neural_networks((species_ghost_as_padding, aev))
         # TODO force is independent of energy_shifter?
         species_energies = self.energy_shifter(species_energies)
         energies = species_energies[1]
@@ -134,10 +129,11 @@ def save_ani2x_model():
     distances = torch.tensor([0.9569, 0.9570, 0.9575, 1.5131, 0.9571, 1.5139, 0.9573, 1.5139, 0.9581,
                              0.9571, 1.5139, 0.9572, 1.5132, 0.9573, 0.9574, 1.5146, 0.9572, 0.9574, 0.9568],
                              device=device)
-    ghost_index = torch.tensor([])
-    # ghost_index = torch.tensor([19])
+    species_ghost_as_padding = species.detach().clone()
+    # nlocal = 19
+    # species_ghost_as_padding[:, nlocal:] = -1
     torch.set_printoptions(precision=10)
-    energy, force = ani2x_loaded(species, coordinates, atom_index12, diff_vector, distances, ghost_index)
+    energy, force = ani2x_loaded(species, coordinates, atom_index12, diff_vector, distances, species_ghost_as_padding)
     print("energy: ", energy.shape, energy.item(), energy.dtype)
     print("force : ", force.shape, force.dtype)
 

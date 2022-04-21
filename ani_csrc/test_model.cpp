@@ -160,7 +160,7 @@ int test_ani2x_withnbr(int argc, const char *argv[]) {
   std::vector<int64_t> atom_index12 = {1,  2,  3,  5,  8,  8, 18,  2, 16, 15, 16,  9, 10,  9, 12, 14, 12,  6, 3,
                                        0,  0,  4,  4,  6,  7, 19,  1, 15, 17, 17, 10, 11, 11, 14, 13, 13,  7, 5};
 
-  std::vector<int64_t> ghost_index = {};
+  int nlocal = species.size();
 
   // run the model
   double out_energy = 0;
@@ -169,7 +169,7 @@ int test_ani2x_withnbr(int argc, const char *argv[]) {
   int ntotal = species.size();
   std::vector<float> out_force (ntotal * 3);
   int npairs = atom_index12.size() / 2;
-  ani.compute(out_energy, out_force, species, coords, npairs, atom_index12.data(), ghost_index);
+  ani.compute(out_energy, out_force, species, coords, npairs, atom_index12.data(), nlocal);
   energy_err = abs(out_energy - out_energy_ref);
   std::cout << "First call : energy " <<  std::fixed << out_energy << ", error: " << energy_err << std::endl;
   std::cout << "First call : force " << out_force[0] << ", " << out_force[1] << ", " << out_force[2] << std::endl;
@@ -177,13 +177,13 @@ int test_ani2x_withnbr(int argc, const char *argv[]) {
   std::cout << std::endl;
 
   // set a ghost atom
-  ghost_index = {19};
+  nlocal = 19;
   // reset energy and force
   out_energy = 0;
   out_energy_ref = -533.4612861349258 * hartree2kcalmol;
   for (auto& f : out_force) {f = 0.f;}
   // run again
-  ani.compute(out_energy, out_force, species, coords, npairs, atom_index12.data(), ghost_index);
+  ani.compute(out_energy, out_force, species, coords, npairs, atom_index12.data(), nlocal);
   std::cout << "Second call: energy " << std::fixed << out_energy << ", error: " << energy_err << std::endl;
   std::cout << "Second call: force " << out_force[0] << ", " << out_force[1] << ", " << out_force[2] << std::endl;
   TORCH_CHECK(energy_err < 1e-5, "Wrong Energy");

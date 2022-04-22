@@ -18,6 +18,8 @@ ANI::ANI(const std::string& model_file, int local_rank) : device(local_rank == -
 
 // For simplicity, the accumulated energy will be saved into eng_vdwl,
 // instead of writing to per atom energy.
+
+// compute with half nbrlist
 void ANI::compute(double& out_energy, std::vector<float>& out_force,
                   std::vector<int64_t>& species, std::vector<float>& coordinates,
                   int npairs_half, int64_t* atom_index12,
@@ -49,6 +51,55 @@ void ANI::compute(double& out_energy, std::vector<float>& out_force,
   inputs.push_back(atom_index12_t);
   inputs.push_back(diff_vector_t);
   inputs.push_back(distances_t);
+  inputs.push_back(species_ghost_as_padding_t);
+
+  // run ani model
+  auto energy_force = model.forward(inputs).toTuple();
+
+  // extract energy and force from model outputs,
+  // and convert the unit to kcal/mol
+  auto energy = energy_force->elements()[0].toTensor() * hartree2kcalmol;
+  auto force = energy_force->elements()[1].toTensor() * hartree2kcalmol;
+
+  // write energy and force out
+  out_energy = energy.item<double>();
+  out_force_t.copy_(force);
+}
+
+// compute with full nbrlist
+void ANI::compute(double& out_energy, std::vector<float>& out_force,
+                  std::vector<int64_t>& species, std::vector<float>& coordinates,
+                  int* ilist_unique, int* numneigh, int nlocal,
+                  int* jlist, int npairs,
+                  int ago) {
+  int ntotal = species.size();
+
+  // output tensor
+  auto out_force_t = torch::from_blob(out_force.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat32));
+  // input tensor
+  auto coordinates_t = torch::from_blob(coordinates.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat32)).to(device);
+
+  // atom_index12_t is cached on GPU and only needs to be updated when neigh_list rebuild
+  if (ago == 0) {
+    // species
+    species_t = torch::from_blob(species.data(), {1, ntotal}, torch::dtype(torch::kLong)).to(device);
+    species_ghost_as_padding_t = species_t.detach().clone();
+    // equivalent to: species_ghost_as_padding[:, nlocal:] = -1
+    species_ghost_as_padding_t.index_put_({torch::indexing::Slice(), torch::indexing::Slice(nlocal, torch::indexing::None)}, -1);
+
+    // nbrlist
+    ilist_unique_t = torch::from_blob(ilist_unique, {nlocal}, torch::dtype(torch::kInt32)).to(device);
+    numneigh_t = torch::from_blob(numneigh, {nlocal}, torch::dtype(torch::kInt32)).to(device);
+    jlist_t = torch::from_blob(jlist, {npairs}, torch::dtype(torch::kInt32)).to(device);
+  }
+
+  // pack forward inputs
+  std::vector<torch::jit::IValue> inputs;
+  inputs.push_back(species_t);
+  inputs.push_back(coordinates_t.requires_grad_(true));
+  inputs.push_back(ilist_unique_t);
+  inputs.push_back(jlist_t);
+  inputs.push_back(numneigh_t);
   inputs.push_back(species_ghost_as_padding_t);
 
   // run ani model

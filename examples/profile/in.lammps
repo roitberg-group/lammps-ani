@@ -13,7 +13,8 @@ neigh_modify    every 10 delay 0 check yes
 read_data      water-5nm.data
 replicate      3 3 3
 
-pair_style      ani 5.1 /blue/roitberg/apps/lammps-ani/models/ani2x_cuda.pt cuda
+pair_style      ani 5.1 /blue/roitberg/apps/lammps-ani/models/ani2x_cuda_full.pt cuda full
+#pair_style      ani 5.1 /blue/roitberg/apps/lammps-ani/models/ani2x_cuda_half.pt cuda half 
 pair_coeff      * *
 
 

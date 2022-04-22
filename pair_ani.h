@@ -27,6 +27,7 @@ class PairANI : public Pair {
 
   void settings(int, char **) override;
   void coeff(int, char **) override;
+  void init_style() override;
   double init_one(int, int) override;
   void *extract(const char *, int &) override;
 
@@ -34,9 +35,13 @@ class PairANI : public Pair {
   double cutoff;
   int local_rank;
   ANI ani;
+
   int64_t* atom_index12;
+  int* jlist;
   int npairs;            // number of pairs in the current domain before neigh_list rebuild
   int npairs_max;        // if exceed this max number the allocated atom_index12 needs to grow
+
+  bool use_full;
 
   virtual void allocate();
 };

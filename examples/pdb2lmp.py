@@ -30,7 +30,7 @@ Atoms
 numbers_to_species = {1: 0, 6: 1, 7: 2, 8: 3, 16: 4, 9: 5, 17: 6}
 numbers_to_lmp_types = {1: 1, 6: 2, 7: 3, 8: 4, 16: 5, 9: 6, 17: 7}
 
-def generate_data(input_file, output_file, system_size=None):
+def generate_data(input_file, output_file, system_size=None, center=False):
 
     mol = read(input_file)
     cell = mol.cell
@@ -38,15 +38,19 @@ def generate_data(input_file, output_file, system_size=None):
         num_atoms = len(mol)
     else:
         num_atoms = system_size
-    xlen_half, ylen_half, zlen_half = cell.lengths() / 2
-
     data = ""
-    data += header.format(num_atoms=num_atoms, xlo=-xlen_half, xhi=xlen_half,
-                          ylo=-ylen_half, yhi=ylen_half, zlo=-zlen_half, zhi=zlen_half)
+    if center:
+        xlen_half, ylen_half, zlen_half = cell.lengths() / 2
+        data += header.format(num_atoms=num_atoms, xlo=-xlen_half, xhi=xlen_half,
+                              ylo=-ylen_half, yhi=ylen_half, zlo=-zlen_half, zhi=zlen_half)
+    else:
+        xlen, ylen, zlen = cell.lengths()
+        data += header.format(num_atoms=num_atoms, xlo=0.0, xhi=xlen,
+                              ylo=0.0, yhi=ylen, zlo=0.0, zhi=zlen)
 
     # header
     print(f"Box information:\nlengths: {cell.lengths()}\nangles: {cell.angles()}\n")
-    print(f"Assume the box is centered, you may need to modify it if necessary\n")
+    print(f"Assume the box is {'not' if not center else ''} centered, you may need to modify it if necessary\n")
     if not np.array_equal(cell.angles(), [90., 90., 90.]):
         warnings.warn("This is not an orthogonal simulation box, please modify the header!")
     print(f"Generated header is the following:\n{data}")
@@ -70,6 +74,7 @@ if __name__ == "__main__":
     parser.add_argument('in_file', type=str)
     parser.add_argument('out_file', type=str)
     parser.add_argument('--system_size', type=int, default=None)
+    parser.add_argument('--center', default=False, action='store_true')
     args = parser.parse_args()
 
-    generate_data(args.in_file, args.out_file, args.system_size)
+    generate_data(args.in_file, args.out_file, args.system_size, args.center)

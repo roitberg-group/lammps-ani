@@ -38,8 +38,17 @@ git clone git@github.com:lammps/lammps.git
 cd lammps
 export lammps_root=${PWD}
 mkdir build; cd build
-cmake -DLAMMPS_INSTALL_RPATH=yes -DPKG_PLUGIN=yes -DCMAKE_INSTALL_PREFIX=${HOME}/.local -DBUILD_MPI=yes -DBUILD_SHARED_LIBS=yes -DLAMMPS_MACHINE=mpi ../cmake/
+cmake -DLAMMPS_INSTALL_RPATH=yes -DPKG_GPU=yes -DGPU_API=cuda -DGPU_ARCH=sm_80 -DPKG_PLUGIN=yes -DCMAKE_INSTALL_PREFIX=${HOME}/.local -DBUILD_MPI=yes -DBUILD_SHARED_LIBS=yes -DLAMMPS_MACHINE=mpi ../cmake/
 make -j
+
+# Optionally build with test
+cd ..
+mkdir build-test; cd build-test
+cmake -DPKG_EXTRA-PAIR=on -DPKG_MOLECULE=on -DPKG_OPENMP=on -DENABLE_TESTING=on -DLAMMPS_EXCEPTIONS=on -DLAMMPS_INSTALL_RPATH=yes -DPKG_GPU=yes -DGPU_API=cuda -DGPU_ARCH=sm_80 -DPKG_PLUGIN=yes -DCMAKE_INSTALL_PREFIX=${HOME}/.local -DBUILD_MPI=no -DBUILD_SHARED_LIBS=yes ../cmake/
+# run test
+mpirun -np 1 ctest -V -R lj_smooth
+# could also use the following to test
+mpirun -np 1 ${lammps_root}/build-test/test_pair_style /path/to/mol-pair-lj_smooth.yaml
 ```
 
 ## Build lammps-ani

@@ -36,6 +36,7 @@ PairANI::PairANI(LAMMPS *lmp) : Pair(lmp)
   npairs = 0;
   npairs_max = 0;
   atom_index12 = nullptr;
+  jlist = nullptr;
   // require real units, ani model will return energy in kcal/mol
   if (strcmp(update->unit_style, "real") != 0) {
     error->all(FLERR, "Pair ani requires real units");
@@ -51,6 +52,7 @@ PairANI::~PairANI()
     memory->destroy(cutsq);
   }
   memory->destroy(atom_index12);
+  memory->destroy(jlist);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -105,19 +107,25 @@ void PairANI::compute(int eflag, int vflag)
       // every time grow 1.5 times larger to avoid reallocate too frequently
       npairs_max = npairs * 1.5;
       memory->grow(atom_index12, 2 * npairs_max, "pair:atom_index12");
+      memory->grow(jlist, npairs_max, "pair:jlist");
     }
 
     // loop over neighbors of local atoms
+    // TODO if use_full or not
     int ipair = 0;
     for (int ii = 0; ii < inum; ii++) {
       int i = ilist[ii];
-      int *jlist = firstneigh[i];
+      int *jlist_i = firstneigh[i];
       int jnum = numneigh[i];
 
       for (int jj = 0; jj < jnum; jj++) {
-        int j = jlist[jj];
+        int j = jlist_i[jj];
+        // half nbrlist
         atom_index12[npairs * 0 + ipair] = i;
         atom_index12[npairs * 1 + ipair] = j;
+        // full nbrlist
+        jlist[ipair] = j;
+        // update index
         ipair++;
       }
     }
@@ -127,7 +135,11 @@ void PairANI::compute(int eflag, int vflag)
   // nghost << ", npairs : " << npairs << std::endl;
 
   // run ani model
-  ani.compute(out_energy, out_force, species, coordinates, npairs, atom_index12, nlocal, ago);
+  if (use_full) {
+    ani.compute(out_energy, out_force, species, coordinates, ilist, numneigh, nlocal, jlist, npairs, ago);
+  } else {
+    ani.compute(out_energy, out_force, species, coordinates, npairs, atom_index12, nlocal, ago);
+  }
 
   // write out force
   for (int ii = 0; ii < ntotal; ii++) {
@@ -169,6 +181,7 @@ void PairANI::settings(int narg, char **arg)
   // parsing pairstyle argument
   std::string model_file = arg[1];
   std::string device_str = arg[2];
+  std::string neigh_str = arg[3];
 
   // not the proper way, when try to cast to interger, srun mpi failed
   // const char* nl_rank = getenv("OMPI_COMM_WORLD_LOCAL_RANK");
@@ -201,6 +214,11 @@ void PairANI::settings(int narg, char **arg)
     local_rank = -1;
   }
 
+  if (neigh_str != "half" && neigh_str != "full") {
+    std::cerr << "3nd argument must be <half/full>\n";
+  }
+  use_full = neigh_str == "full";
+
   // load model
   ani = ANI(model_file, local_rank);
 }
@@ -232,6 +250,15 @@ void PairANI::coeff(int narg, char **arg)
   }
 }
 
+void PairANI::init_style() {
+  // TODO
+  if (use_full) {
+    neighbor->add_request(this, NeighConst::REQ_FULL);
+  } else {
+    neighbor->add_request(this);
+  }
+}
+
 /* ----------------------------------------------------------------------
    init for one type pair i,j and corresponding j,i
 ------------------------------------------------------------------------- */
@@ -245,3 +272,5 @@ void *PairANI::extract(const char *str, int &dim)
 {
   return nullptr;
 }
+
+// TODO memory_usage

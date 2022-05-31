@@ -1,16 +1,17 @@
 variable  newton_pair     index  on
 variable  newton_bond     index  on
-variable  units           index  metal
+variable  units           index  real
 variable  input_dir       index  .
-variable  data_file       index ${input_dir}/data.ani
+variable  data_file       index ${input_dir}/water-0.8nm.data
 variable  pair_style      index 'zero 8.0'
 
 atom_style       atomic
-atom_modify      map array
-neigh_modify     delay 2 every 2 check no
+# boundary         p p p
+neigh_modify     every 2 delay 0 check no
 units            ${units}
 timestep         0.0001
 newton           ${newton_pair} ${newton_bond}
 
 pair_style       ${pair_style}
 read_data        ${data_file}
+change_box       all boundary f f f

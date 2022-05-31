@@ -7,6 +7,8 @@
 #include "ani.h"
 
 ANI::ANI(const std::string& model_file, int local_rank) : device(local_rank == -1 ? torch::kCPU: torch::kCUDA, local_rank) {
+  at::globalContext().setAllowTF32CuBLAS(false);
+  at::globalContext().setAllowTF32CuDNN(false);
   try {
     model = torch::jit::load(model_file, device);
     std::cout << "Successfully loaded the model on " << device << std::endl;
@@ -58,6 +60,18 @@ void ANI::compute(double& out_energy, std::vector<float>& out_force,
   // and convert the unit to kcal/mol
   auto energy = energy_force->elements()[0].toTensor() * hartree2kcalmol;
   auto force = energy_force->elements()[1].toTensor() * hartree2kcalmol;
+
+  std::cout << "coordinates_t: " << coordinates_t << std::endl;
+  std::cout << "species_t: " << species_t << std::endl;
+  // std::cout << "atom_index12_t: " << atom_index12_t << std::endl;
+  // std::cout << "diff_vector_t: " << diff_vector_t << std::endl;
+  // std::cout << "distances_t: " << distances_t << std::endl;
+  std::cout << "energy: " << std::setprecision(15) << energy.item<double>() << std::endl;
+  std::cout << "force: " << force << std::endl;
+  auto in_cutoff = (distances_t <= 5.1).nonzero().flatten();
+  // std::cout << "in_cutoff: " << in_cutoff << std::endl;
+  distances_t = distances_t.index({in_cutoff});
+  // std::cout << "distances_t: " << std::get<0>(distances_t.sort()) << std::endl;
 
   // write energy and force out
   out_energy = energy.item<double>();

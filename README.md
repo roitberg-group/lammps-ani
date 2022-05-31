@@ -44,7 +44,7 @@ make -j
 # Optionally build with test
 cd ..
 mkdir build-test; cd build-test
-cmake -DPKG_EXTRA-PAIR=on -DPKG_MOLECULE=on -DPKG_OPENMP=on -DENABLE_TESTING=on -DLAMMPS_EXCEPTIONS=on -DLAMMPS_INSTALL_RPATH=yes -DPKG_GPU=yes -DGPU_API=cuda -DGPU_ARCH=sm_80 -DPKG_PLUGIN=yes -DCMAKE_INSTALL_PREFIX=${HOME}/.local -DBUILD_MPI=no -DBUILD_SHARED_LIBS=yes ../cmake/
+cmake -DPKG_EXTRA-PAIR=on -DPKG_MOLECULE=on -DPKG_OPENMP=on -DENABLE_TESTING=on -DLAMMPS_EXCEPTIONS=on -DLAMMPS_INSTALL_RPATH=yes -DPKG_GPU=no -DGPU_API=cuda -DGPU_ARCH=sm_80 -DPKG_PLUGIN=yes -DCMAKE_INSTALL_PREFIX=${HOME}/.local -DBUILD_MPI=yes -DBUILD_SHARED_LIBS=yes ../cmake/
 # run test
 mpirun -np 1 ctest -V -R lj_smooth
 # could also use the following to test

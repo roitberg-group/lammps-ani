@@ -29,14 +29,19 @@ class PairANI : public Pair {
   void coeff(int, char **) override;
   double init_one(int, int) override;
   void *extract(const char *, int &) override;
+  void write_restart(FILE *) override;
+  void read_restart(FILE *) override;
+
+  int get_local_rank(std::string device_str);
 
  protected:
   double cutoff;
-  int local_rank;
   ANI ani;
   int64_t* atom_index12;
   int npairs;            // number of pairs in the current domain before neigh_list rebuild
   int npairs_max;        // if exceed this max number the allocated atom_index12 needs to grow
+  std::string model_file;
+  std::string device_str;
 
   virtual void allocate();
 };

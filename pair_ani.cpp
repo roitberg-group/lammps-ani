@@ -36,6 +36,7 @@ PairANI::PairANI(LAMMPS *lmp) : Pair(lmp)
   npairs = 0;
   npairs_max = 0;
   atom_index12 = nullptr;
+  single_enable = 0;
   // require real units, ani model will return energy in kcal/mol
   if (strcmp(update->unit_style, "real") != 0) {
     error->all(FLERR, "Pair ani requires real units");
@@ -159,17 +160,8 @@ void PairANI::allocate()
    global settings
 ------------------------------------------------------------------------- */
 
-void PairANI::settings(int narg, char **arg)
+int PairANI::get_local_rank(std::string device_str)
 {
-  if (narg < 1) error->all(FLERR, "Illegal pair_style command");
-
-  // read cutoff
-  cutoff = utils::numeric(FLERR, arg[0], false, lmp);
-
-  // parsing pairstyle argument
-  std::string model_file = arg[1];
-  std::string device_str = arg[2];
-
   // not the proper way, when try to cast to interger, srun mpi failed
   // const char* nl_rank = getenv("OMPI_COMM_WORLD_LOCAL_RANK");
   // int node_local_rank = atoi(nl_rank);
@@ -200,6 +192,21 @@ void PairANI::settings(int narg, char **arg)
   if (device_str == "cpu") {
     local_rank = -1;
   }
+  return local_rank;
+}
+
+
+void PairANI::settings(int narg, char **arg)
+{
+  if (narg < 1) error->all(FLERR, "Illegal pair_style command");
+
+  // read cutoff
+  cutoff = utils::numeric(FLERR, arg[0], false, lmp);
+
+  // parsing pairstyle argument
+  model_file = arg[1];
+  device_str = arg[2];
+  int local_rank = get_local_rank(device_str);
 
   // load model
   ani = ANI(model_file, local_rank);
@@ -244,4 +251,43 @@ double PairANI::init_one(int i, int j)
 void *PairANI::extract(const char *str, int &dim)
 {
   return nullptr;
+}
+
+void PairANI::read_restart(FILE *fp)
+{
+  // cutoff
+  utils::sfread(FLERR, &cutoff, sizeof(double), 1, fp, nullptr, error);
+
+  // model_file_size device_str_size
+  int model_file_size, device_str_size;
+  utils::sfread(FLERR, &model_file_size, sizeof(int), 1, fp, nullptr, error);
+  utils::sfread(FLERR, &device_str_size, sizeof(int), 1, fp, nullptr, error);
+  model_file.resize(model_file_size);
+  device_str.resize(device_str_size);
+
+  // model_file device_str
+  utils::sfread(FLERR, &model_file[0], sizeof(char), model_file_size, fp, nullptr, error);
+  utils::sfread(FLERR, &device_str[0], sizeof(char), device_str_size, fp, nullptr, error);
+
+  // init model
+  int local_rank = get_local_rank(device_str);
+  ani = ANI(model_file, local_rank);
+}
+
+void PairANI::write_restart(FILE *fp)
+{
+  // cutoff
+  fwrite(&cutoff,sizeof(double),1,fp);
+
+  // TODO fwrite string is bad practice
+
+  // model_file_size device_str_size
+  int model_file_size = model_file.size();
+  fwrite(&model_file_size,sizeof(int),1,fp);
+  int device_str_size = device_str.size();
+  fwrite(&device_str_size,sizeof(int),1,fp);
+
+  // model_file device_str
+  fwrite(model_file.c_str(),sizeof(char),model_file.size(),fp);
+  fwrite(device_str.c_str(),sizeof(char),device_str.size(),fp);
 }

@@ -16,17 +16,16 @@ def run(pbc=False):
     atoms = read(input_file)
 
     device = torch.device("cuda")
-    calculator = (
-        torchani.models.ANI2x(
-            periodic_table_index=True,
-            model_index=None,
-            cell_list=True,
-            use_cuaev_interface=True,
-            use_cuda_extension=True,
-        )
-        .to(device)
-        .ase()
+    ani2x = torchani.models.ANI2x(
+        periodic_table_index=True,
+        model_index=None,
+        cell_list=False,
+        use_cuaev_interface=False,
+        use_cuda_extension=False,
     )
+    # TODO It is IMPORTANT to set cutoff as 7.1 to match lammps nbr cutoff
+    ani2x.aev_computer.neighborlist.cutoff = 7.1
+    calculator = ani2x.to(device).double().ase()
 
     print(len(atoms), "atoms in the cell")
     atoms.set_calculator(calculator)
@@ -58,7 +57,7 @@ def run(pbc=False):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--pbc', default=False, action='store_true')
+    parser.add_argument("--pbc", default=False, action="store_true")
     args = parser.parse_args()
 
     run(args.pbc)

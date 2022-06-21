@@ -75,11 +75,11 @@ void PairANI::compute(int eflag, int vflag)
 
   // ani model outputs
   double out_energy;
-  std::vector<float> out_force(ntotal * 3);
+  std::vector<double> out_force(ntotal * 3);
 
   // ani model inputs
   std::vector<int64_t> species(ntotal);
-  std::vector<float> coordinates(ntotal * 3);
+  std::vector<double> coordinates(ntotal * 3);
 
   // coordinates
   for (int ii = 0; ii < ntotal; ii++) {

@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <vector>
 
-constexpr float hartree2kcalmol = 627.5094738898777;
+constexpr double hartree2kcalmol = 627.5094738898777;
 
 class ANI {
 public:
@@ -19,8 +19,8 @@ public:
   ANI() : device(torch::kCPU) {};
   ANI(const std::string& model_file, int local_rank);
 
-  void compute(double& out_energy, std::vector<float>& out_force,
-               std::vector<int64_t>& species, std::vector<float>& coordinates,
+  void compute(double& out_energy, std::vector<double>& out_force,
+               std::vector<int64_t>& species, std::vector<double>& coordinates,
                int npairs_half, int64_t* atom_index12,
                int nlocal, int ago=0);
 };

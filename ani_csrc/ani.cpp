@@ -20,16 +20,16 @@ ANI::ANI(const std::string& model_file, int local_rank) : device(local_rank == -
 
 // For simplicity, the accumulated energy will be saved into eng_vdwl,
 // instead of writing to per atom energy.
-void ANI::compute(double& out_energy, std::vector<float>& out_force,
-                  std::vector<int64_t>& species, std::vector<float>& coordinates,
+void ANI::compute(double& out_energy, std::vector<double>& out_force,
+                  std::vector<int64_t>& species, std::vector<double>& coordinates,
                   int npairs_half, int64_t* atom_index12,
                   int nlocal, int ago) {
   int ntotal = species.size();
 
   // output tensor
-  auto out_force_t = torch::from_blob(out_force.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat32));
+  auto out_force_t = torch::from_blob(out_force.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat64));
   // input tensor
-  auto coordinates_t = torch::from_blob(coordinates.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat32)).to(device);
+  auto coordinates_t = torch::from_blob(coordinates.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat64)).to(device).requires_grad_(true);
 
   // atom_index12_t is cached on GPU and only needs to be updated when neigh_list rebuild
   if (ago == 0) {
@@ -47,7 +47,7 @@ void ANI::compute(double& out_energy, std::vector<float>& out_force,
   // pack forward inputs
   std::vector<torch::jit::IValue> inputs;
   inputs.push_back(species_t);
-  inputs.push_back(coordinates_t.requires_grad_(true));
+  inputs.push_back(coordinates_t);
   inputs.push_back(atom_index12_t);
   inputs.push_back(diff_vector_t);
   inputs.push_back(distances_t);

@@ -61,8 +61,8 @@ void ANI::compute(double& out_energy, std::vector<double>& out_force,
   auto energy = energy_force->elements()[0].toTensor() * hartree2kcalmol;
   auto force = energy_force->elements()[1].toTensor() * hartree2kcalmol;
 
-  std::cout << "coordinates_t: " << coordinates_t << std::endl;
-  std::cout << "species_t: " << species_t << std::endl;
+  std::cout << "ntotal: " << ntotal << ", nlocal: " << nlocal << ", nghost: " << ntotal - nlocal << std::endl;
+  std::cout << "ago: " << ago << std::endl;
   // std::cout << "atom_index12_t: " << atom_index12_t << std::endl;
   // std::cout << "diff_vector_t: " << diff_vector_t << std::endl;
   // std::cout << "distances_t: " << distances_t << std::endl;

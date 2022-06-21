@@ -258,6 +258,10 @@ void PairANI::read_restart(FILE *fp)
   // cutoff
   utils::sfread(FLERR, &cutoff, sizeof(double), 1, fp, nullptr, error);
 
+  // newton_pair
+  // TODO maybe should remove fixing newton_pair
+  utils::sfread(FLERR, &force->newton_pair, sizeof(int), 1, fp, nullptr, error);
+
   // model_file_size device_str_size
   int model_file_size, device_str_size;
   utils::sfread(FLERR, &model_file_size, sizeof(int), 1, fp, nullptr, error);
@@ -278,6 +282,9 @@ void PairANI::write_restart(FILE *fp)
 {
   // cutoff
   fwrite(&cutoff,sizeof(double),1,fp);
+
+  // newton_pair
+  fwrite(&force->newton_pair,sizeof(int),1,fp);
 
   // TODO fwrite string is bad practice
 

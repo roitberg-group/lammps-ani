@@ -30,8 +30,10 @@ class ANI2xNoCUAEV(torch.nn.Module):
 
         # convert dtype
         dtype = self.dummy_param.dtype
-        # print(coordinates.requires_grad)
-        # coordinates = coordinates.to(dtype)
+        ntotal = species.shape[1]
+        nghost = (species_ghost_as_padding == -1).flatten().sum()
+        nlocal = ntotal - nghost
+
         diff_vector = diff_vector.to(dtype)
         distances = distances.to(dtype)
 
@@ -97,10 +99,10 @@ def save_ani2x_model(runpbc=False):
     print("force : ", force.shape, force.dtype)
 
     # for test_model inputs
-    print(coordinates.flatten())
-    print(species.flatten())
-    print(atom_index12.flatten())
-    print(force.flatten())
+    # print(coordinates.flatten())
+    # print(species.flatten())
+    # print(atom_index12.flatten())
+    # print(force.flatten())
 
     if runpbc:
         _, energy_ref = ani2x_ref((species, coordinates), cell, pbc)

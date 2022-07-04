@@ -1,15 +1,16 @@
 ---
 lammps_version: 17 Feb 2022
-date_generated: Fri Mar 18 22:17:50 2022
+date_generated: Sat Jun 18 22:17:50 2022
 epsilon: 9e-9
 skip_tests:
 prerequisites: ! |
   pair ani
-pre_commands: ! |
+pre_commands: ! |  # execute before the input template file is read
   variable newton_pair delete
-  if "$(is_active(package,gpu)) > 0.0" then "variable newton_pair index off" else "variable newton_pair index off"
+  variable newton_pair index off
   variable change_box index 'all boundary p p p'
-post_commands: ! ""
+post_commands: ! |  # execute right before the actual tests
+  newton ${newton_pair} ${newton_bond}  # needs to be here so that restart test works
 input_file: in.ani
 pair_style: ani 5.1 /blue/roitberg/apps/lammps-ani/models/test/ani2x_cuda_nocuaev_double.pt cuda
 pair_coeff: ! |

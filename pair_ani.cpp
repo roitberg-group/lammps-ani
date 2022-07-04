@@ -66,7 +66,7 @@ void PairANI::compute(int eflag, int vflag)
   int nlocal = atom->nlocal;
   int nghost = atom->nghost;
   int ntotal = nlocal + nghost;
-  // int newton_pair = force->newton_pair; TODO?
+  // int newton_pair = force->newton_pair;
 
   int inum = list->inum;
   int *ilist = list->ilist;
@@ -117,6 +117,7 @@ void PairANI::compute(int eflag, int vflag)
 
       for (int jj = 0; jj < jnum; jj++) {
         int j = jlist[jj];
+        j &= NEIGHMASK;
         atom_index12[npairs * 0 + ipair] = i;
         atom_index12[npairs * 1 + ipair] = j;
         ipair++;
@@ -125,7 +126,7 @@ void PairANI::compute(int eflag, int vflag)
   }
 
   // std::cout << "ago: " << ago << ", nlocal :" << nlocal << ", nghost :" <<
-  // nghost << ", npairs : " << npairs << std::endl;
+  // nghost << ", npairs : " << npairs << ", inum : " << inum << ", jnum : " << jnum << std::endl;
 
   // run ani model
   ani.compute(out_energy, out_force, species, coordinates, npairs, atom_index12, nlocal, ago);
@@ -240,6 +241,19 @@ void PairANI::coeff(int narg, char **arg)
 }
 
 /* ----------------------------------------------------------------------
+   init specific to a pair style
+------------------------------------------------------------------------- */
+
+void PairANI::init_style()
+{
+  if (force->newton_pair == 1)
+    error->all(FLERR, "Pair style ANI requires newton pair off");
+
+  // request half neighbor list
+  neighbor->add_request(this);
+}
+
+/* ----------------------------------------------------------------------
    init for one type pair i,j and corresponding j,i
 ------------------------------------------------------------------------- */
 
@@ -257,10 +271,6 @@ void PairANI::read_restart(FILE *fp)
 {
   // cutoff
   utils::sfread(FLERR, &cutoff, sizeof(double), 1, fp, nullptr, error);
-
-  // newton_pair
-  // TODO maybe should remove fixing newton_pair
-  utils::sfread(FLERR, &force->newton_pair, sizeof(int), 1, fp, nullptr, error);
 
   // model_file_size device_str_size
   int model_file_size, device_str_size;
@@ -282,9 +292,6 @@ void PairANI::write_restart(FILE *fp)
 {
   // cutoff
   fwrite(&cutoff,sizeof(double),1,fp);
-
-  // newton_pair
-  fwrite(&force->newton_pair,sizeof(int),1,fp);
 
   // TODO fwrite string is bad practice
 

@@ -1,4 +1,4 @@
-variable  newton_pair     index  on
+variable  newton_pair     index  off
 variable  newton_bond     index  on
 variable  units           index  real
 variable  input_dir       index  .
@@ -10,7 +10,6 @@ atom_style       atomic
 neigh_modify     every 2 delay 0 check no
 units            ${units}
 timestep         0.1
-newton           ${newton_pair} ${newton_bond}
 
 pair_style       ${pair_style}
 read_data        ${data_file}

@@ -27,6 +27,7 @@ class PairANI : public Pair {
 
   void settings(int, char **) override;
   void coeff(int, char **) override;
+  void init_style() override;
   double init_one(int, int) override;
   void *extract(const char *, int &) override;
   void write_restart(FILE *) override;

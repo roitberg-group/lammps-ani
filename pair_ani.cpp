@@ -76,6 +76,7 @@ void PairANI::compute(int eflag, int vflag)
   // ani model outputs
   double out_energy;
   std::vector<double> out_force(ntotal * 3);
+  std::vector<double> out_atomic_energies;
 
   // ani model inputs
   std::vector<int64_t> species(ntotal);
@@ -90,6 +91,7 @@ void PairANI::compute(int eflag, int vflag)
 
   int ago = neighbor->ago;
 
+  // convert neighbor list data
   if (ago == 0) {
     // species
     for (int ii = 0; ii < ntotal; ii++) {
@@ -125,11 +127,13 @@ void PairANI::compute(int eflag, int vflag)
     }
   }
 
-  // std::cout << "ago: " << ago << ", nlocal :" << nlocal << ", nghost :" <<
-  // nghost << ", npairs : " << npairs << ", inum : " << inum << ", jnum : " << jnum << std::endl;
-
   // run ani model
-  ani.compute(out_energy, out_force, species, coordinates, npairs, atom_index12, nlocal, ago);
+  if (!eflag_atom) {
+    ani.compute(out_energy, out_force, species, coordinates, npairs, atom_index12, nlocal, ago, nullptr);
+  } else {
+    out_atomic_energies.resize(nlocal);
+    ani.compute(out_energy, out_force, species, coordinates, npairs, atom_index12, nlocal, ago, &out_atomic_energies);
+  }
 
   // write out force
   for (int ii = 0; ii < ntotal; ii++) {
@@ -138,7 +142,16 @@ void PairANI::compute(int eflag, int vflag)
     f[ii][2] += out_force[ii * 3 + 2];
   }
 
-  if (eflag) eng_vdwl += out_energy;
+  if (eflag) {
+    eng_vdwl += out_energy;
+  }
+
+  // write out atomic energies
+  if (eflag_atom) {
+    for (int ii = 0; ii < nlocal; ++ii) {
+      eatom[ii] += out_atomic_energies[ii];
+    }
+  }
 }
 
 /* ----------------------------------------------------------------------
@@ -163,10 +176,6 @@ void PairANI::allocate()
 
 int PairANI::get_local_rank(std::string device_str)
 {
-  // not the proper way, when try to cast to interger, srun mpi failed
-  // const char* nl_rank = getenv("OMPI_COMM_WORLD_LOCAL_RANK");
-  // int node_local_rank = atoi(nl_rank);
-
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   int num_devices = 0;
@@ -293,8 +302,7 @@ void PairANI::write_restart(FILE *fp)
   // cutoff
   fwrite(&cutoff,sizeof(double),1,fp);
 
-  // TODO fwrite string is bad practice
-
+  // TODO fwrite string is a bad practice
   // model_file_size device_str_size
   int model_file_size = model_file.size();
   fwrite(&model_file_size,sizeof(int),1,fp);

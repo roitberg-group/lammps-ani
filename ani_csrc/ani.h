@@ -22,7 +22,8 @@ public:
   void compute(double& out_energy, std::vector<double>& out_force,
                std::vector<int64_t>& species, std::vector<double>& coordinates,
                int npairs_half, int64_t* atom_index12,
-               int nlocal, int ago=0);
+               int nlocal, int ago=0,
+               std::vector<double>* out_atomic_energies=nullptr);
 };
 
 #endif

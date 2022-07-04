@@ -23,7 +23,8 @@ ANI::ANI(const std::string& model_file, int local_rank) : device(local_rank == -
 void ANI::compute(double& out_energy, std::vector<double>& out_force,
                   std::vector<int64_t>& species, std::vector<double>& coordinates,
                   int npairs_half, int64_t* atom_index12,
-                  int nlocal, int ago) {
+                  int nlocal, int ago,
+                  std::vector<double>* out_atomic_energies) {
   int ntotal = species.size();
 
   // output tensor
@@ -52,28 +53,25 @@ void ANI::compute(double& out_energy, std::vector<double>& out_force,
   inputs.push_back(diff_vector_t);
   inputs.push_back(distances_t);
   inputs.push_back(species_ghost_as_padding_t);
+  bool atomic = out_atomic_energies != nullptr;
+  inputs.push_back(atomic);
 
   // run ani model
-  auto energy_force = model.forward(inputs).toTuple();
-
-  // extract energy and force from model outputs,
-  // and convert the unit to kcal/mol
-  auto energy = energy_force->elements()[0].toTensor() * hartree2kcalmol;
-  auto force = energy_force->elements()[1].toTensor() * hartree2kcalmol;
-
-  std::cout << "ntotal: " << ntotal << ", nlocal: " << nlocal << ", nghost: " << ntotal - nlocal << std::endl;
-  std::cout << "ago: " << ago << std::endl;
-  // std::cout << "atom_index12_t: " << atom_index12_t << std::endl;
-  // std::cout << "diff_vector_t: " << diff_vector_t << std::endl;
-  // std::cout << "distances_t: " << distances_t << std::endl;
-  std::cout << "energy: " << std::setprecision(15) << energy.item<double>() << std::endl;
-  std::cout << "force: " << force << std::endl;
-  auto in_cutoff = (distances_t <= 5.1).nonzero().flatten();
-  // std::cout << "in_cutoff: " << in_cutoff << std::endl;
-  distances_t = distances_t.index({in_cutoff});
-  // std::cout << "distances_t: " << std::get<0>(distances_t.sort()) << std::endl;
+  torch::Tensor energy, force, atomic_energies;
+  auto outputs = model.forward(inputs).toTuple();
+  // extract energy and force from model outputs, and convert the unit to kcal/mol
+  energy = outputs->elements()[0].toTensor() * hartree2kcalmol;
+  force = outputs->elements()[1].toTensor() * hartree2kcalmol;
 
   // write energy and force out
   out_energy = energy.item<double>();
   out_force_t.copy_(force);
+
+  // if atomic is false, atomic_energies will be an empty tensor
+  if (atomic) {
+    atomic_energies = outputs->elements()[2].toTensor() * hartree2kcalmol;
+    auto out_atomic_energies_t = torch::from_blob(out_atomic_energies->data(), {1, nlocal}, torch::dtype(torch::kFloat64));
+    out_atomic_energies_t.copy_(atomic_energies);
+  }
+
 }

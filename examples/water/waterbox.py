@@ -7,7 +7,7 @@ from openmmtools import testsystems
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('box_size', type=int, help="water box size in nanometer")
+    parser.add_argument('box_size', type=float, help="water box size in nanometer")
     args = parser.parse_args()
 
     box_size = args.box_size

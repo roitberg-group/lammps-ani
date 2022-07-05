@@ -13,29 +13,29 @@
 
 #include "pair_ani.h"
 
+#include <cuda_runtime.h>
+#include <cmath>
+#include <cstring>
+#include <vector>
 #include "atom.h"
 #include "comm.h"
 #include "error.h"
 #include "force.h"
 #include "memory.h"
-#include "neighbor.h"
 #include "neigh_list.h"
+#include "neighbor.h"
 #include "update.h"
-#include <cmath>
-#include <cstring>
-#include <vector>
-#include <cuda_runtime.h>
 
 using namespace LAMMPS_NS;
 
 /* ---------------------------------------------------------------------- */
 
-PairANI::PairANI(LAMMPS *lmp) : Pair(lmp)
-{
+PairANI::PairANI(LAMMPS* lmp) : Pair(lmp) {
   writedata = 0;
   npairs = 0;
   npairs_max = 0;
   atom_index12 = nullptr;
+  single_enable = 0;
   // require real units, ani model will return energy in kcal/mol
   if (strcmp(update->unit_style, "real") != 0) {
     error->all(FLERR, "Pair ani requires real units");
@@ -44,8 +44,7 @@ PairANI::PairANI(LAMMPS *lmp) : Pair(lmp)
 
 /* ---------------------------------------------------------------------- */
 
-PairANI::~PairANI()
-{
+PairANI::~PairANI() {
   if (allocated) {
     memory->destroy(setflag);
     memory->destroy(cutsq);
@@ -55,30 +54,31 @@ PairANI::~PairANI()
 
 /* ---------------------------------------------------------------------- */
 
-void PairANI::compute(int eflag, int vflag)
-{
-  if (eflag || vflag) ev_setup(eflag, vflag);
+void PairANI::compute(int eflag, int vflag) {
+  if (eflag || vflag)
+    ev_setup(eflag, vflag);
 
-  double **x = atom->x;
-  double **f = atom->f;
-  int *type = atom->type;
+  double** x = atom->x;
+  double** f = atom->f;
+  int* type = atom->type;
   int nlocal = atom->nlocal;
   int nghost = atom->nghost;
   int ntotal = nlocal + nghost;
-  // int newton_pair = force->newton_pair; TODO?
+  // int newton_pair = force->newton_pair;
 
   int inum = list->inum;
-  int *ilist = list->ilist;
-  int *numneigh = list->numneigh;
-  int **firstneigh = list->firstneigh;
+  int* ilist = list->ilist;
+  int* numneigh = list->numneigh;
+  int** firstneigh = list->firstneigh;
 
   // ani model outputs
   double out_energy;
-  std::vector<float> out_force(ntotal * 3);
+  std::vector<double> out_force(ntotal * 3);
+  std::vector<double> out_atomic_energies;
 
   // ani model inputs
   std::vector<int64_t> species(ntotal);
-  std::vector<float> coordinates(ntotal * 3);
+  std::vector<double> coordinates(ntotal * 3);
 
   // coordinates
   for (int ii = 0; ii < ntotal; ii++) {
@@ -89,6 +89,7 @@ void PairANI::compute(int eflag, int vflag)
 
   int ago = neighbor->ago;
 
+  // convert neighbor list data
   if (ago == 0) {
     // species
     for (int ii = 0; ii < ntotal; ii++) {
@@ -111,11 +112,12 @@ void PairANI::compute(int eflag, int vflag)
     int ipair = 0;
     for (int ii = 0; ii < inum; ii++) {
       int i = ilist[ii];
-      int *jlist = firstneigh[i];
+      int* jlist = firstneigh[i];
       int jnum = numneigh[i];
 
       for (int jj = 0; jj < jnum; jj++) {
         int j = jlist[jj];
+        j &= NEIGHMASK;
         atom_index12[npairs * 0 + ipair] = i;
         atom_index12[npairs * 1 + ipair] = j;
         ipair++;
@@ -123,11 +125,13 @@ void PairANI::compute(int eflag, int vflag)
     }
   }
 
-  // std::cout << "ago: " << ago << ", nlocal :" << nlocal << ", nghost :" <<
-  // nghost << ", npairs : " << npairs << std::endl;
-
   // run ani model
-  ani.compute(out_energy, out_force, species, coordinates, npairs, atom_index12, nlocal, ago);
+  if (!eflag_atom) {
+    ani.compute(out_energy, out_force, species, coordinates, npairs, atom_index12, nlocal, ago, nullptr);
+  } else {
+    out_atomic_energies.resize(nlocal);
+    ani.compute(out_energy, out_force, species, coordinates, npairs, atom_index12, nlocal, ago, &out_atomic_energies);
+  }
 
   // write out force
   for (int ii = 0; ii < ntotal; ii++) {
@@ -136,21 +140,30 @@ void PairANI::compute(int eflag, int vflag)
     f[ii][2] += out_force[ii * 3 + 2];
   }
 
-  if (eflag) eng_vdwl += out_energy;
+  if (eflag) {
+    eng_vdwl += out_energy;
+  }
+
+  // write out atomic energies
+  if (eflag_atom) {
+    for (int ii = 0; ii < nlocal; ++ii) {
+      eatom[ii] += out_atomic_energies[ii];
+    }
+  }
 }
 
 /* ----------------------------------------------------------------------
    allocate all arrays
 ------------------------------------------------------------------------- */
 
-void PairANI::allocate()
-{
+void PairANI::allocate() {
   allocated = 1;
   int n = atom->ntypes;
 
   memory->create(setflag, n + 1, n + 1, "pair:setflag");
   for (int i = 1; i <= n; i++)
-    for (int j = i; j <= n; j++) setflag[i][j] = 0;
+    for (int j = i; j <= n; j++)
+      setflag[i][j] = 0;
 
   memory->create(cutsq, n + 1, n + 1, "pair:cutsq");
 }
@@ -159,21 +172,7 @@ void PairANI::allocate()
    global settings
 ------------------------------------------------------------------------- */
 
-void PairANI::settings(int narg, char **arg)
-{
-  if (narg < 1) error->all(FLERR, "Illegal pair_style command");
-
-  // read cutoff
-  cutoff = utils::numeric(FLERR, arg[0], false, lmp);
-
-  // parsing pairstyle argument
-  std::string model_file = arg[1];
-  std::string device_str = arg[2];
-
-  // not the proper way, when try to cast to interger, srun mpi failed
-  // const char* nl_rank = getenv("OMPI_COMM_WORLD_LOCAL_RANK");
-  // int node_local_rank = atoi(nl_rank);
-
+int PairANI::get_local_rank(std::string device_str) {
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   int num_devices = 0;
@@ -182,10 +181,10 @@ void PairANI::settings(int narg, char **arg)
   // get local rank to set cuda device
   int local_rank = -1;
   {
-      MPI_Comm local_comm;
-      MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, rank, MPI_INFO_NULL, &local_comm);
-      MPI_Comm_rank(local_comm, &local_rank);
-      MPI_Comm_free(&local_comm);
+    MPI_Comm local_comm;
+    MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, rank, MPI_INFO_NULL, &local_comm);
+    MPI_Comm_rank(local_comm, &local_rank);
+    MPI_Comm_free(&local_comm);
   }
   if (num_devices > 0) {
     // map multiple process to same cuda device if there are more ranks
@@ -200,6 +199,29 @@ void PairANI::settings(int narg, char **arg)
   if (device_str == "cpu") {
     local_rank = -1;
   }
+  return local_rank;
+}
+
+void PairANI::settings(int narg, char** arg) {
+  if (narg < 1)
+    error->all(FLERR, "Illegal pair_style command");
+
+  // read cutoff
+  cutoff = utils::numeric(FLERR, arg[0], false, lmp);
+
+  // parsing pairstyle argument
+  model_file = arg[1];
+  device_str = arg[2];
+  std::string neigh_str = arg[3];
+
+  int local_rank = get_local_rank(device_str);
+
+  // half or full neighbor list
+  if (neigh_str != "half" && neigh_str != "full") {
+    std::cerr << "3nd argument must be <half/full>\n";
+  }
+  // use_fullnbr = neigh_str == "full";
+  use_fullnbr = false; // force half for now
 
   // load model
   ani = ANI(model_file, local_rank);
@@ -209,9 +231,9 @@ void PairANI::settings(int narg, char **arg)
    set coeffs for one or more type pairs
 ------------------------------------------------------------------------- */
 
-void PairANI::coeff(int narg, char **arg)
-{
-  if (!allocated) allocate();
+void PairANI::coeff(int narg, char** arg) {
+  if (!allocated)
+    allocate();
   if (narg != 2) {
     error->all(FLERR, "Incorrect args for pair coefficients, it should be set as: pair_coeff * *");
   }
@@ -233,15 +255,76 @@ void PairANI::coeff(int narg, char **arg)
 }
 
 /* ----------------------------------------------------------------------
+   init specific to a pair style
+------------------------------------------------------------------------- */
+
+void PairANI::init_style() {
+  if (!use_fullnbr && force->newton_pair == 1)
+    error->all(FLERR, "Pair style ANI requires newton pair off when using half neighbor list");
+
+  // TODO in the future may use newton pair with "on" for full neighbor list
+  // https://github.com/lammps/lammps/blob/develop/src/verlet.cpp#L157
+  if (use_fullnbr && force->newton_pair == 1)
+    error->all(FLERR, "Pair style ANI requires newton pair off when using full neighbor list");
+
+  if (use_fullnbr) {
+    neighbor->add_request(this, NeighConst::REQ_FULL);
+  } else {
+    // request half neighbor list
+    neighbor->add_request(this);
+  }
+}
+
+/* ----------------------------------------------------------------------
    init for one type pair i,j and corresponding j,i
 ------------------------------------------------------------------------- */
 
-double PairANI::init_one(int i, int j)
-{
+double PairANI::init_one(int i, int j) {
   return cutoff;
 }
 
-void *PairANI::extract(const char *str, int &dim)
-{
+void* PairANI::extract(const char* str, int& dim) {
   return nullptr;
+}
+
+void PairANI::read_restart(FILE* fp) {
+  // cutoff
+  utils::sfread(FLERR, &cutoff, sizeof(double), 1, fp, nullptr, error);
+
+  // use_fullnbr
+  utils::sfread(FLERR, &use_fullnbr, sizeof(bool), 1, fp, nullptr, error);
+
+  // model_file_size device_str_size
+  int model_file_size, device_str_size;
+  utils::sfread(FLERR, &model_file_size, sizeof(int), 1, fp, nullptr, error);
+  utils::sfread(FLERR, &device_str_size, sizeof(int), 1, fp, nullptr, error);
+  model_file.resize(model_file_size);
+  device_str.resize(device_str_size);
+
+  // model_file device_str
+  utils::sfread(FLERR, &model_file[0], sizeof(char), model_file_size, fp, nullptr, error);
+  utils::sfread(FLERR, &device_str[0], sizeof(char), device_str_size, fp, nullptr, error);
+
+  // init model
+  int local_rank = get_local_rank(device_str);
+  ani = ANI(model_file, local_rank);
+}
+
+void PairANI::write_restart(FILE* fp) {
+  // cutoff
+  fwrite(&cutoff, sizeof(double), 1, fp);
+
+  // use_fullnbr
+  fwrite(&use_fullnbr, sizeof(bool), 1, fp);
+
+  // TODO fwrite string is a bad practice
+  // model_file_size device_str_size
+  int model_file_size = model_file.size();
+  fwrite(&model_file_size, sizeof(int), 1, fp);
+  int device_str_size = device_str.size();
+  fwrite(&device_str_size, sizeof(int), 1, fp);
+
+  // model_file device_str
+  fwrite(model_file.c_str(), sizeof(char), model_file.size(), fp);
+  fwrite(device_str.c_str(), sizeof(char), device_str.size(), fp);
 }

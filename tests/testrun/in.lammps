@@ -23,7 +23,7 @@ fix            2 all nve
 timestep       0.5
 
 # Output: dump atom positions every 0.5 ps and log info every 0.5 ps
-dump           dumpXYZ all xyz 50 water.xyz
+# dump           dumpXYZ all xyz 50 water.xyz
 thermo_style   custom step pe ke etotal temp press vol
 thermo         50
 
@@ -31,4 +31,4 @@ thermo         50
 run            1 # 100
 
 # write final state of simulation
-write_data    water.final
+# write_data    water.final

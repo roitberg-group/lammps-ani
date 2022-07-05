@@ -13,25 +13,24 @@
 
 #include "pair_ani.h"
 
+#include <cuda_runtime.h>
+#include <cmath>
+#include <cstring>
+#include <vector>
 #include "atom.h"
 #include "comm.h"
 #include "error.h"
 #include "force.h"
 #include "memory.h"
-#include "neighbor.h"
 #include "neigh_list.h"
+#include "neighbor.h"
 #include "update.h"
-#include <cmath>
-#include <cstring>
-#include <vector>
-#include <cuda_runtime.h>
 
 using namespace LAMMPS_NS;
 
 /* ---------------------------------------------------------------------- */
 
-PairANI::PairANI(LAMMPS *lmp) : Pair(lmp)
-{
+PairANI::PairANI(LAMMPS* lmp) : Pair(lmp) {
   writedata = 0;
   npairs = 0;
   npairs_max = 0;
@@ -45,8 +44,7 @@ PairANI::PairANI(LAMMPS *lmp) : Pair(lmp)
 
 /* ---------------------------------------------------------------------- */
 
-PairANI::~PairANI()
-{
+PairANI::~PairANI() {
   if (allocated) {
     memory->destroy(setflag);
     memory->destroy(cutsq);
@@ -56,22 +54,22 @@ PairANI::~PairANI()
 
 /* ---------------------------------------------------------------------- */
 
-void PairANI::compute(int eflag, int vflag)
-{
-  if (eflag || vflag) ev_setup(eflag, vflag);
+void PairANI::compute(int eflag, int vflag) {
+  if (eflag || vflag)
+    ev_setup(eflag, vflag);
 
-  double **x = atom->x;
-  double **f = atom->f;
-  int *type = atom->type;
+  double** x = atom->x;
+  double** f = atom->f;
+  int* type = atom->type;
   int nlocal = atom->nlocal;
   int nghost = atom->nghost;
   int ntotal = nlocal + nghost;
   // int newton_pair = force->newton_pair;
 
   int inum = list->inum;
-  int *ilist = list->ilist;
-  int *numneigh = list->numneigh;
-  int **firstneigh = list->firstneigh;
+  int* ilist = list->ilist;
+  int* numneigh = list->numneigh;
+  int** firstneigh = list->firstneigh;
 
   // ani model outputs
   double out_energy;
@@ -114,7 +112,7 @@ void PairANI::compute(int eflag, int vflag)
     int ipair = 0;
     for (int ii = 0; ii < inum; ii++) {
       int i = ilist[ii];
-      int *jlist = firstneigh[i];
+      int* jlist = firstneigh[i];
       int jnum = numneigh[i];
 
       for (int jj = 0; jj < jnum; jj++) {
@@ -158,14 +156,14 @@ void PairANI::compute(int eflag, int vflag)
    allocate all arrays
 ------------------------------------------------------------------------- */
 
-void PairANI::allocate()
-{
+void PairANI::allocate() {
   allocated = 1;
   int n = atom->ntypes;
 
   memory->create(setflag, n + 1, n + 1, "pair:setflag");
   for (int i = 1; i <= n; i++)
-    for (int j = i; j <= n; j++) setflag[i][j] = 0;
+    for (int j = i; j <= n; j++)
+      setflag[i][j] = 0;
 
   memory->create(cutsq, n + 1, n + 1, "pair:cutsq");
 }
@@ -174,8 +172,7 @@ void PairANI::allocate()
    global settings
 ------------------------------------------------------------------------- */
 
-int PairANI::get_local_rank(std::string device_str)
-{
+int PairANI::get_local_rank(std::string device_str) {
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   int num_devices = 0;
@@ -184,10 +181,10 @@ int PairANI::get_local_rank(std::string device_str)
   // get local rank to set cuda device
   int local_rank = -1;
   {
-      MPI_Comm local_comm;
-      MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, rank, MPI_INFO_NULL, &local_comm);
-      MPI_Comm_rank(local_comm, &local_rank);
-      MPI_Comm_free(&local_comm);
+    MPI_Comm local_comm;
+    MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, rank, MPI_INFO_NULL, &local_comm);
+    MPI_Comm_rank(local_comm, &local_rank);
+    MPI_Comm_free(&local_comm);
   }
   if (num_devices > 0) {
     // map multiple process to same cuda device if there are more ranks
@@ -205,10 +202,9 @@ int PairANI::get_local_rank(std::string device_str)
   return local_rank;
 }
 
-
-void PairANI::settings(int narg, char **arg)
-{
-  if (narg < 1) error->all(FLERR, "Illegal pair_style command");
+void PairANI::settings(int narg, char** arg) {
+  if (narg < 1)
+    error->all(FLERR, "Illegal pair_style command");
 
   // read cutoff
   cutoff = utils::numeric(FLERR, arg[0], false, lmp);
@@ -226,9 +222,9 @@ void PairANI::settings(int narg, char **arg)
    set coeffs for one or more type pairs
 ------------------------------------------------------------------------- */
 
-void PairANI::coeff(int narg, char **arg)
-{
-  if (!allocated) allocate();
+void PairANI::coeff(int narg, char** arg) {
+  if (!allocated)
+    allocate();
   if (narg != 2) {
     error->all(FLERR, "Incorrect args for pair coefficients, it should be set as: pair_coeff * *");
   }
@@ -253,8 +249,7 @@ void PairANI::coeff(int narg, char **arg)
    init specific to a pair style
 ------------------------------------------------------------------------- */
 
-void PairANI::init_style()
-{
+void PairANI::init_style() {
   if (force->newton_pair == 1)
     error->all(FLERR, "Pair style ANI requires newton pair off");
 
@@ -266,18 +261,15 @@ void PairANI::init_style()
    init for one type pair i,j and corresponding j,i
 ------------------------------------------------------------------------- */
 
-double PairANI::init_one(int i, int j)
-{
+double PairANI::init_one(int i, int j) {
   return cutoff;
 }
 
-void *PairANI::extract(const char *str, int &dim)
-{
+void* PairANI::extract(const char* str, int& dim) {
   return nullptr;
 }
 
-void PairANI::read_restart(FILE *fp)
-{
+void PairANI::read_restart(FILE* fp) {
   // cutoff
   utils::sfread(FLERR, &cutoff, sizeof(double), 1, fp, nullptr, error);
 
@@ -297,19 +289,18 @@ void PairANI::read_restart(FILE *fp)
   ani = ANI(model_file, local_rank);
 }
 
-void PairANI::write_restart(FILE *fp)
-{
+void PairANI::write_restart(FILE* fp) {
   // cutoff
-  fwrite(&cutoff,sizeof(double),1,fp);
+  fwrite(&cutoff, sizeof(double), 1, fp);
 
   // TODO fwrite string is a bad practice
   // model_file_size device_str_size
   int model_file_size = model_file.size();
-  fwrite(&model_file_size,sizeof(int),1,fp);
+  fwrite(&model_file_size, sizeof(int), 1, fp);
   int device_str_size = device_str.size();
-  fwrite(&device_str_size,sizeof(int),1,fp);
+  fwrite(&device_str_size, sizeof(int), 1, fp);
 
   // model_file device_str
-  fwrite(model_file.c_str(),sizeof(char),model_file.size(),fp);
-  fwrite(device_str.c_str(),sizeof(char),device_str.size(),fp);
+  fwrite(model_file.c_str(), sizeof(char), model_file.size(), fp);
+  fwrite(device_str.c_str(), sizeof(char), device_str.size(), fp);
 }

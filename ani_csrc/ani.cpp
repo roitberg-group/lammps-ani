@@ -1,36 +1,39 @@
+#include "ani.h"
 #include <torch/script.h>
 #include <torch/torch.h>
+#include <cstdint>
+#include <iostream>
 #include <tuple>
 #include <vector>
-#include <iostream>
-#include <cstdint>
-#include "ani.h"
 
-ANI::ANI(const std::string& model_file, int local_rank) : device(local_rank == -1 ? torch::kCPU: torch::kCUDA, local_rank) {
+ANI::ANI(const std::string& model_file, int local_rank) : device(local_rank == -1 ? torch::kCPU : torch::kCUDA, local_rank) {
   at::globalContext().setAllowTF32CuBLAS(false);
   at::globalContext().setAllowTF32CuDNN(false);
   try {
     model = torch::jit::load(model_file, device);
     std::cout << "Successfully loaded the model on " << device << std::endl;
-  }
-  catch (const c10::Error &e) {
+  } catch (const c10::Error& e) {
     std::cerr << "Error loading the model on " << device << std::endl;
   }
 }
 
-// For simplicity, the accumulated energy will be saved into eng_vdwl,
-// instead of writing to per atom energy.
-void ANI::compute(double& out_energy, std::vector<double>& out_force,
-                  std::vector<int64_t>& species, std::vector<double>& coordinates,
-                  int npairs_half, int64_t* atom_index12,
-                  int nlocal, int ago,
-                  std::vector<double>* out_atomic_energies) {
+void ANI::compute(
+    double& out_energy,
+    std::vector<double>& out_force,
+    std::vector<int64_t>& species,
+    std::vector<double>& coordinates,
+    int npairs_half,
+    int64_t* atom_index12,
+    int nlocal,
+    int ago,
+    std::vector<double>* out_atomic_energies) {
   int ntotal = species.size();
 
   // output tensor
   auto out_force_t = torch::from_blob(out_force.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat64));
   // input tensor
-  auto coordinates_t = torch::from_blob(coordinates.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat64)).to(device).requires_grad_(true);
+  auto coordinates_t =
+      torch::from_blob(coordinates.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat64)).to(device).requires_grad_(true);
 
   // atom_index12_t is cached on GPU and only needs to be updated when neigh_list rebuild
   if (ago == 0) {
@@ -73,5 +76,4 @@ void ANI::compute(double& out_energy, std::vector<double>& out_force,
     auto out_atomic_energies_t = torch::from_blob(out_atomic_energies->data(), {1, nlocal}, torch::dtype(torch::kFloat64));
     out_atomic_energies_t.copy_(atomic_energies);
   }
-
 }

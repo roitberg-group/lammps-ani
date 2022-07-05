@@ -35,13 +35,19 @@ void ANI::compute(
   auto coordinates_t =
       torch::from_blob(coordinates.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat64)).to(device).requires_grad_(true);
 
-  // atom_index12_t is cached on GPU and only needs to be updated when neigh_list rebuild
+  // species_t and atom_index12_t are cloned/cached on devices and only needs to be updated when neigh_list rebuild
   if (ago == 0) {
+    atom_index12_t = torch::from_blob(atom_index12, {2, npairs_half}, torch::dtype(torch::kLong)).to(device);
     species_t = torch::from_blob(species.data(), {1, ntotal}, torch::dtype(torch::kLong)).to(device);
+    // when runing on the CPU, we have to explicitly clone these two tensors
+    // because they are created from temporary vector data pointers
+    if (device == torch::kCPU) {
+      atom_index12_t = atom_index12_t.clone();
+      species_t = species_t.clone();
+    }
     species_ghost_as_padding_t = species_t.detach().clone();
     // equivalent to: species_ghost_as_padding[:, nlocal:] = -1
     species_ghost_as_padding_t.index_put_({torch::indexing::Slice(), torch::indexing::Slice(nlocal, torch::indexing::None)}, -1);
-    atom_index12_t = torch::from_blob(atom_index12, {2, npairs_half}, torch::dtype(torch::kLong)).to(device);
   }
 
   // perform calculation of diff and dist on device

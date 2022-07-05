@@ -212,7 +212,16 @@ void PairANI::settings(int narg, char** arg) {
   // parsing pairstyle argument
   model_file = arg[1];
   device_str = arg[2];
+  std::string neigh_str = arg[3];
+
   int local_rank = get_local_rank(device_str);
+
+  // half or full neighbor list
+  if (neigh_str != "half" && neigh_str != "full") {
+    std::cerr << "3nd argument must be <half/full>\n";
+  }
+  // use_fullnbr = neigh_str == "full";
+  use_fullnbr = false; // force half for now
 
   // load model
   ani = ANI(model_file, local_rank);
@@ -250,11 +259,20 @@ void PairANI::coeff(int narg, char** arg) {
 ------------------------------------------------------------------------- */
 
 void PairANI::init_style() {
-  if (force->newton_pair == 1)
-    error->all(FLERR, "Pair style ANI requires newton pair off");
+  if (!use_fullnbr && force->newton_pair == 1)
+    error->all(FLERR, "Pair style ANI requires newton pair off when using half neighbor list");
 
-  // request half neighbor list
-  neighbor->add_request(this);
+  // TODO in the future may use newton pair with "on" for full neighbor list
+  // https://github.com/lammps/lammps/blob/develop/src/verlet.cpp#L157
+  if (use_fullnbr && force->newton_pair == 1)
+    error->all(FLERR, "Pair style ANI requires newton pair off when using full neighbor list");
+
+  if (use_fullnbr) {
+    neighbor->add_request(this, NeighConst::REQ_FULL);
+  } else {
+    // request half neighbor list
+    neighbor->add_request(this);
+  }
 }
 
 /* ----------------------------------------------------------------------
@@ -272,6 +290,9 @@ void* PairANI::extract(const char* str, int& dim) {
 void PairANI::read_restart(FILE* fp) {
   // cutoff
   utils::sfread(FLERR, &cutoff, sizeof(double), 1, fp, nullptr, error);
+
+  // use_fullnbr
+  utils::sfread(FLERR, &use_fullnbr, sizeof(bool), 1, fp, nullptr, error);
 
   // model_file_size device_str_size
   int model_file_size, device_str_size;
@@ -292,6 +313,9 @@ void PairANI::read_restart(FILE* fp) {
 void PairANI::write_restart(FILE* fp) {
   // cutoff
   fwrite(&cutoff, sizeof(double), 1, fp);
+
+  // use_fullnbr
+  fwrite(&use_fullnbr, sizeof(bool), 1, fp);
 
   // TODO fwrite string is a bad practice
   // model_file_size device_str_size

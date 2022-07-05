@@ -85,8 +85,7 @@ class ANI2xNoCUAEV(torch.nn.Module):
         return energies, force, atomic_energies[:, :nlocal]
 
 
-def save_ani2x_model(runpbc=False):
-    device = torch.device('cuda')
+def save_ani2x_model(runpbc=False, device='cuda'):
     hartree2kcalmol = 627.5094738898777
 
     # dtype
@@ -99,7 +98,6 @@ def save_ani2x_model(runpbc=False):
     filename = 'ani2x_cuda_nocuaev_double.pt'
     script_module.save(filename)
 
-    device = 'cuda:1' if torch.cuda.device_count() > 1 else 'cuda:0'
     ani2x_loaded = torch.jit.load(filename).to(device)
     ani2x_ref = torchani.models.ANI2x(periodic_table_index=False, model_index=None, cell_list=False,
                                       use_cuaev_interface=False, use_cuda_extension=False).to(device)
@@ -165,4 +163,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--pbc', default=False, action='store_true')
     args = parser.parse_args()
-    save_ani2x_model(args.pbc)
+    devices = [] if args.pbc else ['cpu']  # CPU does not work with pbc: LAPACK library not found in compilation
+    if torch.cuda.is_available():
+        if torch.cuda.device_count() > 1:
+            # avoid the bug that could only use the 0th gpu
+            devices.append('cuda:1')
+        else:
+            devices.append('cuda:0')
+    for d in devices:
+        print(f"====================== device: {d} ======================")
+        save_ani2x_model(args.pbc, d)

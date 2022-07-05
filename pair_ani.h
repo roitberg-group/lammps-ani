@@ -38,11 +38,12 @@ class PairANI : public Pair {
  protected:
   double cutoff;
   ANI ani;
-  int64_t* atom_index12;
+  int64_t* atom_index12; // to avoid dynamically allocate atom_index12 in every iteration
   int npairs; // number of pairs in the current domain before neigh_list rebuild
   int npairs_max; // if exceed this max number the allocated atom_index12 needs to grow
   std::string model_file;
   std::string device_str;
+  bool use_fullnbr;
 
   virtual void allocate();
 };

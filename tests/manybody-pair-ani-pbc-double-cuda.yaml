@@ -12,7 +12,7 @@ pre_commands: ! |  # execute before the input template file is read
 post_commands: ! |  # execute right before the actual tests
   newton ${newton_pair} ${newton_bond}  # needs to be here so that restart test works
 input_file: in.ani
-pair_style: ani 5.1 /blue/roitberg/apps/lammps-ani/models/test/ani2x_cuda_nocuaev_double.pt cuda
+pair_style: ani 5.1 /blue/roitberg/apps/lammps-ani/models/test/ani2x_cuda_nocuaev_double.pt cuda half
 pair_coeff: ! |
   * *
 extract: ! ""

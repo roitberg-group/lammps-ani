@@ -11,13 +11,13 @@ pre_commands: ! |  # execute before the input template file is read
   variable newton_pair delete
   variable newton_pair index off
   variable newton_bond delete
-  variable newton_bond index off
+  variable newton_bond index on
   newton ${newton_pair} ${newton_bond}
   variable change_box index 'all boundary p p p'
 post_commands: ! |  # execute right before the actual tests
   newton ${newton_pair} ${newton_bond}  # needs to be here so that restart test works
 input_file: in.ani
-pair_style: ani 5.1 /blue/roitberg/apps/lammps-ani/models/test/ani2x_cuda_nocuaev_double.pt cuda half
+pair_style: ani 5.1 /blue/roitberg/apps/lammps-ani/models/test/ani2x_cuda_nocuaev_double.pt cpu half
 pair_coeff: ! |
   * *
 extract: ! ""

@@ -40,6 +40,8 @@ PairANI::PairANI(LAMMPS* lmp) : Pair(lmp) {
   if (strcmp(update->unit_style, "real") != 0) {
     error->all(FLERR, "Pair ani requires real units");
   }
+  comm_reverse = 3;
+  comm_reverse_off = 3;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -64,7 +66,11 @@ void PairANI::compute(int eflag, int vflag) {
   int nlocal = atom->nlocal;
   int nghost = atom->nghost;
   int ntotal = nlocal + nghost;
-  // int newton_pair = force->newton_pair;
+  // newton is on if either newton_pair or newton_bond is on.
+  // https://github.com/lammps/lammps/blob/66bbfa67dcbca7dbb81a7be45184233e51022030/src/input.cpp#L1654-L1655
+  // if either newton is on, we don't need to mannuly call reverse_comm().
+  // https://github.com/lammps/lammps/blob/66bbfa67dcbca7dbb81a7be45184233e51022030/src/verlet.cpp#L340-L343
+  int newton = force->newton;
 
   int inum = list->inum;
   int* ilist = list->ilist;
@@ -73,7 +79,7 @@ void PairANI::compute(int eflag, int vflag) {
 
   // ani model outputs
   double out_energy;
-  std::vector<double> out_force(ntotal * 3);
+  out_force.resize(ntotal * 3);
   std::vector<double> out_atomic_energies;
 
   // ani model inputs
@@ -133,8 +139,18 @@ void PairANI::compute(int eflag, int vflag) {
     ani.compute(out_energy, out_force, species, coordinates, npairs, atom_index12, nlocal, ago, &out_atomic_energies);
   }
 
+  // we have to manually pass the ghost atoms' force to other domains if newton is off.
+  // we accumulate forces on out_force instead of f, because when newton flag is off, the previous step's
+  // ghost atoms' forces are not cleared.
+  // https://github.com/lammps/lammps/blob/66bbfa67dcbca7dbb81a7be45184233e51022030/src/verlet.cpp#L382-L384
+  if (!newton) {
+    comm->reverse_comm(this);
+  }
+
   // write out force
   for (int ii = 0; ii < ntotal; ii++) {
+    // notes: at this point, ghost atoms' forces have wrong results because they were not cleard between steps,
+    // but we don't care because they are not used anyway as long as newton flag is off.
     f[ii][0] += out_force[ii * 3 + 0];
     f[ii][1] += out_force[ii * 3 + 1];
     f[ii][2] += out_force[ii * 3 + 2];
@@ -287,6 +303,10 @@ void* PairANI::extract(const char* str, int& dim) {
   return nullptr;
 }
 
+/* ----------------------------------------------------------------------
+   read and write restart file
+------------------------------------------------------------------------- */
+
 void PairANI::read_restart(FILE* fp) {
   // cutoff
   utils::sfread(FLERR, &cutoff, sizeof(double), 1, fp, nullptr, error);
@@ -327,4 +347,33 @@ void PairANI::write_restart(FILE* fp) {
   // model_file device_str
   fwrite(model_file.c_str(), sizeof(char), model_file.size(), fp);
   fwrite(device_str.c_str(), sizeof(char), device_str.size(), fp);
+}
+
+/* ----------------------------------------------------------------------
+   pack and unpack reverse communication
+------------------------------------------------------------------------- */
+
+int PairANI::pack_reverse_comm(int n, int first, double* buf) {
+  int i, m, last;
+
+  m = 0;
+  last = first + n;
+  for (i = first; i < last; i++) {
+    buf[m++] = out_force[i * 3 + 0];
+    buf[m++] = out_force[i * 3 + 1];
+    buf[m++] = out_force[i * 3 + 2];
+  }
+  return m;
+}
+
+void PairANI::unpack_reverse_comm(int n, int* list, double* buf) {
+  int i, j, m;
+
+  m = 0;
+  for (i = 0; i < n; i++) {
+    j = list[i];
+    out_force[j * 3 + 0] += buf[m++];
+    out_force[j * 3 + 1] += buf[m++];
+    out_force[j * 3 + 2] += buf[m++];
+  }
 }

@@ -32,6 +32,8 @@ class PairANI : public Pair {
   void* extract(const char*, int&) override;
   void write_restart(FILE*) override;
   void read_restart(FILE*) override;
+  int pack_reverse_comm(int, int, double *);
+  void unpack_reverse_comm(int, int *, double *);
 
   int get_local_rank(std::string device_str);
 
@@ -44,6 +46,7 @@ class PairANI : public Pair {
   std::string model_file;
   std::string device_str;
   bool use_fullnbr;
+  std::vector<double> out_force;
 
   virtual void allocate();
 };

@@ -5,9 +5,14 @@ epsilon: 9e-9
 skip_tests:
 prerequisites: ! |
   pair ani
+# test_pair_style.cpp manually run both newton_pair on and off,
+# we manually set newton at pre_commands to override that setting.
 pre_commands: ! |  # execute before the input template file is read
   variable newton_pair delete
   variable newton_pair index off
+  variable newton_bond delete
+  variable newton_bond index off
+  newton ${newton_pair} ${newton_bond}
   variable change_box index 'all boundary p p p'
 post_commands: ! |  # execute right before the actual tests
   newton ${newton_pair} ${newton_bond}  # needs to be here so that restart test works

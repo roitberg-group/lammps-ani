@@ -14,7 +14,7 @@ libtorch (Pre-cxx11 ABI)
 ```
 wget https://download.pytorch.org/libtorch/cu116/libtorch-shared-with-deps-1.12.1%2Bcu116.zip
 unzip libtorch-shared-with-deps-1.12.1+cu116.zip
-export LIBTORCH_PATH=${PWD}
+export LIBTORCH_PATH=${PWD}/libtorch
 ```
 
 pytorch and cudnn

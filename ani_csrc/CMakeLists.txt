@@ -1,5 +1,14 @@
 cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-extended-lambda -use_fast_math --expt-relaxed-constexpr")
+
+# use cub in a safe manner, see:
+# https://github.com/pytorch/pytorch/pull/55292
+# https://github.com/pytorch/pytorch/pull/66219
+string(APPEND CMAKE_CUDA_FLAGS " -DCUB_NS_QUALIFIER=::cuaev::cub")
+# TODO: also remove CUB_NS_PREFIX and CUB_NS_POSTFIX from cuaev_cub.cuh
+# string(APPEND CMAKE_CUDA_FLAGS " -DCUB_NS_PREFIX='namespace cuaev {'")
+# string(APPEND CMAKE_CUDA_FLAGS " -DCUB_NS_POSTFIX=}")
+
 set(CMAKE_CXX_STANDARD 14)
 project(cuaev LANGUAGES CXX CUDA)
 

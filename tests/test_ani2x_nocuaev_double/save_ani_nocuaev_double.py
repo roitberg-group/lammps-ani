@@ -95,10 +95,9 @@ def save_ani2x_model(runpbc=False, device='cuda'):
     ani2x = ANI2xNoCUAEV()
     ani2x = ani2x.to(dtype)
     script_module = torch.jit.script(ani2x)
-    filename = 'ani2x_cuda_nocuaev_double.pt'
-    script_module.save(filename)
+    script_module.save(output_file)
 
-    ani2x_loaded = torch.jit.load(filename).to(device)
+    ani2x_loaded = torch.jit.load(output_file).to(device)
     ani2x_ref = torchani.models.ANI2x(periodic_table_index=False, model_index=None, cell_list=False,
                                       use_cuaev_interface=False, use_cuda_extension=False).to(device)
     ani2x_ref = ani2x_ref.to(dtype)
@@ -163,6 +162,7 @@ if __name__ == '__main__':
     # parser.add_argument('--pbc', default=False, action='store_true')
     args = parser.parse_args()
     input_file = "../water-0.8nm.pdb"
+    output_file = 'ani2x_nocuaev_double.pt'
 
     devices = ['cpu']
     if torch.cuda.is_available():

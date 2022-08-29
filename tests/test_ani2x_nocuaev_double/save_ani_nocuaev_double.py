@@ -102,7 +102,6 @@ def save_ani2x_model(runpbc=False, device='cuda'):
     ani2x_ref = torchani.models.ANI2x(periodic_table_index=False, model_index=None, cell_list=False,
                                       use_cuaev_interface=False, use_cuda_extension=False).to(device)
     ani2x_ref = ani2x_ref.to(dtype)
-    input_file = "water-0.8nm.pdb"
     mol = read(input_file)
 
     species = torch.tensor(mol.get_atomic_numbers(), device=device).unsqueeze(0)
@@ -161,15 +160,18 @@ def save_ani2x_model(runpbc=False, device='cuda'):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--pbc', default=False, action='store_true')
+    # parser.add_argument('--pbc', default=False, action='store_true')
     args = parser.parse_args()
-    devices = [] if args.pbc else ['cpu']  # CPU does not work with pbc: LAPACK library not found in compilation
+    input_file = "../water-0.8nm.pdb"
+
+    devices = ['cpu']
     if torch.cuda.is_available():
         if torch.cuda.device_count() > 1:
             # avoid the bug that could only use the 0th gpu
             devices.append('cuda:1')
         else:
             devices.append('cuda:0')
-    for d in devices:
-        print(f"====================== device: {d} ======================")
-        save_ani2x_model(args.pbc, d)
+    for pbc in [False, True]:
+        for d in devices:
+            print(f"====================== device: {d} | pbc: {pbc} ======================")
+            save_ani2x_model(pbc, d)

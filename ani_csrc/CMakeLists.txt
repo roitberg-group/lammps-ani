@@ -39,7 +39,9 @@ target_link_libraries(ani OpenMP::OpenMP_CXX)
 project(test_model LANGUAGES CXX)
 add_executable(test_model test_model.cpp)
 target_include_directories(test_model PRIVATE ./)
-target_link_libraries(test_model ${TORCH_LIBRARIES})
-target_link_libraries(test_model ${Python_LIBRARIES})
-target_link_libraries(test_model ani)
-target_link_libraries(test_model cuaev)
+target_link_libraries(test_model PRIVATE ${TORCH_LIBRARIES})
+target_link_libraries(test_model PRIVATE ${Python_LIBRARIES})
+# -Wl,--no-as-needed flag forces the link to happen
+# https://pytorch.org/tutorials/advanced/torch_script_custom_ops.html
+target_link_libraries(test_model PRIVATE -Wl,--no-as-needed cuaev)
+target_link_libraries(test_model PRIVATE -Wl,--no-as-needed ani)

@@ -2,9 +2,21 @@
 set -ex
 
 # files and envs
-cp external/torchani/torchani/cuaev/* ani_csrc/
+cp external/torchani_sandbox/torchani/csrc/* ani_csrc/
 export lammps_root=${PWD}/external/lammps/
 export LAMMPS_PLUGIN_PATH=${PWD}/build/
+export CMAKE_CUDA_ARCHITECTURES="7.5;8.0"
+
+# build torchani
+cd external/torchani_sandbox
+python setup.py develop --ext --user
+pip install h5py ase
+cd ../../
+
+# save model
+cd tests/test_ani2x_nocuaev_double/
+python save_ani_nocuaev_double.py
+cd ../../
 
 # build lammps
 cd external/lammps/
@@ -17,10 +29,15 @@ cmake -DCMAKE_C_FLAGS='-D_GLIBCXX_USE_CXX11_ABI=0'  -DCMAKE_CXX_FLAGS='-D_GLIBCX
 make -j
 # test
 mpirun -np 1 ${lammps_root}/build-test/test_pair_style ../unittest/force-styles/tests/mol-pair-lj_smooth.yaml
+cd ../../../
 
 # build lammps-ani
-cd ../../../
 mkdir -p build; cd build
-cmake -DCMAKE_C_FLAGS='-D_GLIBCXX_USE_CXX11_ABI=0' -DCMAKE_CXX_FLAGS='-D_GLIBCXX_USE_CXX11_ABI=0' -DLAMMPS_HEADER_DIR=${lammps_root}/src -DCUDNN_INCLUDE_PATH=${CONDA_PREFIX}/include -DCUDNN_LIBRARY_PATH=${CONDA_PREFIX}/lib ..
+# cmake -DCMAKE_C_FLAGS='-D_GLIBCXX_USE_CXX11_ABI=0' -DCMAKE_CXX_FLAGS='-D_GLIBCXX_USE_CXX11_ABI=0' -DLAMMPS_HEADER_DIR=${lammps_root}/src -DCUDNN_INCLUDE_PATH=${CONDA_PREFIX}/include -DCUDNN_LIBRARY_PATH=${CONDA_PREFIX}/lib ..
+cmake -DCMAKE_C_FLAGS='-D_GLIBCXX_USE_CXX11_ABI=0' -DCMAKE_CXX_FLAGS='-D_GLIBCXX_USE_CXX11_ABI=0' -DLAMMPS_HEADER_DIR=${lammps_root}/src ..
 make -j
+cd ../
 
+# test
+cd tests/
+./test_all.sh

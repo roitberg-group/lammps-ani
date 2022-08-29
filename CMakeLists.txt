@@ -51,7 +51,8 @@ endif()
 
 # find/fetch libtorch
 set(libtorch_VERSION 1.12.1)
-find_package(Torch ${libtorch_VERSION} EXACT QUIET CONFIG)
+# find_package(Torch ${libtorch_VERSION} EXACT QUIET CONFIG)
+find_package(Torch)
 if(NOT Torch_FOUND)
   message(STATUS "libtorch ${libtorch_VERSION} - not found")
   message(STATUS "Fetching libtorch")

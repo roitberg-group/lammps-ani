@@ -18,4 +18,4 @@ jobs:
       with:
         singularity-version: 3.8.3
     - name: Run a singularity container
-      run: singularity run docker://alpine cat /etc/os-release
+      run: singularity exec --cleanenv -H $PWD:/home --pwd /home --nv docker://nvcr.io/nvidia/pytorch:22.08-py3 /bin/bash -c "./build.sh"

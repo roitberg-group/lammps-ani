@@ -17,7 +17,7 @@ cmake -DCMAKE_C_FLAGS='-D_GLIBCXX_USE_CXX11_ABI=0'  -DCMAKE_CXX_FLAGS='-D_GLIBCX
 ../cmake/
 make -j
 # test
-${lammps_root}/build-test/test_pair_style ../unittest/force-styles/tests/mol-pair-lj_smooth.yaml
+mpirun -np 1 ${lammps_root}/build-test/test_pair_style ../unittest/force-styles/tests/mol-pair-lj_smooth.yaml
 
 # build lammps-ani
 cd ../../

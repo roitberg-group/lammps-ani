@@ -6,7 +6,6 @@ cp external/torchani/torchani/cuaev/* ani_csrc/
 export lammps_root=${PWD}/external/lammps/
 export LAMMPS_PLUGIN_PATH=${PWD}/build/
 
-
 # build lammps
 cd external/lammps/
 mkdir -p build-test; cd build-test

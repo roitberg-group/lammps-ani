@@ -25,6 +25,7 @@ def run(pbc=False):
     )
     # TODO It is IMPORTANT to set cutoff as 7.1 to match lammps nbr cutoff
     ani2x.aev_computer.neighborlist.cutoff = 7.1
+    # double precision
     calculator = ani2x.to(device).double().ase()
 
     print(len(atoms), "atoms in the cell")

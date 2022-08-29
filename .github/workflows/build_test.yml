@@ -14,5 +14,8 @@ jobs:
       with:
         token: ${{ secrets.PAT }}
         submodules: recursive
-    - name: hello
-      run: echo hello world
+    - uses: eWaterCycle/setup-singularity@v7
+      with:
+        singularity-version: 3.8.3
+    - name: Run a singularity container
+      run: singularity run docker://alpine cat /etc/os-release

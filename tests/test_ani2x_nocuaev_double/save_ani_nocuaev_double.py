@@ -15,8 +15,7 @@ class ANI2xNoCUAEV(torch.nn.Module):
                                           use_cuaev_interface=False, use_cuda_extension=False)
         else:
             # aiqm/torchani is missing some features
-            ani2x = torchani.models.ANI2x(periodic_table_index=False, model_index=None,
-                                          use_cuda_extension=False)
+            ani2x = torchani.models.ANI2x(periodic_table_index=False, model_index=None)
         self.aev_computer = ani2x.aev_computer
         # self.neural_networks = ani2x.neural_networks.to_infer_model(use_mnp=True)
         self.neural_networks = ani2x.neural_networks
@@ -108,8 +107,7 @@ def save_ani2x_model(runpbc=False, device='cuda'):
                                           use_cuaev_interface=False, use_cuda_extension=False).to(device)
     else:
         # aiqm/torchani is missing some features
-        ani2x_ref = torchani.models.ANI2x(periodic_table_index=False, model_index=None,
-                                          use_cuda_extension=False).to(device)
+        ani2x_ref = torchani.models.ANI2x(periodic_table_index=False, model_index=None).to(device)
     ani2x_ref = ani2x_ref.to(dtype)
     mol = read(input_file)
 

@@ -59,14 +59,14 @@ int test_cuaev(int argc, const char* argv[]) {
 int test_ani2x_withnbr(int argc, const char* argv[]) {
   // Get the path of the model and the device type
   if (argc != 3) {
-    std::cerr << "usage: test_model <model.pt> <cpu/cuda>\n";
+    std::cerr << "Error: usage is test_model <model.pt> <cpu/cuda>\n";
     return -1;
   }
   std::string model_file = argv[1];
   std::string device_str = argv[2];
   int local_rank;
   if (device_str != "cpu" && device_str != "cuda") {
-    std::cerr << "2nd argument must be <cpu/cuda>\n";
+    std::cerr << "Error: 2nd argument must be <cpu/cuda>\n";
     return -1;
   }
   local_rank = device_str == "cpu" ? -1 : 0;
@@ -156,18 +156,6 @@ int test_ani2x_withnbr(int argc, const char* argv[]) {
   TORCH_CHECK(energy_err < 1e-5, "Wrong Energy");
   TORCH_CHECK(force_err < 1e-5, "Wrong Forces");
   std::cout << std::endl;
-
-  // // set a ghost atom
-  // nlocal = 19;
-  // // reset energy and force
-  // out_energy = 0;
-  // expected_energy = -533.4612861349258 * hartree2kcalmol;
-  // for (auto& f : out_force) {f = 0.f;}
-  // // run again
-  // ani.compute(out_energy, out_force, species, coords, npairs, atom_index12.data(), nlocal);
-  // std::cout << "Second call: energy " << std::fixed << out_energy << ", error: " << energy_err << std::endl;
-  // std::cout << "Second call: force " << out_force[0] << ", " << out_force[1] << ", " << out_force[2] << std::endl;
-  // TORCH_CHECK(energy_err < 1e-5, "Wrong Energy");
 
   return 0;
 }

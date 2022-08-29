@@ -48,6 +48,29 @@ endif()
 
 
 ##########################
+
+# find/fetch libtorch
+set(libtorch_VERSION 1.12.1)
+find_package(Torch ${libtorch_VERSION} EXACT QUIET CONFIG)
+if(NOT Torch_FOUND)
+  message(STATUS "libtorch ${libtorch_VERSION} - not found")
+  message(STATUS "Fetching libtorch")
+  include(FetchContent)
+  FetchContent_Declare(
+    libtorch
+    URL https://download.pytorch.org/libtorch/cu116/libtorch-shared-with-deps-${libtorch_VERSION}%2Bcu116.zip
+    SOURCE_DIR libtorch)
+  FetchContent_GetProperties(libtorch)
+  if(NOT libtorch_POPULATED)
+    unset(FETCHCONTENT_QUIET CACHE)
+    FetchContent_Populate(libtorch)
+    list(APPEND CMAKE_PREFIX_PATH ${CMAKE_BINARY_DIR}/libtorch)
+  endif()
+  find_package(Torch ${libtorch_VERSION} EXACT CONFIG REQUIRED)
+else()
+  message(STATUS "libtorch ${libtorch_VERSION} - found")
+endif()
+
 # packages
 find_package(Torch REQUIRED)
 find_package(Python REQUIRED COMPONENTS Interpreter Development)

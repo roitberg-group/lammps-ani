@@ -10,13 +10,6 @@ module load cuda/11.4.3 gcc/9.3.0 openmpi/4.0.5 cmake/3.21.3 git/2.30.1
 export CMAKE_CUDA_ARCHITECTURES="7.5;8.0"
 ```
 
-libtorch (Pre-cxx11 ABI)
-```
-wget https://download.pytorch.org/libtorch/cu116/libtorch-shared-with-deps-1.12.1%2Bcu116.zip
-unzip libtorch-shared-with-deps-1.12.1+cu116.zip
-export LIBTORCH_PATH=${PWD}/libtorch
-```
-
 pytorch and cudnn
 ```
 conda install pytorch torchvision torchaudio cudatoolkit=11.3 -c pytorch
@@ -63,11 +56,11 @@ python setup.py develop --ext
 cd ..
 
 # lammps-ani
-git clone git@github.com:roitberg-group/lammps-ani.git
+git clone --recursive git@github.com:roitberg-group/lammps-ani.git
 cp torchani_sandbox/torchani/csrc/* lammps-ani/ani_csrc/
 cd lammps-ani
 mkdir build; cd build
-cmake -DCMAKE_C_FLAGS='-D_GLIBCXX_USE_CXX11_ABI=0'  -DCMAKE_CXX_FLAGS='-D_GLIBCXX_USE_CXX11_ABI=0' -DLAMMPS_HEADER_DIR=${lammps_root}/src -DCMAKE_PREFIX_PATH=${LIBTORCH_PATH} -DCUDNN_INCLUDE_PATH=${CONDA_PREFIX}/include -DCUDNN_LIBRARY_PATH=${CONDA_PREFIX}/lib ..
+cmake -DCMAKE_C_FLAGS='-D_GLIBCXX_USE_CXX11_ABI=0'  -DCMAKE_CXX_FLAGS='-D_GLIBCXX_USE_CXX11_ABI=0' -DLAMMPS_HEADER_DIR=${lammps_root}/src -DCUDNN_INCLUDE_PATH=${CONDA_PREFIX}/include -DCUDNN_LIBRARY_PATH=${CONDA_PREFIX}/lib ..
 make -j
 export LAMMPS_PLUGIN_PATH=${PWD}
 

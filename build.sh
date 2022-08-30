@@ -12,6 +12,7 @@ export TORCH_CUDA_ARCH_LIST="7.5;8.0"
 # NGC PyTorch needs CXX11_ABI
 export CXX11_ABI=1
 
+df -h
 # copy source files to ani_csrc
 cp external/torchani_sandbox/torchani/csrc/* ani_csrc/
 
@@ -20,11 +21,13 @@ cd external/torchani_sandbox
 rm -rf build && python setup.py develop --ext --user
 pip install h5py ase
 cd ../../
+df -h
 
 # save model
 cd tests/test_ani2x_nocuaev_double/
 python save_ani_nocuaev_double.py
 cd ../../
+df -h
 
 # build lammps
 cd external/lammps/
@@ -34,6 +37,7 @@ cmake -DCMAKE_C_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}"  -DCMAKE_CXX_FLAGS
 -DGPU_API=cuda -DGPU_ARCH=sm_80 -DPKG_PLUGIN=yes -DCMAKE_INSTALL_PREFIX=${HOME}/.local -DBUILD_MPI=yes -DBUILD_SHARED_LIBS=yes -DLAMMPS_MACHINE=mpi \
 -DPKG_EXTRA-PAIR=off -DPKG_MOLECULE=off -DPKG_OPENMP=on -DENABLE_TESTING=on -DLAMMPS_EXCEPTIONS=on \
 ../cmake/
+df -h
 make -j
 # test
 # mpirun -np 1 ${LAMMPS_ROOT}/build-test/test_pair_style ../unittest/force-styles/tests/mol-pair-lj_smooth.yaml

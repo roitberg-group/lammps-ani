@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted  # use ubuntu-latest for github servers
     steps:
     - uses: actions/checkout@v3
       with:
@@ -21,3 +21,7 @@ jobs:
       run: singularity build --nv --fakeroot -B $PWD:/tmp/host_pwd ../lammps-ani.sif Singularity.def
     # - name: Run a singularity container
     #   run: singularity exec --cleanenv -H $PWD:/home --pwd /home --nv docker://nvcr.io/nvidia/pytorch:22.08-py3 /bin/bash -c "./build.sh"
+
+concurrency:
+  group: build_docker-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true

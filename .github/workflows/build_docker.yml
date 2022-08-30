@@ -11,7 +11,7 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build-and-push-image:
+  build_docker:
     runs-on: self-hosted
     permissions:
       contents: read
@@ -44,3 +44,7 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+concurrency:
+  group: build_docker-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true

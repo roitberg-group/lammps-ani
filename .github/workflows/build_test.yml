@@ -17,5 +17,7 @@ jobs:
     - uses: eWaterCycle/setup-singularity@v7
       with:
         singularity-version: 3.8.3
-    - name: Run a singularity container
-      run: singularity exec --cleanenv -H $PWD:/home --pwd /home --nv docker://nvcr.io/nvidia/pytorch:22.08-py3 /bin/bash -c "./build.sh"
+    - name: Build Singularity Image
+      run: singularity build --nv --fakeroot --writable-tmpfs -B $PWD:/tmp/host_pwd ../lammps-ani.sif Singularity.def
+    # - name: Run a singularity container
+    #   run: singularity exec --cleanenv -H $PWD:/home --pwd /home --nv docker://nvcr.io/nvidia/pytorch:22.08-py3 /bin/bash -c "./build.sh"

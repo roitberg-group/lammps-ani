@@ -46,7 +46,7 @@ jobs:
       #     labels: ${{ steps.meta.outputs.labels }}
 
       - name: test
-        run: echo ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tags }} && docker run --gpus all ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tags }} bash -c "nvidia-smi"
+        run: echo ${{ steps.meta.outputs.tags }} && docker run --gpus all ${{ steps.meta.outputs.tags }} bash -c "nvidia-smi"
 
 concurrency:
   group: build_docker-${{ github.event.pull_request.number || github.sha }}

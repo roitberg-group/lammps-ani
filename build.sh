@@ -1,13 +1,19 @@
 #!/bin/bash
 set -ex
 
-# files and envs
-cp external/torchani_sandbox/torchani/csrc/* ani_csrc/
-export LAMMPS_ROOT=${PWD}/external/lammps/
-export LAMMPS_PLUGIN_PATH=${PWD}/build/
+# environment
+# Paths
+export LAMMPS_ANI_ROOT=${LAMMPS_ANI_ROOT:=${PWD}}  # default as PWD
+export LAMMPS_ROOT=${LAMMPS_ANI_ROOT}/external/lammps/
+export LAMMPS_PLUGIN_PATH=${LAMMPS_ANI_ROOT}/build/
+# CUDA_ARCH
 export CMAKE_CUDA_ARCHITECTURES="7.5;8.0"
+export TORCH_CUDA_ARCH_LIST="7.5;8.0"
 # NGC PyTorch needs CXX11_ABI
 export CXX11_ABI=1
+
+# copy source files to ani_csrc
+cp external/torchani_sandbox/torchani/csrc/* ani_csrc/
 
 # build torchani
 cd external/torchani_sandbox

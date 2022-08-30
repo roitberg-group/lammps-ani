@@ -22,7 +22,7 @@ Build LAMMPS
 cd /some/path
 git clone git@github.com:lammps/lammps.git
 cd lammps
-export lammps_root=${PWD}
+export LAMMPS_ROOT=${PWD}
 mkdir build; cd build
 cmake -DCMAKE_C_FLAGS='-D_GLIBCXX_USE_CXX11_ABI=0'  -DCMAKE_CXX_FLAGS='-D_GLIBCXX_USE_CXX11_ABI=0' -DLAMMPS_INSTALL_RPATH=yes -DPKG_GPU=no \
 -DGPU_API=cuda -DGPU_ARCH=sm_80 -DPKG_PLUGIN=yes -DCMAKE_INSTALL_PREFIX=${HOME}/.local -DBUILD_MPI=yes -DBUILD_SHARED_LIBS=yes -DLAMMPS_MACHINE=mpi \
@@ -41,7 +41,7 @@ make -j
 # run test
 ctest -V -R lj_smooth
 # could also use the following to test
-${lammps_root}/build-test/test_pair_style ../unittest/force-styles/tests/mol-pair-lj_smooth.yaml
+${LAMMPS_ROOT}/build-test/test_pair_style ../unittest/force-styles/tests/mol-pair-lj_smooth.yaml
 ```
 
 ## Build lammps-ani
@@ -60,7 +60,7 @@ git clone --recursive git@github.com:roitberg-group/lammps-ani.git
 cp torchani_sandbox/torchani/csrc/* lammps-ani/ani_csrc/
 cd lammps-ani
 mkdir build; cd build
-cmake -DCMAKE_C_FLAGS='-D_GLIBCXX_USE_CXX11_ABI=0' -DCMAKE_CXX_FLAGS='-D_GLIBCXX_USE_CXX11_ABI=0' -DLAMMPS_HEADER_DIR=${lammps_root}/src -DCUDNN_INCLUDE_PATH=${CONDA_PREFIX}/include -DCUDNN_LIBRARY_PATH=${CONDA_PREFIX}/lib ..
+cmake -DCMAKE_C_FLAGS='-D_GLIBCXX_USE_CXX11_ABI=0' -DCMAKE_CXX_FLAGS='-D_GLIBCXX_USE_CXX11_ABI=0' -DLAMMPS_HEADER_DIR=${LAMMPS_ROOT}/src -DCUDNN_INCLUDE_PATH=${CONDA_PREFIX}/include -DCUDNN_LIBRARY_PATH=${CONDA_PREFIX}/lib ..
 make -j
 export LAMMPS_PLUGIN_PATH=${PWD}
 
@@ -73,9 +73,9 @@ cd ..
 ```
 
 ## Run example
-make sure `LAMMPS_PLUGIN_PATH` and `lammps_root` are set correctly
+make sure `LAMMPS_PLUGIN_PATH` and `LAMMPS_ROOT` are set correctly
 ```
 export LAMMPS_PLUGIN_PATH=/blue/roitberg/apps/lammps-ani/build/
 cd examples/water/
-mpirun -np 8 ${lammps_root}/build/lmp_mpi -in in.lammps
+mpirun -np 8 ${LAMMPS_ROOT}/build/lmp_mpi -in in.lammps
 ```

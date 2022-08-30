@@ -3,7 +3,7 @@ set -ex
 
 # files and envs
 cp external/torchani_sandbox/torchani/csrc/* ani_csrc/
-export lammps_root=${PWD}/external/lammps/
+export LAMMPS_ROOT=${PWD}/external/lammps/
 export LAMMPS_PLUGIN_PATH=${PWD}/build/
 export CMAKE_CUDA_ARCHITECTURES="7.5;8.0"
 # NGC PyTorch needs CXX11_ABI
@@ -30,14 +30,14 @@ cmake -DCMAKE_C_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}"  -DCMAKE_CXX_FLAGS
 ../cmake/
 make -j
 # test
-mpirun -np 1 ${lammps_root}/build-test/test_pair_style ../unittest/force-styles/tests/mol-pair-lj_smooth.yaml
+mpirun -np 1 ${LAMMPS_ROOT}/build-test/test_pair_style ../unittest/force-styles/tests/mol-pair-lj_smooth.yaml
 cd ../../../
 
 # build lammps-ani
 rm -rf build; mkdir -p build; cd build
-# cmake -DCMAKE_C_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DLAMMPS_HEADER_DIR=${lammps_root}/src -DCUDNN_INCLUDE_PATH=${CONDA_PREFIX}/include -DCUDNN_LIBRARY_PATH=${CONDA_PREFIX}/lib ..
+# cmake -DCMAKE_C_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DLAMMPS_HEADER_DIR=${LAMMPS_ROOT}/src -DCUDNN_INCLUDE_PATH=${CONDA_PREFIX}/include -DCUDNN_LIBRARY_PATH=${CONDA_PREFIX}/lib ..
 # For NGC PyTorch: we need to use the built-in PyTorch shared libraries, and we don't need to use custom cudnn
-cmake -DCMAKE_C_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DLAMMPS_HEADER_DIR=${lammps_root}/src -DCMAKE_PREFIX_PATH="$(python -c 'import torch.utils; print(torch.utils.cmake_prefix_path)')" ..
+cmake -DCMAKE_C_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DLAMMPS_HEADER_DIR=${LAMMPS_ROOT}/src -DCMAKE_PREFIX_PATH="$(python -c 'import torch.utils; print(torch.utils.cmake_prefix_path)')" ..
 make -j
 cd ../
 

@@ -1,5 +1,5 @@
 # you could build the image with:
-# singularity build --nv --fakeroot --writable-tmpfs -B $PWD:/tmp/host_pwd ../lammps-ani.sif Singularity.def
+# singularity build --nv --fakeroot -B $PWD:/tmp/host_pwd ../lammps-ani.sif Singularity.def  # --writable-tmpfs
 # usage:
 # singularity exec --nv --writable ../lammps-ani.sif /bin/bash
 BootStrap: docker

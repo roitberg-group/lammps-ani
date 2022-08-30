@@ -12,8 +12,8 @@ From: nvcr.io/nvidia/pytorch:22.08-py3
     export LAMMPS_ROOT=${LAMMPS_ANI_ROOT}/external/lammps/
     export LAMMPS_PLUGIN_PATH=${LAMMPS_ANI_ROOT}/build/
     # CUDA_ARCH
-    export CMAKE_CUDA_ARCHITECTURES="7.5;8.0"
-    export TORCH_CUDA_ARCH_LIST="7.5;8.0"
+    export CMAKE_CUDA_ARCHITECTURES="6.0+PTX;7.5;8.0"
+    export TORCH_CUDA_ARCH_LIST="6.0+PTX;7.5;8.0"
     # NGC PyTorch needs CXX11_ABI
     export CXX11_ABI=1
     # allow run OpenMPI as root

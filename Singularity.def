@@ -1,0 +1,73 @@
+BootStrap: docker
+From: nvcr.io/nvidia/pytorch:22.08-py3
+
+%environment
+    export lammps_root=/lammps-ani/external/lammps/
+    export LAMMPS_PLUGIN_PATH=/lammps-ani/build/
+    export CMAKE_CUDA_ARCHITECTURES="7.5;8.0"
+    # NGC PyTorch needs CXX11_ABI
+    export CXX11_ABI=1
+
+%post
+    # copy files
+    # a workaround to copy a folder, must set the binding at the working directory:
+    # `-B $PWD:/tmp/host_pwd`
+    cp -r /tmp/host_pwd/ /lammps-ani
+    cd /lammps-ani
+
+    # allow run OpenMPI as root
+    export OMPI_ALLOW_RUN_AS_ROOT=1
+    export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
+
+    # files and envs
+    export lammps_root=/lammps-ani/external/lammps/
+    export LAMMPS_PLUGIN_PATH=/lammps-ani/build/
+    cp external/torchani_sandbox/torchani/csrc/* ani_csrc/
+    export CMAKE_CUDA_ARCHITECTURES="7.5;8.0"
+    # NGC PyTorch needs CXX11_ABI
+    export CXX11_ABI=1
+
+    # build torchani
+    cd external/torchani_sandbox
+    rm -rf build && python setup.py develop --ext --user
+    pip install h5py ase
+    cd ../../
+
+    # save model
+    cd tests/test_ani2x_nocuaev_double/
+    python save_ani_nocuaev_double.py
+    cd ../../
+
+    # build lammps
+    cd external/lammps/
+    rm -rf build-test; mkdir build-test; cd build-test
+    # D_GLIBCXX_USE_CXX11_ABI: https://stackoverflow.com/a/50873329/9581569
+    cmake -DCMAKE_C_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}"  -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DLAMMPS_INSTALL_RPATH=yes -DPKG_GPU=no \
+    -DGPU_API=cuda -DGPU_ARCH=sm_80 -DPKG_PLUGIN=yes -DCMAKE_INSTALL_PREFIX=${HOME}/.local -DBUILD_MPI=yes -DBUILD_SHARED_LIBS=yes -DLAMMPS_MACHINE=mpi \
+    -DPKG_EXTRA-PAIR=on -DPKG_MOLECULE=on -DPKG_OPENMP=on -DENABLE_TESTING=on -DLAMMPS_EXCEPTIONS=on \
+    ../cmake/
+    make -j
+    # test
+    mpirun -np 1 ${lammps_root}/build-test/test_pair_style ../unittest/force-styles/tests/mol-pair-lj_smooth.yaml
+    cd ../../../
+
+    # build lammps-ani
+    rm -rf build; mkdir build; cd build
+    # cmake -DCMAKE_C_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DLAMMPS_HEADER_DIR=${lammps_root}/src -DCUDNN_INCLUDE_PATH=${CONDA_PREFIX}/include -DCUDNN_LIBRARY_PATH=${CONDA_PREFIX}/lib ..
+    # For NGC PyTorch: we need to use the built-in PyTorch shared libraries, and we don't need to use custom cudnn
+    cmake -DCMAKE_C_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DLAMMPS_HEADER_DIR=${lammps_root}/src -DCMAKE_PREFIX_PATH="$(python -c 'import torch.utils; print(torch.utils.cmake_prefix_path)')" ..
+    make -j
+    cd ../
+
+    # test
+    cd tests/
+    ./test_all.sh
+
+%test
+    echo To Be Added
+
+%labels
+    Author roitberg-group
+
+%help
+    Lammps ANI Interface

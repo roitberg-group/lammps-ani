@@ -89,11 +89,10 @@ class ANI2xNoCUAEV(torch.nn.Module):
         return energies, force, atomic_energies[:, :nlocal]
 
 
-def save_ani2x_model(runpbc=False, device='cuda'):
+def save_ani2x_model(runpbc=False, device='cuda', use_double=True):
     hartree2kcalmol = 627.5094738898777
 
     # dtype
-    use_double = True
     dtype = torch.float64 if use_double else torch.float32
 
     ani2x = ANI2xNoCUAEV()
@@ -155,7 +154,7 @@ def save_ani2x_model(runpbc=False, device='cuda'):
     print(f"{'energy_ref:'.ljust(15)} shape: {energy_ref.shape}, value: {energy_ref.item()}, dtype: {energy_ref.dtype}, unit: (kcal/mol)")
     print(f"{'force_ref:'.ljust(15)} shape: {force_ref.shape}, dtype: {force_ref.dtype}, unit: (kcal/mol/A)")
 
-    threshold = 1e-7
+    threshold = 1e-7 if use_double else 3e-5
     energy_err = torch.abs(torch.max(energy_ref.cpu() - energy.cpu()))
     force_err = torch.abs(torch.max(force_ref.cpu() - force.cpu()))
 
@@ -169,8 +168,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # parser.add_argument('--pbc', default=False, action='store_true')
     args = parser.parse_args()
-    input_file = "../water-0.8nm.pdb"
-    output_file = 'ani2x_nocuaev_double.pt'
+    input_file = "water-0.8nm.pdb"
 
     devices = ['cpu']
     if torch.cuda.is_available():
@@ -179,7 +177,12 @@ if __name__ == '__main__':
             devices.append('cuda:1')
         else:
             devices.append('cuda:0')
-    for pbc in [False, True]:
-        for d in devices:
-            print(f"====================== device: {d} | pbc: {pbc} ======================")
-            save_ani2x_model(pbc, d)
+
+    for use_double in [True, False]:
+        double_or_single = "double" if use_double else "single"
+        output_file = f'ani2x_nocuaev_{double_or_single}.pt'
+        print(output_file)
+        for pbc in [False, True]:
+            for d in devices:
+                print(f"====================== {double_or_single} | pbc: {pbc} | device: {d} ======================")
+                save_ani2x_model(pbc, d, use_double)

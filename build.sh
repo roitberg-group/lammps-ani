@@ -10,7 +10,7 @@ export LAMMPS_PLUGIN_PATH=${LAMMPS_ANI_ROOT}/build/
 export CMAKE_CUDA_ARCHITECTURES="6.0+PTX;7.5;8.0"
 export TORCH_CUDA_ARCH_LIST="6.0+PTX;7.5;8.0"
 # NGC PyTorch needs CXX11_ABI
-export CXX11_ABI=${CXX11_ABI:=0}
+export CXX11_ABI=${CXX11_ABI:=$(python -c "import torch; print(int(torch._C._GLIBCXX_USE_CXX11_ABI))")}
 
 # copy source files to ani_csrc
 cp external/torchani_sandbox/torchani/csrc/* ani_csrc/

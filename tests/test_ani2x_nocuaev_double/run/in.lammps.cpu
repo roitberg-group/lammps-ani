@@ -1,5 +1,5 @@
 #LAMMPS Input file
-# mpirun -np 4 ${lammps_root}/build/lmp_mpi -in in.lammps
+# mpirun -np 4 ${LAMMPS_ROOT}/build/lmp_mpi -in in.lammps
 
 # Intialization
 units          real

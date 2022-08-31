@@ -10,8 +10,12 @@ torch.backends.cudnn.allow_tf32 = False
 class ANI2xNoCUAEV(torch.nn.Module):
     def __init__(self):
         super().__init__()
-        ani2x = torchani.models.ANI2x(periodic_table_index=False, model_index=None, cell_list=False,
-                                        use_cuaev_interface=False, use_cuda_extension=False)
+        if hasattr(torchani, 'mnp'):
+            ani2x = torchani.models.ANI2x(periodic_table_index=False, model_index=None, cell_list=False,
+                                          use_cuaev_interface=False, use_cuda_extension=False)
+        else:
+            # aiqm/torchani is missing some features
+            ani2x = torchani.models.ANI2x(periodic_table_index=False, model_index=None)
         self.aev_computer = ani2x.aev_computer
         # self.neural_networks = ani2x.neural_networks.to_infer_model(use_mnp=True)
         self.neural_networks = ani2x.neural_networks
@@ -98,8 +102,12 @@ def save_ani2x_model(runpbc=False, device='cuda'):
     script_module.save(output_file)
 
     ani2x_loaded = torch.jit.load(output_file).to(device)
-    ani2x_ref = torchani.models.ANI2x(periodic_table_index=False, model_index=None, cell_list=False,
-                                      use_cuaev_interface=False, use_cuda_extension=False).to(device)
+    if hasattr(torchani, 'mnp'):
+        ani2x_ref = torchani.models.ANI2x(periodic_table_index=False, model_index=None, cell_list=False,
+                                          use_cuaev_interface=False, use_cuda_extension=False).to(device)
+    else:
+        # aiqm/torchani is missing some features
+        ani2x_ref = torchani.models.ANI2x(periodic_table_index=False, model_index=None).to(device)
     ani2x_ref = ani2x_ref.to(dtype)
     mol = read(input_file)
 

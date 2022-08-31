@@ -1,12 +1,20 @@
 #!/bin/bash
 set -ex
+NUM_TASKS=${SLURM_NTASKS:-1}
+NUM_GPUs=$(nvidia-smi --query-gpu=name --format=csv,noheader | wc -l)
 
-# cuda
-mpirun -np 1 /blue/roitberg/apps/lammps/build-test/lmp_mpi -in in.lammps.cuda
-mpirun -np 2 /blue/roitberg/apps/lammps/build-test/lmp_mpi -in in.lammps.cuda
-# cpu
-mpirun -np 1 /blue/roitberg/apps/lammps/build-test/lmp_mpi -in in.lammps.cpu
-mpirun -np 2 /blue/roitberg/apps/lammps/build-test/lmp_mpi -in in.lammps.cpu
+mpirun -np 1 ../../../external/lammps/build/lmp_mpi -in in.lammps.cpu
+if [ $NUM_GPUs -gt 0 ]; then
+    mpirun -np 1 ../../../external/lammps/build/lmp_mpi -in in.lammps.cuda
+fi
+
+# Domain Decomposition with 2 processes
+if [ $NUM_TASKS -gt 1 ]; then
+    mpirun -np 2 ../../../external/lammps/build/lmp_mpi -in in.lammps.cpu
+    if [ $NUM_GPUs -gt 0 ]; then
+        mpirun -np 2 ../../../external/lammps/build/lmp_mpi -in in.lammps.cuda
+    fi
+fi
 
 rm log.lammps
 rm water.final

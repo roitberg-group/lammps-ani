@@ -1,6 +1,6 @@
 [submodule "external/lammps"]
 	path = external/lammps
 	url = https://github.com/lammps/lammps
-[submodule "external/torchani"]
-	path = external/torchani
-	url = https://github.com/aiqm/torchani/
+[submodule "external/torchani_sandbox"]
+	path = external/torchani_sandbox
+	url = git@github.com:roitberg-group/torchani_sandbox.git

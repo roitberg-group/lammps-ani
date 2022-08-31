@@ -1,0 +1,28 @@
+name: build_singularity
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build_singularity:
+    runs-on: self-hosted  # use ubuntu-latest for github servers
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        token: ${{ secrets.PAT }}
+        submodules: recursive
+    - uses: eWaterCycle/setup-singularity@v7
+      with:
+        singularity-version: 3.8.3
+    - name: Build Singularity Image
+      run: rm -rf ../lammps-ani.sif && singularity build --nv --fakeroot -B $PWD:/tmp/host_pwd ../lammps-ani.sif Singularity.def
+    - name: Test
+      # TODO: not perfect, nvidia-smi is not available (nv files may not be bound with --writable)
+      run: singularity exec --cleanenv --writable -H $PWD:/home --pwd /home --nv ../lammps-ani.sif /bin/bash -c "cd /lammps-ani/tests && ./test_all.sh"
+
+concurrency:
+  group: build_singularity-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true

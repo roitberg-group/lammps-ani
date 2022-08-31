@@ -20,7 +20,8 @@ jobs:
     - name: Build Singularity Image
       run: rm -rf ../lammps-ani.sif && singularity build --nv --fakeroot -B $PWD:/tmp/host_pwd ../lammps-ani.sif Singularity.def
     - name: Test
-      run: singularity exec --cleanenv -H $PWD:/home --pwd /home --nv ../lammps-ani.sif /bin/bash -c "nvidia-smi && cd /lammps-ani/tests/ && ./test_all.sh"
+      # TODO: not perfect, nvidia-smi is not available (nv files may not be bound with --writable)
+      run: singularity exec --cleanenv --writable -H $PWD:/home --pwd /home --nv ../lammps-ani.sif /bin/bash -c "cd /lammps-ani/tests && ./test_all.sh"
 
 concurrency:
   group: build_singularity-${{ github.event.pull_request.number || github.sha }}

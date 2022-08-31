@@ -18,10 +18,9 @@ jobs:
       with:
         singularity-version: 3.8.3
     - name: Build Singularity Image
-      run: rm -rf ../lammps-ani.sif && singularity build --nv --fakeroot --sandbox -B $PWD:/tmp/host_pwd ../lammps-ani.sif Singularity.def
+      run: rm -rf ../lammps-ani.sif && singularity build --nv --fakeroot -B $PWD:/tmp/host_pwd ../lammps-ani.sif Singularity.def
     - name: Test
-      # TODO: not perfect, nvidia-smi is not available (nv files may not be bound with --writable)
-      run: singularity exec --writable --cleanenv -H $PWD:/home --pwd /home --nv ../lammps-ani.sif /bin/bash -c "nvidia-smi && cd /lammps-ani/tests/test_ani2x_nocuaev_double && python save_ani_nocuaev_double.py && cd ../ && ./test_all.sh"
+      run: singularity exec --cleanenv -H $PWD:/home --pwd /home --nv ../lammps-ani.sif /bin/bash -c "nvidia-smi && cd external/torchani_sandbox && python setup.py install --ext --user && cd ../../ && cd tests/test_ani2x_nocuaev_double && python save_ani_nocuaev_double.py && cd ../ && ./test_all.sh"
 
 concurrency:
   group: build_singularity-${{ github.event.pull_request.number || github.sha }}

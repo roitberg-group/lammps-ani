@@ -33,6 +33,8 @@ From: nvcr.io/nvidia/pytorch:22.08-py3
 
     # environment
     export LAMMPS_ANI_ROOT=/lammps-ani
+    # NGC PyTorch needs CXX11_ABI
+    export CXX11_ABI=1
 
     # build
     ./build.sh

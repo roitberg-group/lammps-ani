@@ -51,6 +51,6 @@ cmake -DCMAKE_C_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DCMAKE_CXX_FLAGS=
 make -j
 cd ../
 
-# test
-cd tests/
-./test_all.sh
+# # test
+# cd tests/
+# ./test_all.sh

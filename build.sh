@@ -17,7 +17,7 @@ cp external/torchani_sandbox/torchani/csrc/* ani_csrc/
 
 # build torchani
 cd external/torchani_sandbox
-rm -rf build && python setup.py develop --ext --user
+rm -rf build && python setup.py install --ext
 pip install h5py ase
 cd ../../
 

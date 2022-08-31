@@ -24,14 +24,6 @@ git clone git@github.com:lammps/lammps.git
 cd lammps
 export LAMMPS_ROOT=${PWD}
 mkdir build; cd build
-cmake -DCMAKE_C_FLAGS='-D_GLIBCXX_USE_CXX11_ABI=0'  -DCMAKE_CXX_FLAGS='-D_GLIBCXX_USE_CXX11_ABI=0' -DLAMMPS_INSTALL_RPATH=yes -DPKG_GPU=no \
--DGPU_API=cuda -DGPU_ARCH=sm_80 -DPKG_PLUGIN=yes -DCMAKE_INSTALL_PREFIX=${HOME}/.local -DBUILD_MPI=yes -DBUILD_SHARED_LIBS=yes -DLAMMPS_MACHINE=mpi \
-../cmake/
-make -j
-
-# Optionally build with test
-cd ..
-mkdir build-test; cd build-test
 # D_GLIBCXX_USE_CXX11_ABI: https://stackoverflow.com/a/50873329/9581569
 cmake -DCMAKE_C_FLAGS='-D_GLIBCXX_USE_CXX11_ABI=0'  -DCMAKE_CXX_FLAGS='-D_GLIBCXX_USE_CXX11_ABI=0' -DLAMMPS_INSTALL_RPATH=yes -DPKG_GPU=no \
 -DGPU_API=cuda -DGPU_ARCH=sm_80 -DPKG_PLUGIN=yes -DCMAKE_INSTALL_PREFIX=${HOME}/.local -DBUILD_MPI=yes -DBUILD_SHARED_LIBS=yes -DLAMMPS_MACHINE=mpi \

@@ -71,3 +71,15 @@ export LAMMPS_PLUGIN_PATH=/blue/roitberg/apps/lammps-ani/build/
 cd examples/water/
 mpirun -np 8 ${LAMMPS_ROOT}/build/lmp_mpi -in in.lammps
 ```
+
+## Singularity Usage
+```bash
+git clone --recursive git@github.com:roitberg-group/lammps-ani.git
+singularity pull -F docker://ghcr.io/roitberg-group/lammps-ani:master
+mkdir -p ~/singularity-home
+# exec into container
+SINGULARITYENV_CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES singularity exec --cleanenv -H ~/singularity-home:/home --nv lammps-ani_master.sif /bin/bash
+# test
+cd lammps-ani
+nvidia-smi && cd external/torchani_sandbox && python setup.py install --ext --user && cd ../../ && cd tests/test_ani2x_nocuaev_double && python save_ani_nocuaev_double.py && cd ../ && ./test_all.sh
+```

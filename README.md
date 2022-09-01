@@ -15,9 +15,10 @@ conda install pytorch torchvision torchaudio cudatoolkit=11.3 -c pytorch
 conda install -c conda-forge cudnn=8.3.2
 ```
 
-## Singularity Usage
-You could use the pre-built Singularity container to avoid build yourself.
+## Singularity & Docker Container
+You could use the pre-built [docker container](https://github.com/roitberg-group/lammps-ani/pkgs/container/lammps-ani) to avoid compiling the program by yourself.
 
+Some HPCs provide Singularity instead of Docker. The following shows the instruction for Singularity usage.:
 ```bash
 git clone --recursive git@github.com:roitberg-group/lammps-ani.git
 singularity pull -F docker://ghcr.io/roitberg-group/lammps-ani:master

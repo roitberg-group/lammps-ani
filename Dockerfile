@@ -13,6 +13,8 @@ ENV CXX11_ABI=1
 # allow run OpenMPI as root
 ENV OMPI_ALLOW_RUN_AS_ROOT=1
 ENV OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
+# NGC Container forces using TF32, disable it
+ENV TORCH_ALLOW_TF32_CUBLAS_OVERRIDE=0
 
 # Set default shell to /bin/bash
 SHELL ["/bin/bash", "-cu"]

@@ -31,6 +31,48 @@ class ANI2x(torch.nn.Module):
             # self.neural_networks.mnp_migrate_device()
         # when use ghost_index and mnp, the input system must be a single molecule
 
+        if atomic:
+            return self.forward_atomic(species, coordinates, atom_index12, diff_vector, distances, species_ghost_as_padding)
+        else:
+            return self.forward_total(species, coordinates, atom_index12, diff_vector, distances, species_ghost_as_padding)
+
+    @torch.jit.export
+    def forward_total(self, species, coordinates, atom_index12, diff_vector, distances, species_ghost_as_padding):
+        aev = self.compute_aev(species, coordinates, atom_index12, diff_vector, distances)
+
+        # run neural networks
+        species_energies = self.neural_networks((species_ghost_as_padding, aev))
+        # TODO force is independent of energy_shifter?
+        species_energies = self.energy_shifter(species_energies)
+        energies = species_energies[1]
+        force = torch.autograd.grad([energies.sum()], [coordinates], create_graph=True, retain_graph=True)[0]
+        assert force is not None
+        force = -force
+        return energies, force, torch.empty(0)
+
+    @torch.jit.export
+    def forward_atomic(self, species, coordinates, atom_index12, diff_vector, distances, species_ghost_as_padding):
+        aev = self.compute_aev(species, coordinates, atom_index12, diff_vector, distances)
+
+        ntotal = species.shape[1]
+        nghost = (species_ghost_as_padding == -1).flatten().sum()
+        nlocal = ntotal - nghost
+
+        # run neural networks
+        atomic_energies = self.neural_networks._atomic_energies((species_ghost_as_padding, aev))
+        atomic_energies += self.energy_shifter._atomic_saes(species_ghost_as_padding)
+        if atomic_energies.dim() == 2:
+            atomic_energies = atomic_energies.unsqueeze(0)
+        atomic_energies = atomic_energies.mean(dim=0)
+
+        energies = atomic_energies.sum(dim=1)
+        force = torch.autograd.grad([energies.sum()], [coordinates], create_graph=True, retain_graph=True)[0]
+        assert force is not None
+        force = -force
+        return energies, force, atomic_energies[:, :nlocal]
+
+    @torch.jit.export
+    def compute_aev(self, species, coordinates, atom_index12, diff_vector, distances):
         # dtype
         dtype = self.dummy_buffer.dtype
 
@@ -52,42 +94,8 @@ class ANI2x(torch.nn.Module):
             distances = distances.to(dtype)
             aev = self.aev_computer._compute_aev(species, atom_index12, diff_vector, distances)
 
-        # run neural networks
-        if atomic:
-            return self.forward_atomic(coordinates, species_ghost_as_padding, aev)
-        else:
-            return self.forward_total(coordinates, species_ghost_as_padding, aev)
+        return aev
 
-    @torch.jit.export
-    def forward_total(self, coordinates, species_ghost_as_padding, aev):
-        # run neural networks
-        species_energies = self.neural_networks((species_ghost_as_padding, aev))
-        # TODO force is independent of energy_shifter?
-        species_energies = self.energy_shifter(species_energies)
-        energies = species_energies[1]
-        force = torch.autograd.grad([energies.sum()], [coordinates], create_graph=True, retain_graph=True)[0]
-        assert force is not None
-        force = -force
-        return energies, force, torch.empty(0)
-
-    @torch.jit.export
-    def forward_atomic(self, coordinates, species_ghost_as_padding, aev):
-        ntotal = species_ghost_as_padding.shape[1]
-        nghost = (species_ghost_as_padding == -1).flatten().sum()
-        nlocal = ntotal - nghost
-
-        # run neural networks
-        atomic_energies = self.neural_networks._atomic_energies((species_ghost_as_padding, aev))
-        atomic_energies += self.energy_shifter._atomic_saes(species_ghost_as_padding)
-        if atomic_energies.dim() == 2:
-            atomic_energies = atomic_energies.unsqueeze(0)
-        atomic_energies = atomic_energies.mean(dim=0)
-
-        energies = atomic_energies.sum(dim=1)
-        force = torch.autograd.grad([energies.sum()], [coordinates], create_graph=True, retain_graph=True)[0]
-        assert force is not None
-        force = -force
-        return energies, force, atomic_energies[:, :nlocal]
 
 class ANI2xRef(torch.nn.Module):
     """
@@ -163,9 +171,9 @@ def save_ani2x_model(runpbc=False, device='cuda', use_double=True, use_cuaev=Fal
 
     # test forward_atomic API
     energy_, force_, atomic_energies = ani2x_loaded(species, coordinates, atom_index12, diff_vector, distances, species_ghost_as_padding, atomic=True)
-    assert torch.allclose(energy, energy_)
-    assert torch.allclose(force, force_)
-    assert torch.allclose(energy, atomic_energies.sum(dim=-1))
+    assert torch.allclose(energy, energy_, atol=1e-5)
+    assert torch.allclose(force, force_, atol=1e-5)
+    assert torch.allclose(energy, atomic_energies.sum(dim=-1), atol=1e-5)
 
     energy, force = energy * hartree2kcalmol, force * hartree2kcalmol
     print(f"{'energy:'.ljust(15)} shape: {energy.shape}, value: {energy.item()}, dtype: {energy.dtype}, unit: (kcal/mol)")
@@ -187,7 +195,7 @@ def save_ani2x_model(runpbc=False, device='cuda', use_double=True, use_cuaev=Fal
     print(f"{'force_ref:'.ljust(15)} shape: {force_ref.shape}, dtype: {force_ref.dtype}, unit: (kcal/mol/A)")
 
     if use_cuaev:
-        threshold = 7e-6
+        threshold = 7e-5
     else:
         threshold = 1e-7 if use_double else 3e-5
     energy_err = torch.abs(torch.max(energy_ref.cpu() - energy.cpu()))

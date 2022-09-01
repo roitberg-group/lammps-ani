@@ -52,6 +52,7 @@ def run(pbc=False, use_double=True):
             % (epot, ekin, ekin / len(a) / (1.5 * units.kB), epot + ekin)
         )
         df = pd.DataFrame(forces)
+        df.index = df.index + 1
         print(f"forces: \n{df}")
 
     dyn = VelocityVerlet(

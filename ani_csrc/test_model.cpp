@@ -140,7 +140,7 @@ int test_ani2x_withnbr(int argc, const char* argv[]) {
   ani.compute(out_energy, out_force, species, coords, npairs, atom_index12.data(), nlocal);
 
   // check error
-  energy_err = abs(out_energy - expected_energy);
+  energy_err = abs(out_energy - expected_energy) / hartree2kcalmol; // use hartree for error
   force_err = 0.0;
   // check force error
   for (int i = 0; i < out_force.size(); i++) {
@@ -150,11 +150,13 @@ int test_ani2x_withnbr(int argc, const char* argv[]) {
     force_err = std::max(force_err, err);
   }
 
-  std::cout << "First call : energy " << std::fixed << out_energy << ", error: " << std::scientific << energy_err << std::endl;
+  double threshold = (ani.dtype == torch::kFloat64) ? 1e-8 : 1e-4;
+  std::cout << "First call : energy " << std::fixed << out_energy << " (kcal/mol), error: " << std::scientific << energy_err
+            << " (hartree)" << std::endl;
   std::cout << "First call : force " << out_force[0] << ", " << out_force[1] << ", " << out_force[2]
-            << ", error: " << std::scientific << force_err << std::endl;
-  TORCH_CHECK(energy_err < 1e-5, "Wrong Energy");
-  TORCH_CHECK(force_err < 1e-5, "Wrong Forces");
+            << ", error: " << std::scientific << force_err << " (kcal/mol)" << std::endl;
+  TORCH_CHECK(energy_err < threshold, "Wrong Energy");
+  TORCH_CHECK(force_err < threshold, "Wrong Forces");
   std::cout << std::endl;
 
   return 0;

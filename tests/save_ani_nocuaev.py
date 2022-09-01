@@ -20,7 +20,7 @@ class ANI2xNoCUAEV(torch.nn.Module):
         # self.neural_networks = ani2x.neural_networks.to_infer_model(use_mnp=True)
         self.neural_networks = ani2x.neural_networks
         self.energy_shifter = ani2x.energy_shifter
-        self.dummy_param = torch.nn.Parameter(torch.empty(0))
+        self.register_buffer("dummy_buffer", torch.empty(0))
 
     @torch.jit.export
     def forward(self, species, coordinates, atom_index12, diff_vector, distances, species_ghost_as_padding, atomic: bool=False):
@@ -39,7 +39,7 @@ class ANI2xNoCUAEV(torch.nn.Module):
         # when use ghost_index and mnp, the input system must be a single molecule
 
         # convert dtype
-        dtype = self.dummy_param.dtype
+        dtype = self.dummy_buffer.dtype
         ntotal = species.shape[1]
         nghost = (species_ghost_as_padding == -1).flatten().sum()
         nlocal = ntotal - nghost
@@ -64,7 +64,7 @@ class ANI2xNoCUAEV(torch.nn.Module):
     @torch.jit.export
     def forward_atomic(self, species, coordinates, atom_index12, diff_vector, distances, species_ghost_as_padding):
         # convert dtype
-        dtype = self.dummy_param.dtype
+        dtype = self.dummy_buffer.dtype
         ntotal = species.shape[1]
         nghost = (species_ghost_as_padding == -1).flatten().sum()
         nlocal = ntotal - nghost

@@ -1,7 +1,7 @@
 ---
 lammps_version: 17 Feb 2022
 date_generated: Sat Jun 18 22:17:50 2022
-epsilon: 8e-3
+epsilon: 9e-3
 skip_tests:
 prerequisites: ! |
   pair ani

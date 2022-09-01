@@ -186,7 +186,10 @@ def save_ani2x_model(runpbc=False, device='cuda', use_double=True, use_cuaev=Fal
     print(f"{'energy_ref:'.ljust(15)} shape: {energy_ref.shape}, value: {energy_ref.item()}, dtype: {energy_ref.dtype}, unit: (kcal/mol)")
     print(f"{'force_ref:'.ljust(15)} shape: {force_ref.shape}, dtype: {force_ref.dtype}, unit: (kcal/mol/A)")
 
-    threshold = 1e-7 if use_double else 3e-5
+    if use_cuaev:
+        threshold = 7e-6
+    else:
+        threshold = 1e-7 if use_double else 3e-5
     energy_err = torch.abs(torch.max(energy_ref.cpu() - energy.cpu()))
     force_err = torch.abs(torch.max(force_ref.cpu() - force.cpu()))
 

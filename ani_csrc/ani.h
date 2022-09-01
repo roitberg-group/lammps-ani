@@ -12,6 +12,7 @@ class ANI {
  public:
   torch::jit::script::Module model;
   torch::Device device;
+  torch::Dtype dtype;
   torch::Tensor atom_index12_t;
   torch::Tensor species_t;
   torch::Tensor species_ghost_as_padding_t;

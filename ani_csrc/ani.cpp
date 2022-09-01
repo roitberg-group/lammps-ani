@@ -11,9 +11,21 @@ ANI::ANI(const std::string& model_file, int local_rank) : device(local_rank == -
   at::globalContext().setAllowTF32CuDNN(false);
   try {
     model = torch::jit::load(model_file, device);
-    std::cout << "Successfully loaded the model on " << device << std::endl;
+    bool found_dummy_buffer = false;
+    for (const torch::jit::NameTensor& p : model.named_buffers(/*recurse=*/false)) {
+      if (p.name == "dummy_buffer") {
+        dtype = p.value.scalar_type();
+        found_dummy_buffer = true;
+      }
+    }
+    TORCH_CHECK(
+        found_dummy_buffer,
+        "dummy_buffer is not found in your model, please register one with: "
+        "self.register_buffer('dummy_buffer', torch.empty(0))");
+    std::cout << "Successfully loaded the model '" << model_file << "' on: " << device << ", dtype: " << dtype << std::endl;
   } catch (const c10::Error& e) {
-    std::cerr << "Error loading the model on " << device << std::endl;
+    std::cerr << "Error loading the model '" << model_file << "' on " << device << ". " << e.what();
+    throw std::runtime_error("Error");
   }
 }
 

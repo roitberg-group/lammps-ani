@@ -26,7 +26,7 @@ mkdir -p ~/singularity-home
 SINGULARITYENV_CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES singularity exec --cleanenv -H ~/singularity-home:/home --nv lammps-ani_master.sif /bin/bash
 # test
 cd lammps-ani
-nvidia-smi && cd external/torchani_sandbox && python setup.py install --ext --user && cd ../../ && cd tests/test_ani2x_nocuaev_double && python save_ani_nocuaev_double.py && cd ../ && ./test_all.sh
+nvidia-smi && cd external/torchani_sandbox && python setup.py install --ext --user && cd ../../ && cd tests/ && python save_ani_nocuaev.py && ./test_all.sh
 ```
 
 ## Build

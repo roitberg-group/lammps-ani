@@ -2,6 +2,7 @@ import ase
 import torch
 import torchani
 import numpy as np
+import pandas as pd
 from ase.io import read
 from ase.md.verlet import VelocityVerlet
 from ase import units
@@ -9,13 +10,15 @@ import argparse
 
 torch.set_printoptions(precision=15)
 np.set_printoptions(precision=15)
+pd.set_option("display.precision", 15)
 
 
-def run(pbc=False):
+def run(pbc=False, use_double=True):
     input_file = "water-0.8nm.pdb"
     atoms = read(input_file)
 
-    device = torch.device("cuda")
+    # use cpu for reference result
+    device = torch.device("cpu")
     ani2x = torchani.models.ANI2x(
         periodic_table_index=True,
         model_index=None,
@@ -26,7 +29,9 @@ def run(pbc=False):
     # TODO It is IMPORTANT to set cutoff as 7.1 to match lammps nbr cutoff
     ani2x.aev_computer.neighborlist.cutoff = 7.1
     # double precision
-    calculator = ani2x.to(device).double().ase()
+    if use_double:
+        ani2x = ani2x.double()
+    calculator = ani2x.to(device).ase()
 
     print(len(atoms), "atoms in the cell")
     atoms.set_calculator(calculator)
@@ -46,7 +51,9 @@ def run(pbc=False):
             "Etot = %.13f kcal/mol"
             % (epot, ekin, ekin / len(a) / (1.5 * units.kB), epot + ekin)
         )
-        print(f"forces: \n{forces}")
+        df = pd.DataFrame(forces)
+        df.index = df.index + 1
+        print(f"forces: \n{df}")
 
     dyn = VelocityVerlet(
         atoms, dt=0.1 * units.fs, trajectory="md.traj", logfile="md.log"
@@ -59,6 +66,7 @@ def run(pbc=False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--pbc", default=False, action="store_true")
+    parser.add_argument("--single", default=False, action="store_true")
     args = parser.parse_args()
 
-    run(args.pbc)
+    run(args.pbc, not args.single)

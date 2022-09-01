@@ -20,7 +20,7 @@ class ANI2xNoCUAEV(torch.nn.Module):
         # self.neural_networks = ani2x.neural_networks.to_infer_model(use_mnp=True)
         self.neural_networks = ani2x.neural_networks
         self.energy_shifter = ani2x.energy_shifter
-        self.dummy_param = torch.nn.Parameter(torch.empty(0))
+        self.register_buffer("dummy_buffer", torch.empty(0))
 
     @torch.jit.export
     def forward(self, species, coordinates, atom_index12, diff_vector, distances, species_ghost_as_padding, atomic: bool=False):
@@ -39,7 +39,7 @@ class ANI2xNoCUAEV(torch.nn.Module):
         # when use ghost_index and mnp, the input system must be a single molecule
 
         # convert dtype
-        dtype = self.dummy_param.dtype
+        dtype = self.dummy_buffer.dtype
         ntotal = species.shape[1]
         nghost = (species_ghost_as_padding == -1).flatten().sum()
         nlocal = ntotal - nghost
@@ -64,7 +64,7 @@ class ANI2xNoCUAEV(torch.nn.Module):
     @torch.jit.export
     def forward_atomic(self, species, coordinates, atom_index12, diff_vector, distances, species_ghost_as_padding):
         # convert dtype
-        dtype = self.dummy_param.dtype
+        dtype = self.dummy_buffer.dtype
         ntotal = species.shape[1]
         nghost = (species_ghost_as_padding == -1).flatten().sum()
         nlocal = ntotal - nghost
@@ -89,11 +89,10 @@ class ANI2xNoCUAEV(torch.nn.Module):
         return energies, force, atomic_energies[:, :nlocal]
 
 
-def save_ani2x_model(runpbc=False, device='cuda'):
+def save_ani2x_model(runpbc=False, device='cuda', use_double=True):
     hartree2kcalmol = 627.5094738898777
 
     # dtype
-    use_double = True
     dtype = torch.float64 if use_double else torch.float32
 
     ani2x = ANI2xNoCUAEV()
@@ -155,7 +154,7 @@ def save_ani2x_model(runpbc=False, device='cuda'):
     print(f"{'energy_ref:'.ljust(15)} shape: {energy_ref.shape}, value: {energy_ref.item()}, dtype: {energy_ref.dtype}, unit: (kcal/mol)")
     print(f"{'force_ref:'.ljust(15)} shape: {force_ref.shape}, dtype: {force_ref.dtype}, unit: (kcal/mol/A)")
 
-    threshold = 1e-7
+    threshold = 1e-7 if use_double else 3e-5
     energy_err = torch.abs(torch.max(energy_ref.cpu() - energy.cpu()))
     force_err = torch.abs(torch.max(force_ref.cpu() - force.cpu()))
 
@@ -169,8 +168,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # parser.add_argument('--pbc', default=False, action='store_true')
     args = parser.parse_args()
-    input_file = "../water-0.8nm.pdb"
-    output_file = 'ani2x_nocuaev_double.pt'
+    input_file = "water-0.8nm.pdb"
 
     devices = ['cpu']
     if torch.cuda.is_available():
@@ -179,7 +177,12 @@ if __name__ == '__main__':
             devices.append('cuda:1')
         else:
             devices.append('cuda:0')
-    for pbc in [False, True]:
-        for d in devices:
-            print(f"====================== device: {d} | pbc: {pbc} ======================")
-            save_ani2x_model(pbc, d)
+
+    for use_double in [True, False]:
+        double_or_single = "double" if use_double else "single"
+        output_file = f'ani2x_nocuaev_{double_or_single}.pt'
+        print(output_file)
+        for pbc in [False, True]:
+            for d in devices:
+                print(f"====================== {double_or_single} | pbc: {pbc} | device: {d} ======================")
+                save_ani2x_model(pbc, d, use_double)

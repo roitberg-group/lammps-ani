@@ -22,9 +22,9 @@ pip install h5py ase
 cd ../../
 
 # save model
-cd tests/test_ani2x_nocuaev_double/
-python save_ani_nocuaev_double.py
-cd ../../
+cd tests/
+python save_ani_nocuaev.py
+cd ../
 
 # build lammps
 cd external/lammps/

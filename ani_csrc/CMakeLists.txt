@@ -24,12 +24,7 @@ target_link_libraries(cuaev ${Python_LIBRARIES})
 # ani interface lib
 project(ani LANGUAGES CXX)
 find_package(OpenMP REQUIRED)
-if(EXISTS "mnp.cpp")
-    add_library(ani SHARED mnp.cpp ani.cpp)
-else()
-    # the aiqm/torchani does not have mnp
-    add_library(ani SHARED ani.cpp)
-endif()
+add_library(ani SHARED mnp.cpp ani.cpp)
 target_include_directories(ani PRIVATE ./)
 target_link_libraries(ani ${TORCH_LIBRARIES})
 target_link_libraries(ani ${Python_LIBRARIES})

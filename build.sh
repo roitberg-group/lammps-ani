@@ -23,7 +23,7 @@ cd ../../
 
 # save model
 cd tests/
-python save_ani_nocuaev.py
+python save_ani.py
 cd ../
 
 # build lammps

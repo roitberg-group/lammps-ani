@@ -13,18 +13,18 @@ np.set_printoptions(precision=15)
 pd.set_option("display.precision", 15)
 
 
-def run(pbc=False, use_double=True):
+def run(pbc=False, use_double=True, use_cuaev=False):
     input_file = "water-0.8nm.pdb"
     atoms = read(input_file)
 
-    # use cpu for reference result
-    device = torch.device("cpu")
+    # use cpu for reference result if not for cuaev
+    device = torch.device("cuda") if use_cuaev else torch.device("cpu")
     ani2x = torchani.models.ANI2x(
         periodic_table_index=True,
         model_index=None,
         cell_list=False,
-        use_cuaev_interface=False,
-        use_cuda_extension=False,
+        use_cuaev_interface=use_cuaev,
+        use_cuda_extension=use_cuaev,
     )
     # TODO It is IMPORTANT to set cutoff as 7.1 to match lammps nbr cutoff
     ani2x.aev_computer.neighborlist.cutoff = 7.1
@@ -67,6 +67,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--pbc", default=False, action="store_true")
     parser.add_argument("--single", default=False, action="store_true")
+    parser.add_argument("--cuaev", default=False, action="store_true")
     args = parser.parse_args()
+    if args.cuaev:
+        assert (
+            args.single
+        ), "please only use single precision (--single) for cuaev reference result"
 
-    run(args.pbc, not args.single)
+    run(args.pbc, not args.single, args.cuaev)

@@ -19,6 +19,8 @@ From: nvcr.io/nvidia/pytorch:22.08-py3
     # allow run OpenMPI as root
     export OMPI_ALLOW_RUN_AS_ROOT=1
     export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
+    # NGC Container forces using TF32, disable it
+    export TORCH_ALLOW_TF32_CUBLAS_OVERRIDE=0
 
 %post
     # copy files
@@ -35,6 +37,9 @@ From: nvcr.io/nvidia/pytorch:22.08-py3
     export LAMMPS_ANI_ROOT=/lammps-ani
     # NGC PyTorch needs CXX11_ABI
     export CXX11_ABI=1
+
+    # NGC Container forces using TF32, disable it
+    export TORCH_ALLOW_TF32_CUBLAS_OVERRIDE=0
 
     # build
     ./build.sh

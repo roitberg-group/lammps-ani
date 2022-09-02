@@ -14,3 +14,9 @@ fi
 # test_ani2x_nocuaev_double
 cd ./test_ani2x_nocuaev_double && ./test.sh
 cd run && ./run.sh && cd ../../
+
+cd ./test_ani2x_nocuaev_single && ./test.sh
+cd run && ./run.sh && cd ../../
+
+cd ./test_ani2x_cuaev_single && ./test.sh
+cd run && ./run.sh && cd ../../

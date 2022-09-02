@@ -17,8 +17,9 @@ class ANI2x(torch.nn.Module):
                                       use_cuaev_interface=use_cuaev, use_cuda_extension=use_cuaev)
         self.use_cuaev = use_cuaev
         self.aev_computer = ani2x.aev_computer
-        # self.neural_networks = ani2x.neural_networks.to_infer_model(use_mnp=True)
-        self.neural_networks = ani2x.neural_networks
+        # batched neural networks
+        self.neural_networks = ani2x.neural_networks.to_infer_model(use_mnp=False)
+        # self.neural_networks = ani2x.neural_networks
         self.energy_shifter = ani2x.energy_shifter
         self.register_buffer("dummy_buffer", torch.empty(0))
 
@@ -27,8 +28,6 @@ class ANI2x(torch.nn.Module):
         if self.use_cuaev and not self.aev_computer.cuaev_is_initialized:
             self.aev_computer._init_cuaev_computer()
             self.aev_computer.cuaev_is_initialized = True
-            # TODO check again
-            # self.neural_networks.mnp_migrate_device()
         # when use ghost_index and mnp, the input system must be a single molecule
 
         if atomic:
@@ -61,9 +60,6 @@ class ANI2x(torch.nn.Module):
         # run neural networks
         atomic_energies = self.neural_networks._atomic_energies((species_ghost_as_padding, aev))
         atomic_energies += self.energy_shifter._atomic_saes(species_ghost_as_padding)
-        if atomic_energies.dim() == 2:
-            atomic_energies = atomic_energies.unsqueeze(0)
-        atomic_energies = atomic_energies.mean(dim=0)
 
         energies = atomic_energies.sum(dim=1)
         force = torch.autograd.grad([energies.sum()], [coordinates], create_graph=True, retain_graph=True)[0]

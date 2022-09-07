@@ -11,8 +11,8 @@ torch.backends.cudnn.allow_tf32 = False
 hartree2kcalmol = 627.5094738898777
 
 # NVFuser has bug
-torch._C._jit_set_nvfuser_enabled(False)
-
+# torch._C._jit_set_nvfuser_enabled(False)
+torch._C._get_graph_executor_optimize(False)
 
 class ANI2x(torch.nn.Module):
     def __init__(self, use_cuaev, use_fullnbr):
@@ -28,6 +28,7 @@ class ANI2x(torch.nn.Module):
         self.energy_shifter = ani2x.energy_shifter
         self.register_buffer("dummy_buffer", torch.empty(0))
         self.use_fullnbr = use_fullnbr
+        # self.nvfuser_enabled = torch._C._jit_nvfuser_enabled()
 
     @torch.jit.export
     def forward(self, species, coordinates, atom_index12, diff_vector, distances, species_ghost_as_padding, atomic: bool=False):
@@ -58,7 +59,6 @@ class ANI2x(torch.nn.Module):
 
     @torch.jit.export
     def forward_atomic(self, species, coordinates, atom_index12, diff_vector, distances, species_ghost_as_padding, aev):
-        print("=============\n=============\n=============\n=============\n=============\n=============\n=============")
         # aev = self.compute_aev(species, coordinates, atom_index12, diff_vector, distances)
 
         ntotal = species.shape[1]
@@ -152,10 +152,10 @@ def save_ani2x_model(runpbc=False, device='cuda', use_double=True, use_cuaev=Fal
 
     # we need a fewer iterations to tigger the fuser
     for i in range(5):
-        test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, dtype)
+        test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, dtype, verbose=(i==0))
 
 
-def test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, dtype):
+def test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, dtype, verbose=False):
     mol = read(input_file)
 
     species = torch.tensor(mol.get_atomic_numbers(), device=device).unsqueeze(0)
@@ -173,7 +173,6 @@ def test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, dtype):
         atom_index12, _, diff_vector, distances = ani2x_ref.model.aev_computer.neighborlist(species, coordinates, cell, pbc)
     else:
         atom_index12, _, diff_vector, distances = ani2x_ref.model.aev_computer.neighborlist(species, coordinates)
-    print(distances.shape)
     species_ghost_as_padding = species.detach().clone()
     torch.set_printoptions(profile="full")
 
@@ -182,14 +181,24 @@ def test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, dtype):
 
     # test forward_atomic API
     energy_, force_, atomic_energies = ani2x_loaded(species, coordinates, atom_index12, diff_vector, distances, species_ghost_as_padding, atomic=True)
-    assert torch.allclose(energy, energy_, atol=1e-5)
-    print("atomic force max err: ".ljust(15), (force - force_).abs().max().item())
-    assert torch.allclose(force, force_, atol=1e-5)
-    assert torch.allclose(energy, atomic_energies.sum(dim=-1), atol=1e-5)
 
     energy, force = energy * hartree2kcalmol, force * hartree2kcalmol
-    print(f"{'energy:'.ljust(15)} shape: {energy.shape}, value: {energy.item()}, dtype: {energy.dtype}, unit: (kcal/mol)")
-    print(f"{'force:'.ljust(15)} shape: {force.shape}, dtype: {force.dtype}, unit: (kcal/mol/A)")
+    energy_, atomic_energies, force_ = energy_ * hartree2kcalmol, atomic_energies * hartree2kcalmol, force_ * hartree2kcalmol
+
+    if verbose:
+        print(distances.shape)
+        print("atomic force max err: ".ljust(15), (force - force_).abs().max().item())
+        print(f"{'energy:'.ljust(15)} shape: {energy.shape}, value: {energy.item()}, dtype: {energy.dtype}, unit: (kcal/mol)")
+        print(f"{'force:'.ljust(15)} shape: {force.shape}, dtype: {force.dtype}, unit: (kcal/mol/A)")
+
+    if use_cuaev:
+        threshold = 9.5e-5
+    else:
+        threshold = 1e-7 if use_double else 3e-5
+
+    assert torch.allclose(energy, energy_, atol=threshold), f"error {(energy - energy_).abs().max()}"
+    assert torch.allclose(force, force_, atol=threshold), f"error {(force - force_).abs().max()}"
+    assert torch.allclose(energy, atomic_energies.sum(dim=-1), atol=threshold), f"error {(energy - atomic_energies.sum(dim=-1)).abs().max()}"
 
     # for test_model inputs
     # print(coordinates.flatten())
@@ -203,20 +212,18 @@ def test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, dtype):
         _, energy_ref = ani2x_ref((species, coordinates))
     force_ref = -torch.autograd.grad(energy_ref.sum(), coordinates, create_graph=True, retain_graph=True)[0]
     energy_ref, force_ref = energy_ref * hartree2kcalmol, force_ref * hartree2kcalmol
-    print(f"{'energy_ref:'.ljust(15)} shape: {energy_ref.shape}, value: {energy_ref.item()}, dtype: {energy_ref.dtype}, unit: (kcal/mol)")
-    print(f"{'force_ref:'.ljust(15)} shape: {force_ref.shape}, dtype: {force_ref.dtype}, unit: (kcal/mol/A)")
 
-    if use_cuaev:
-        threshold = 9.5e-5
-    else:
-        threshold = 1e-7 if use_double else 3e-5
     energy_err = torch.abs(torch.max(energy_ref.cpu() - energy.cpu()))
     force_err = torch.abs(torch.max(force_ref.cpu() - force.cpu()))
 
-    print("energy max err: ".ljust(15), energy_err.item())
-    print("force  max err: ".ljust(15), force_err.item())
-    assert(energy_err < threshold)
-    assert(force_err < threshold)
+    if verbose:
+        print(f"{'energy_ref:'.ljust(15)} shape: {energy_ref.shape}, value: {energy_ref.item()}, dtype: {energy_ref.dtype}, unit: (kcal/mol)")
+        print(f"{'force_ref:'.ljust(15)} shape: {force_ref.shape}, dtype: {force_ref.dtype}, unit: (kcal/mol/A)")
+        print("energy max err: ".ljust(15), energy_err.item())
+        print("force  max err: ".ljust(15), force_err.item())
+
+    assert torch.allclose(energy, energy_ref, atol=threshold), f"error {(energy - energy_ref).abs().max()}"
+    assert torch.allclose(force, force_ref, atol=threshold), f"error {(force - force_ref).abs().max()}"
 
 
 if __name__ == '__main__':

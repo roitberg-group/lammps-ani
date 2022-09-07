@@ -8,6 +8,10 @@ from torchani.nn import SpeciesEnergies
 
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
+hartree2kcalmol = 627.5094738898777
+
+# NVFuser has bug
+torch._C._jit_set_nvfuser_enabled(False)
 
 
 class ANI2x(torch.nn.Module):
@@ -32,14 +36,15 @@ class ANI2x(torch.nn.Module):
             self.aev_computer.cuaev_is_initialized = True
         # when use ghost_index and mnp, the input system must be a single molecule
 
+        aev = self.compute_aev(species, coordinates, atom_index12, diff_vector, distances)
         if atomic:
-            return self.forward_atomic(species, coordinates, atom_index12, diff_vector, distances, species_ghost_as_padding)
+            return self.forward_atomic(species, coordinates, atom_index12, diff_vector, distances, species_ghost_as_padding, aev)
         else:
-            return self.forward_total(species, coordinates, atom_index12, diff_vector, distances, species_ghost_as_padding)
+            return self.forward_total(species, coordinates, atom_index12, diff_vector, distances, species_ghost_as_padding, aev)
 
     @torch.jit.export
-    def forward_total(self, species, coordinates, atom_index12, diff_vector, distances, species_ghost_as_padding):
-        aev = self.compute_aev(species, coordinates, atom_index12, diff_vector, distances)
+    def forward_total(self, species, coordinates, atom_index12, diff_vector, distances, species_ghost_as_padding, aev):
+        # aev = self.compute_aev(species, coordinates, atom_index12, diff_vector, distances)
 
         # run neural networks
         species_energies = self.neural_networks((species_ghost_as_padding, aev))
@@ -52,8 +57,9 @@ class ANI2x(torch.nn.Module):
         return energies, force, torch.empty(0)
 
     @torch.jit.export
-    def forward_atomic(self, species, coordinates, atom_index12, diff_vector, distances, species_ghost_as_padding):
-        aev = self.compute_aev(species, coordinates, atom_index12, diff_vector, distances)
+    def forward_atomic(self, species, coordinates, atom_index12, diff_vector, distances, species_ghost_as_padding, aev):
+        print("=============\n=============\n=============\n=============\n=============\n=============\n=============")
+        # aev = self.compute_aev(species, coordinates, atom_index12, diff_vector, distances)
 
         ntotal = species.shape[1]
         nghost = (species_ghost_as_padding == -1).flatten().sum()
@@ -126,8 +132,6 @@ class ANI2xRef(torch.nn.Module):
 
 
 def save_ani2x_model(runpbc=False, device='cuda', use_double=True, use_cuaev=False, use_fullnbr=False):
-    hartree2kcalmol = 627.5094738898777
-
     # dtype
     dtype = torch.float64 if use_double else torch.float32
 
@@ -145,6 +149,13 @@ def save_ani2x_model(runpbc=False, device='cuda', use_double=True, use_cuaev=Fal
     # cuaev currently only works with single precision
     if use_cuaev:
         ani2x_ref.model.aev_computer = ani2x_ref.model.aev_computer.to(torch.float32)
+
+    # we need a fewer iterations to tigger the fuser
+    for i in range(5):
+        test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, dtype)
+
+
+def test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, dtype):
     mol = read(input_file)
 
     species = torch.tensor(mol.get_atomic_numbers(), device=device).unsqueeze(0)
@@ -172,6 +183,7 @@ def save_ani2x_model(runpbc=False, device='cuda', use_double=True, use_cuaev=Fal
     # test forward_atomic API
     energy_, force_, atomic_energies = ani2x_loaded(species, coordinates, atom_index12, diff_vector, distances, species_ghost_as_padding, atomic=True)
     assert torch.allclose(energy, energy_, atol=1e-5)
+    print("atomic force max err: ".ljust(15), (force - force_).abs().max().item())
     assert torch.allclose(force, force_, atol=1e-5)
     assert torch.allclose(energy, atomic_energies.sum(dim=-1), atol=1e-5)
 

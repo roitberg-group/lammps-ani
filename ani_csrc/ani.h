@@ -13,7 +13,7 @@ class ANI {
   torch::jit::script::Module model;
   torch::Device device;
   torch::Dtype dtype;
-  bool use_full_nbrlist;
+  bool use_fullnbr;
   torch::Tensor atom_index12_t;
   torch::Tensor species_t;
   torch::Tensor species_ghost_as_padding_t;

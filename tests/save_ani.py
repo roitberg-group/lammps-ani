@@ -11,11 +11,11 @@ torch.backends.cudnn.allow_tf32 = False
 
 
 class ANI2x(torch.nn.Module):
-    def __init__(self, use_cuaev, use_full_nbrlist):
+    def __init__(self, use_cuaev, use_fullnbr):
         super().__init__()
         ani2x = torchani.models.ANI2x(periodic_table_index=False, model_index=None, cell_list=False,
                                       use_cuaev_interface=use_cuaev, use_cuda_extension=use_cuaev,
-                                      use_full_nbrlist=use_full_nbrlist)
+                                      use_fullnbr=use_fullnbr)
         self.use_cuaev = use_cuaev
         self.aev_computer = ani2x.aev_computer
         # batched neural networks
@@ -23,7 +23,7 @@ class ANI2x(torch.nn.Module):
         # self.neural_networks = ani2x.neural_networks
         self.energy_shifter = ani2x.energy_shifter
         self.register_buffer("dummy_buffer", torch.empty(0))
-        self.use_full_nbrlist = use_full_nbrlist
+        self.use_fullnbr = use_fullnbr
 
     @torch.jit.export
     def forward(self, species, coordinates, atom_index12, diff_vector, distances, species_ghost_as_padding, atomic: bool=False):
@@ -99,15 +99,15 @@ class ANI2xRef(torch.nn.Module):
     """
     This is used to handel cuaev_computer that currently only works with single precision.
     """
-    def __init__(self, use_cuaev, use_full_nbrlist):
+    def __init__(self, use_cuaev, use_fullnbr):
         super().__init__()
         ani2x = torchani.models.ANI2x(periodic_table_index=False, model_index=None, cell_list=False,
                                       use_cuaev_interface=use_cuaev, use_cuda_extension=use_cuaev,
-                                      use_full_nbrlist=use_full_nbrlist)
+                                      use_fullnbr=use_fullnbr)
         self.model = ani2x
         self.use_cuaev = use_cuaev
         self.register_buffer("dummy_buffer", torch.empty(0))
-        self.use_full_nbrlist = use_full_nbrlist
+        self.use_fullnbr = use_fullnbr
 
     def forward(self, species_coordinates: Tuple[Tensor, Tensor],
                 cell: Optional[Tensor] = None,
@@ -125,13 +125,13 @@ class ANI2xRef(torch.nn.Module):
         return self.model.energy_shifter(species_energies)
 
 
-def save_ani2x_model(runpbc=False, device='cuda', use_double=True, use_cuaev=False, use_full_nbrlist=False):
+def save_ani2x_model(runpbc=False, device='cuda', use_double=True, use_cuaev=False, use_fullnbr=False):
     hartree2kcalmol = 627.5094738898777
 
     # dtype
     dtype = torch.float64 if use_double else torch.float32
 
-    ani2x = ANI2x(use_cuaev, use_full_nbrlist)
+    ani2x = ANI2x(use_cuaev, use_fullnbr)
     ani2x = ani2x.to(dtype)
     # cuaev currently only works with single precision
     if use_cuaev:
@@ -141,7 +141,7 @@ def save_ani2x_model(runpbc=False, device='cuda', use_double=True, use_cuaev=Fal
 
     ani2x_loaded = torch.jit.load(output_file).to(device)
     # ani2x_loaded = ani2x.to(device)
-    ani2x_ref = ANI2xRef(use_cuaev, use_full_nbrlist).to(device).to(dtype)
+    ani2x_ref = ANI2xRef(use_cuaev, use_fullnbr).to(device).to(dtype)
     # cuaev currently only works with single precision
     if use_cuaev:
         ani2x_ref.model.aev_computer = ani2x_ref.model.aev_computer.to(torch.float32)
@@ -223,8 +223,8 @@ if __name__ == '__main__':
 
     for use_cuaev in [True, False]:
         full_nbrlist = [True, False] if use_cuaev else [False]
-        for use_full_nbrlist in full_nbrlist:
-            full_or_half = "full" if use_full_nbrlist else "half"
+        for use_fullnbr in full_nbrlist:
+            full_or_half = "full" if use_fullnbr else "half"
             cuaev_or_nocuaev = "cuaev" if use_cuaev else "nocuaev"
             for use_double in [True, False]:
                 double_or_single = "double" if use_double else "single"
@@ -235,4 +235,4 @@ if __name__ == '__main__':
                         if use_cuaev and d == "cpu":
                             continue
                         print(f"====================== {cuaev_or_nocuaev} | {full_or_half} | {double_or_single} | pbc: {pbc} | device: {d} ======================")
-                        save_ani2x_model(pbc, d, use_double, use_cuaev, use_full_nbrlist)
+                        save_ani2x_model(pbc, d, use_double, use_cuaev, use_fullnbr)

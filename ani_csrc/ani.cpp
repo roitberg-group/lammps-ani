@@ -26,10 +26,10 @@ ANI::ANI(const std::string& model_file, int local_rank) : device(local_rank == -
         "dummy_buffer is not found in your model, please register one with: "
         "self.register_buffer('dummy_buffer', torch.empty(0))");
 
-    // use_full_nbrlist
-    TORCH_CHECK(model.hasattr("use_full_nbrlist"), "use_full_nbrlist (bool) is not found in your model");
-    use_full_nbrlist = model.attr("use_full_nbrlist").toBool();
-    std::string nbrlist = use_full_nbrlist ? "full" : "half";
+    // use_fullnbr
+    TORCH_CHECK(model.hasattr("use_fullnbr"), "use_fullnbr (bool) is not found in your model");
+    use_fullnbr = model.attr("use_fullnbr").toBool();
+    std::string nbrlist = use_fullnbr ? "full" : "half";
 
     std::cout << "Successfully loaded the model \nfile: '" << model_file << "' \ndevice: " << device << " \ndtype: " << dtype
               << " \nnbrlist: " << nbrlist << std::endl

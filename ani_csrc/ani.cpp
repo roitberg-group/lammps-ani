@@ -47,6 +47,7 @@ ANI::ANI(const std::string& model_file, int local_rank) : device(local_rank == -
   }
 }
 
+// compute with half nbrlist
 void ANI::compute(
     double& out_energy,
     std::vector<double>& out_force,
@@ -91,6 +92,76 @@ void ANI::compute(
   inputs.push_back(atom_index12_t);
   inputs.push_back(diff_vector_t);
   inputs.push_back(distances_t);
+  inputs.push_back(species_ghost_as_padding_t);
+  bool atomic = out_atomic_energies != nullptr;
+  inputs.push_back(atomic);
+
+  // run ani model
+  torch::Tensor energy, force, atomic_energies;
+  auto outputs = model.forward(inputs).toTuple();
+  // extract energy and force from model outputs, and convert the unit to kcal/mol
+  energy = outputs->elements()[0].toTensor() * hartree2kcalmol;
+  force = outputs->elements()[1].toTensor() * hartree2kcalmol;
+
+  // write energy and force out
+  out_energy = energy.item<double>();
+  out_force_t.copy_(force);
+
+  // if atomic is false, atomic_energies will be an empty tensor
+  if (atomic) {
+    atomic_energies = outputs->elements()[2].toTensor() * hartree2kcalmol;
+    auto out_atomic_energies_t = torch::from_blob(out_atomic_energies->data(), {1, nlocal}, torch::dtype(torch::kFloat64));
+    out_atomic_energies_t.copy_(atomic_energies);
+  }
+}
+
+// compute with full nbrlist
+void ANI::compute(
+    double& out_energy,
+    std::vector<double>& out_force,
+    std::vector<int64_t>& species,
+    std::vector<double>& coordinates,
+    int npairs,
+    int* ilist_unique,
+    int* jlist,
+    int* numneigh,
+    int nlocal,
+    int ago,
+    std::vector<double>* out_atomic_energies) {
+  int ntotal = species.size();
+
+  // output tensor
+  auto out_force_t = torch::from_blob(out_force.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat64));
+  // input tensor
+  auto coordinates_t =
+      torch::from_blob(coordinates.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat64)).to(device).requires_grad_(true);
+
+  // species_t, ilist_unique_t, jlist_t and numneigh_t are cloned/cached on devices and only needs to be updated when neigh_list
+  // rebuild
+  if (ago == 0) {
+    // nbrlist
+    ilist_unique_t = torch::from_blob(ilist_unique, {nlocal}, torch::dtype(torch::kInt32)).to(device);
+    jlist_t = torch::from_blob(jlist, {npairs}, torch::dtype(torch::kInt32)).to(device);
+    numneigh_t = torch::from_blob(numneigh, {nlocal}, torch::dtype(torch::kInt32)).to(device);
+
+    species_t = torch::from_blob(species.data(), {1, ntotal}, torch::dtype(torch::kLong)).to(device);
+    // when runing on the CPU, we have to explicitly clone this tensor
+    // because they are created from temporary vector data pointers
+    if (device == torch::kCPU) {
+      species_t = species_t.clone();
+    }
+    species_ghost_as_padding_t = species_t.detach().clone();
+    // equivalent to: species_ghost_as_padding[:, nlocal:] = -1
+    species_ghost_as_padding_t.index_put_({torch::indexing::Slice(), torch::indexing::Slice(nlocal, torch::indexing::None)}, -1);
+  }
+
+  // pack forward inputs
+  std::vector<torch::jit::IValue> inputs;
+  inputs.push_back(species_t);
+  inputs.push_back(coordinates_t);
+  inputs.push_back(ilist_unique_t);
+  inputs.push_back(jlist_t);
+  inputs.push_back(numneigh_t);
   inputs.push_back(species_ghost_as_padding_t);
   bool atomic = out_atomic_energies != nullptr;
   inputs.push_back(atomic);

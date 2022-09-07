@@ -35,6 +35,7 @@ PairANI::PairANI(LAMMPS* lmp) : Pair(lmp) {
   npairs = 0;
   npairs_max = 0;
   atom_index12 = nullptr;
+  jlist = nullptr;
   single_enable = 0;
   // require real units, ani model will return energy in kcal/mol
   if (strcmp(update->unit_style, "real") != 0) {
@@ -52,6 +53,7 @@ PairANI::~PairANI() {
     memory->destroy(cutsq);
   }
   memory->destroy(atom_index12);
+  memory->destroy(jlist);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -111,32 +113,51 @@ void PairANI::compute(int eflag, int vflag) {
     if (npairs > npairs_max) {
       // every time grow 1.5 times larger to avoid reallocate too frequently
       npairs_max = npairs * 1.5;
-      memory->grow(atom_index12, 2 * npairs_max, "pair:atom_index12");
+      if (ani.use_fullnbr) {
+        memory->grow(jlist, npairs_max, "pair:jlist");
+      } else {
+        memory->grow(atom_index12, 2 * npairs_max, "pair:atom_index12");
+      }
     }
 
     // loop over neighbors of local atoms
     int ipair = 0;
     for (int ii = 0; ii < inum; ii++) {
       int i = ilist[ii];
-      int* jlist = firstneigh[i];
+      int* jlist_i = firstneigh[i];
       int jnum = numneigh[i];
 
       for (int jj = 0; jj < jnum; jj++) {
-        int j = jlist[jj];
+        int j = jlist_i[jj];
         j &= NEIGHMASK;
-        atom_index12[npairs * 0 + ipair] = i;
-        atom_index12[npairs * 1 + ipair] = j;
+        if (ani.use_fullnbr) {
+          // full nbrlist
+          jlist[ipair] = j;
+        } else {
+          // half nbrlist
+          atom_index12[npairs * 0 + ipair] = i;
+          atom_index12[npairs * 1 + ipair] = j;
+        }
+        // update index
         ipair++;
       }
     }
   }
 
-  // run ani model
+  std::vector<double>* out_atomic_energies_ptr;
   if (!eflag_atom) {
-    ani.compute(out_energy, out_force, species, coordinates, npairs, atom_index12, nlocal, ago, nullptr);
+    out_atomic_energies_ptr = nullptr;
   } else {
     out_atomic_energies.resize(nlocal);
-    ani.compute(out_energy, out_force, species, coordinates, npairs, atom_index12, nlocal, ago, &out_atomic_energies);
+    out_atomic_energies_ptr = &out_atomic_energies;
+  }
+
+  // run ani model
+  if (ani.use_fullnbr) {
+    ani.compute(
+        out_energy, out_force, species, coordinates, npairs, ilist, jlist, numneigh, nlocal, ago, out_atomic_energies_ptr);
+  } else {
+    ani.compute(out_energy, out_force, species, coordinates, npairs, atom_index12, nlocal, ago, out_atomic_energies_ptr);
   }
 
   // we have to manually pass the ghost atoms' force to other domains if newton is off.
@@ -236,8 +257,7 @@ void PairANI::settings(int narg, char** arg) {
   if (neigh_str != "half" && neigh_str != "full") {
     std::cerr << "3nd argument must be <half/full>\n";
   }
-  // use_fullnbr = neigh_str == "full";
-  use_fullnbr = false; // force half for now
+  use_fullnbr = neigh_str == "full";
 
   // load model
   ani = ANI(model_file, local_rank);
@@ -377,3 +397,5 @@ void PairANI::unpack_reverse_comm(int n, int* list, double* buf) {
     out_force[j * 3 + 2] += buf[m++];
   }
 }
+
+// TODO memory_usage

@@ -14,6 +14,7 @@ hartree2kcalmol = 627.5094738898777
 # torch._C._jit_set_nvfuser_enabled(False)
 torch._C._get_graph_executor_optimize(False)
 
+
 class ANI2x(torch.nn.Module):
     def __init__(self, use_cuaev, use_fullnbr):
         super().__init__()
@@ -31,22 +32,20 @@ class ANI2x(torch.nn.Module):
         # self.nvfuser_enabled = torch._C._jit_nvfuser_enabled()
 
     @torch.jit.export
-    def forward(self, species, coordinates, atom_index12, diff_vector, distances, species_ghost_as_padding, atomic: bool=False):
+    def forward(self, species, coordinates, para1, para2, para3, species_ghost_as_padding, atomic: bool=False):
         if self.use_cuaev and not self.aev_computer.cuaev_is_initialized:
             self.aev_computer._init_cuaev_computer()
             self.aev_computer.cuaev_is_initialized = True
         # when use ghost_index and mnp, the input system must be a single molecule
 
-        aev = self.compute_aev(species, coordinates, atom_index12, diff_vector, distances)
+        aev = self.compute_aev(species, coordinates, para1, para2, para3)
         if atomic:
-            return self.forward_atomic(species, coordinates, atom_index12, diff_vector, distances, species_ghost_as_padding, aev)
+            return self.forward_atomic(species, coordinates, species_ghost_as_padding, aev)
         else:
-            return self.forward_total(species, coordinates, atom_index12, diff_vector, distances, species_ghost_as_padding, aev)
+            return self.forward_total(species, coordinates, species_ghost_as_padding, aev)
 
     @torch.jit.export
-    def forward_total(self, species, coordinates, atom_index12, diff_vector, distances, species_ghost_as_padding, aev):
-        # aev = self.compute_aev(species, coordinates, atom_index12, diff_vector, distances)
-
+    def forward_total(self, species, coordinates, species_ghost_as_padding, aev):
         # run neural networks
         species_energies = self.neural_networks((species_ghost_as_padding, aev))
         # TODO force is independent of energy_shifter?
@@ -58,9 +57,7 @@ class ANI2x(torch.nn.Module):
         return energies, force, torch.empty(0)
 
     @torch.jit.export
-    def forward_atomic(self, species, coordinates, atom_index12, diff_vector, distances, species_ghost_as_padding, aev):
-        # aev = self.compute_aev(species, coordinates, atom_index12, diff_vector, distances)
-
+    def forward_atomic(self, species, coordinates, species_ghost_as_padding, aev):
         ntotal = species.shape[1]
         nghost = (species_ghost_as_padding == -1).flatten().sum()
         nlocal = ntotal - nghost
@@ -76,10 +73,12 @@ class ANI2x(torch.nn.Module):
         return energies, force, atomic_energies[:, :nlocal]
 
     @torch.jit.export
-    def compute_aev(self, species, coordinates, atom_index12, diff_vector, distances):
+    def compute_aev(self, species, coordinates, para1, para2, para3):
         # dtype
         dtype = self.dummy_buffer.dtype
 
+        atom_index12, diff_vector, distances = para1, para2, para3
+        ilist_unique, jlist, numneigh = para1, para2, para3
         # compute aev
         assert species.shape[0] == 1, "Currently only support inference for single molecule"
         if self.use_cuaev:
@@ -88,7 +87,11 @@ class ANI2x(torch.nn.Module):
             diff_vector = diff_vector.to(torch.float32)
             distances = distances.to(torch.float32)
             coordinates = coordinates.to(torch.float32)
-            aev = self.aev_computer._compute_cuaev_with_nbrlist(species, coordinates, atom_index12, diff_vector, distances)
+            if self.use_fullnbr:
+                aev = self.aev_computer._compute_cuaev_with_full_nbrlist(species, coordinates, ilist_unique, jlist, numneigh)
+            else:
+                aev = self.aev_computer._compute_cuaev_with_nbrlist(species, coordinates, atom_index12, diff_vector, distances)
+            assert aev is not None
             # the neural network part will use whatever dtype the user specified
             aev = aev.to(dtype)
         else:
@@ -152,10 +155,10 @@ def save_ani2x_model(runpbc=False, device='cuda', use_double=True, use_cuaev=Fal
 
     # we need a fewer iterations to tigger the fuser
     for i in range(5):
-        test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, dtype, verbose=(i==0))
+        test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr, dtype, verbose=(i==0))
 
 
-def test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, dtype, verbose=False):
+def test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr, dtype, verbose=False):
     mol = read(input_file)
 
     species = torch.tensor(mol.get_atomic_numbers(), device=device).unsqueeze(0)
@@ -173,14 +176,19 @@ def test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, dtype, verbose=Fals
         atom_index12, _, diff_vector, distances = ani2x_ref.model.aev_computer.neighborlist(species, coordinates, cell, pbc)
     else:
         atom_index12, _, diff_vector, distances = ani2x_ref.model.aev_computer.neighborlist(species, coordinates)
+    if use_fullnbr:
+        ilist_unique, jlist, numneigh = ani2x_ref.model.aev_computer._half_to_full_nbrlist(atom_index12)
+        para1, para2, para3 = ilist_unique, jlist, numneigh
+    else:
+        para1, para2, para3 = atom_index12, diff_vector, distances
     species_ghost_as_padding = species.detach().clone()
     torch.set_printoptions(profile="full")
 
     torch.set_printoptions(precision=13)
-    energy, force, _ = ani2x_loaded(species, coordinates, atom_index12, diff_vector, distances, species_ghost_as_padding, atomic=False)
+    energy, force, _ = ani2x_loaded(species, coordinates, para1, para2, para3, species_ghost_as_padding, atomic=False)
 
     # test forward_atomic API
-    energy_, force_, atomic_energies = ani2x_loaded(species, coordinates, atom_index12, diff_vector, distances, species_ghost_as_padding, atomic=True)
+    energy_, force_, atomic_energies = ani2x_loaded(species, coordinates, para1, para2, para3, species_ghost_as_padding, atomic=True)
 
     energy, force = energy * hartree2kcalmol, force * hartree2kcalmol
     energy_, atomic_energies, force_ = energy_ * hartree2kcalmol, atomic_energies * hartree2kcalmol, force_ * hartree2kcalmol

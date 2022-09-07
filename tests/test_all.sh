@@ -12,11 +12,11 @@ if [ $NUM_GPUs -gt 0 ]; then
 fi
 
 # test_ani2x_nocuaev_double
-cd ./test_ani2x_nocuaev_double && ./test.sh
+cd ./test_ani2x_nocuaev_double_half && ./test.sh
 cd run && ./run.sh && cd ../../
 
-cd ./test_ani2x_nocuaev_single && ./test.sh
+cd ./test_ani2x_nocuaev_single_half && ./test.sh
 cd run && ./run.sh && cd ../../
 
-cd ./test_ani2x_cuaev_single && ./test.sh
+cd ./test_ani2x_cuaev_single_half && ./test.sh
 cd run && ./run.sh && cd ../../

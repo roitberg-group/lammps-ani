@@ -17,7 +17,7 @@ pre_commands: ! |  # execute before the input template file is read
 post_commands: ! |  # execute right before the actual tests
   newton ${newton_pair} ${newton_bond}  # needs to be here so that restart test works
 input_file: in.ani
-pair_style: ani 5.1 ../ani2x_nocuaev_single.pt cpu half
+pair_style: ani 5.1 ../ani2x_nocuaev_single_half.pt cpu half
 pair_coeff: ! |
   * *
 extract: ! ""

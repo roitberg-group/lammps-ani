@@ -228,7 +228,7 @@ if __name__ == '__main__':
             cuaev_or_nocuaev = "cuaev" if use_cuaev else "nocuaev"
             for use_double in [True, False]:
                 double_or_single = "double" if use_double else "single"
-                output_file = f'ani2x_{cuaev_or_nocuaev}_{full_or_half}_{double_or_single}.pt'
+                output_file = f'ani2x_{cuaev_or_nocuaev}_{double_or_single}_{full_or_half}.pt'
                 print(output_file)
                 for pbc in [False, True]:
                     for d in devices:

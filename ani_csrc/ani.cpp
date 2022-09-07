@@ -11,6 +11,9 @@ ANI::ANI(const std::string& model_file, int local_rank) : device(local_rank == -
   at::globalContext().setAllowTF32CuDNN(false);
   try {
     model = torch::jit::load(model_file, device);
+
+    // std::cout << model.dump_to_str(false, false, false) << std::endl;
+    // dummy_buffer
     bool found_dummy_buffer = false;
     for (const torch::jit::NameTensor& p : model.named_buffers(/*recurse=*/false)) {
       if (p.name == "dummy_buffer") {
@@ -22,7 +25,15 @@ ANI::ANI(const std::string& model_file, int local_rank) : device(local_rank == -
         found_dummy_buffer,
         "dummy_buffer is not found in your model, please register one with: "
         "self.register_buffer('dummy_buffer', torch.empty(0))");
-    std::cout << "Successfully loaded the model '" << model_file << "' on: " << device << ", dtype: " << dtype << std::endl;
+
+    // use_full_nbrlist
+    TORCH_CHECK(model.hasattr("use_full_nbrlist"), "use_full_nbrlist (bool) is not found in your model");
+    use_full_nbrlist = model.attr("use_full_nbrlist").toBool();
+    std::string nbrlist = use_full_nbrlist ? "full" : "half";
+
+    std::cout << "Successfully loaded the model \nfile: '" << model_file << "' \ndevice: " << device << " \ndtype: " << dtype
+              << " \nnbrlist: " << nbrlist << std::endl
+              << std::endl;
   } catch (const c10::Error& e) {
     std::cerr << "Error loading the model '" << model_file << "' on " << device << ". " << e.what();
     throw std::runtime_error("Error");

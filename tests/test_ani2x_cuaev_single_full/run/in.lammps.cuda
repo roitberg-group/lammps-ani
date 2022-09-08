@@ -13,7 +13,7 @@ newton         off off
 read_data      ../../water-0.8nm.data
 change_box     all boundary p p p
 
-pair_style     ani 5.1 ../../ani2x_cuaev_single_full.pt cuda full 
+pair_style     ani 5.1 ../../ani2x_cuaev_single_full.pt cuda
 pair_coeff     * *
 
 # Settings: temperature at 300 K, timestep (0.5 fs)

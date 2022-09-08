@@ -1,7 +1,7 @@
 ---
 lammps_version: 17 Feb 2022
 date_generated: Sat Jun 18 22:17:50 2022
-epsilon: 9e-3
+epsilon: 7e-3
 skip_tests:
 prerequisites: ! |
   pair ani
@@ -17,7 +17,7 @@ pre_commands: ! |  # execute before the input template file is read
 post_commands: ! |  # execute right before the actual tests
   newton ${newton_pair} ${newton_bond}  # needs to be here so that restart test works
 input_file: in.ani
-pair_style: ani 5.1 ../ani2x_nocuaev_single.pt cuda half
+pair_style: ani 5.1 ../ani2x_nocuaev_single_half.pt cpu
 pair_coeff: ! |
   * *
 extract: ! ""

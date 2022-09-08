@@ -41,6 +41,7 @@ class PairANI : public Pair {
   double cutoff;
   ANI ani;
   int64_t* atom_index12; // to avoid dynamically allocate atom_index12 in every iteration
+  int* jlist;
   int npairs; // number of pairs in the current domain before neigh_list rebuild
   int npairs_max; // if exceed this max number the allocated atom_index12 needs to grow
   std::string model_file;

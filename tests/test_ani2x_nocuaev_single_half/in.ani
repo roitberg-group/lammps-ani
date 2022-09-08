@@ -1,0 +1,14 @@
+variable  units           index  real
+variable  input_dir       index  .
+variable  data_file       index ${input_dir}/../water-0.8nm.data
+variable  pair_style      index 'zero 8.0'
+variable  change_box      index 'all boundary p p p'
+
+atom_style       atomic
+neigh_modify     every 2 delay 0 check no
+units            ${units}
+timestep         0.1
+
+pair_style       ${pair_style}
+read_data        ${data_file}
+change_box       ${change_box}

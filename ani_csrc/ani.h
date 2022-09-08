@@ -13,13 +13,23 @@ class ANI {
   torch::jit::script::Module model;
   torch::Device device;
   torch::Dtype dtype;
-  torch::Tensor atom_index12_t;
+  bool use_fullnbr;
+
   torch::Tensor species_t;
   torch::Tensor species_ghost_as_padding_t;
+
+  // for half nbr list
+  torch::Tensor atom_index12_t;
+
+  // for full nbr list
+  torch::Tensor ilist_unique_t;
+  torch::Tensor jlist_t;
+  torch::Tensor numneigh_t;
 
   ANI() : device(torch::kCPU){};
   ANI(const std::string& model_file, int local_rank);
 
+  // compute with half nbrlist
   void compute(
       double& out_energy,
       std::vector<double>& out_force,
@@ -27,6 +37,20 @@ class ANI {
       std::vector<double>& coordinates,
       int npairs_half,
       int64_t* atom_index12,
+      int nlocal,
+      int ago = 0,
+      std::vector<double>* out_atomic_energies = nullptr);
+
+  // compute with full nbrlist
+  void compute(
+      double& out_energy,
+      std::vector<double>& out_force,
+      std::vector<int64_t>& species,
+      std::vector<double>& coordinates,
+      int npairs,
+      int* ilist_unique,
+      int* jlist,
+      int* numneigh,
       int nlocal,
       int ago = 0,
       std::vector<double>* out_atomic_energies = nullptr);

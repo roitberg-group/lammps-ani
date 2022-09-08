@@ -20,3 +20,6 @@ cd run && ./run.sh && cd ../../
 
 cd ./test_ani2x_cuaev_single_half && ./test.sh
 cd run && ./run.sh && cd ../../
+
+cd ./test_ani2x_cuaev_single_full && ./test.sh
+cd run && ./run.sh && cd ../../

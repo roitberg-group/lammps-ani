@@ -160,8 +160,9 @@ void PairANI::compute(int eflag, int vflag) {
     ani.compute(out_energy, out_force, species, coordinates, npairs, atom_index12, nlocal, ago, out_atomic_energies_ptr);
   }
 
-  // we have to manually pass the ghost atoms' force to other domains if newton is off.
-  // we accumulate forces on out_force instead of f, because when newton flag is off, the previous step's
+  // When newton is off, there will be no reverse communication of the ghost atom's force to the neighboring
+  // domain's local atom, so we need to manually call reverse communication.
+  // We accumulate forces on out_force instead of f, because when newton flag is off, the previous step's
   // ghost atoms' forces are not cleared.
   // https://github.com/lammps/lammps/blob/66bbfa67dcbca7dbb81a7be45184233e51022030/src/verlet.cpp#L382-L384
   if (!newton) {
@@ -288,11 +289,12 @@ void PairANI::coeff(int narg, char** arg) {
 ------------------------------------------------------------------------- */
 
 void PairANI::init_style() {
+  // when using half neighbor list, newton_pair must be set as off so that the local atoms have the
+  // complete set of neighboring ghost atoms.
   if (!ani.use_fullnbr && force->newton_pair == 1)
     error->all(FLERR, "Pair style ANI requires newton pair off when using half neighbor list");
 
-  // TODO in the future may use newton pair with "on" for full neighbor list
-  // https://github.com/lammps/lammps/blob/develop/src/verlet.cpp#L157
+  // For consistency, we also require newton_pair is off for full nbrlist.
   if (ani.use_fullnbr && force->newton_pair == 1)
     error->all(FLERR, "Pair style ANI requires newton pair off when using full neighbor list");
 

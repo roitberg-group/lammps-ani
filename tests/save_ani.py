@@ -31,6 +31,10 @@ class ANI2x(torch.nn.Module):
         self.use_fullnbr = use_fullnbr
         # self.nvfuser_enabled = torch._C._jit_nvfuser_enabled()
 
+        # we don't need weight gradient when calculating force
+        for name, param in self.neural_networks.named_parameters():
+            param.requires_grad_(False)
+
     @torch.jit.export
     def forward(self, species, coordinates, para1, para2, para3, species_ghost_as_padding, atomic: bool=False):
         if self.use_cuaev and not self.aev_computer.cuaev_is_initialized:
@@ -38,7 +42,9 @@ class ANI2x(torch.nn.Module):
             self.aev_computer.cuaev_is_initialized = True
         # when use ghost_index and mnp, the input system must be a single molecule
 
+        torch.ops.mnp.nvtx_range_push("AEV forward")
         aev = self.compute_aev(species, coordinates, para1, para2, para3)
+        torch.ops.mnp.nvtx_range_pop()
         if atomic:
             return self.forward_atomic(species, coordinates, species_ghost_as_padding, aev)
         else:
@@ -47,13 +53,19 @@ class ANI2x(torch.nn.Module):
     @torch.jit.export
     def forward_total(self, species, coordinates, species_ghost_as_padding, aev):
         # run neural networks
+        torch.ops.mnp.nvtx_range_push("NN forward")
         species_energies = self.neural_networks((species_ghost_as_padding, aev))
         # TODO force is independent of energy_shifter?
         species_energies = self.energy_shifter(species_energies)
         energies = species_energies[1]
+        torch.ops.mnp.nvtx_range_pop()
+
+        torch.ops.mnp.nvtx_range_push("Force")
         force = torch.autograd.grad([energies.sum()], [coordinates], create_graph=True, retain_graph=True)[0]
         assert force is not None
         force = -force
+        torch.ops.mnp.nvtx_range_pop()
+
         return energies, force, torch.empty(0)
 
     @torch.jit.export
@@ -63,13 +75,18 @@ class ANI2x(torch.nn.Module):
         nlocal = ntotal - nghost
 
         # run neural networks
+        torch.ops.mnp.nvtx_range_push("NN forward")
         atomic_energies = self.neural_networks._atomic_energies((species_ghost_as_padding, aev))
         atomic_energies += self.energy_shifter._atomic_saes(species_ghost_as_padding)
-
         energies = atomic_energies.sum(dim=1)
+        torch.ops.mnp.nvtx_range_pop()
+
+        torch.ops.mnp.nvtx_range_push("Force")
         force = torch.autograd.grad([energies.sum()], [coordinates], create_graph=True, retain_graph=True)[0]
         assert force is not None
         force = -force
+        torch.ops.mnp.nvtx_range_pop()
+
         return energies, force, atomic_energies[:, :nlocal]
 
     @torch.jit.export

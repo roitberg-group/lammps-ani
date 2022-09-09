@@ -1,4 +1,5 @@
 #include "ani.h"
+#include <nvToolsExt.h>
 #include <torch/script.h>
 #include <torch/torch.h>
 #include <cstdint>
@@ -68,6 +69,7 @@ void ANI::compute(
 
   // species_t and atom_index12_t are cloned/cached on devices and only needs to be updated when neigh_list rebuild
   if (ago == 0) {
+    ::nvtxMarkA("neighbor list rebuilt");
     atom_index12_t = torch::from_blob(atom_index12, {2, npairs_half}, torch::dtype(torch::kLong)).to(device);
     species_t = torch::from_blob(species.data(), {1, ntotal}, torch::dtype(torch::kLong)).to(device);
     // when runing on the CPU, we have to explicitly clone these two tensors

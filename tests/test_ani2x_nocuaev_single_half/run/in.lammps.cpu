@@ -1,6 +1,9 @@
 #LAMMPS Input file
 # mpirun -np 4 ${LAMMPS_ROOT}/build/lmp_mpi -in in.lammps
 
+# variables
+variable       lammps_ani_root getenv LAMMPS_ANI_ROOT
+
 # Intialization
 units          real
 atom_style     atomic
@@ -13,7 +16,7 @@ newton         off off
 read_data      ../../water-0.8nm.data
 change_box     all boundary p p p
 
-pair_style     ani 5.1 ../../ani2x_nocuaev_single_half.pt cpu
+pair_style     ani 5.1 ${lammps_ani_root}/tests/ani2x_nocuaev_single_half.pt cpu
 pair_coeff     * *
 
 # Settings: temperature at 300 K, timestep (0.5 fs)

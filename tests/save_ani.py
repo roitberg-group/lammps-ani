@@ -130,6 +130,7 @@ class ANI2x(torch.nn.Module):
         neural_networks = self.neural_networks
         if isinstance(neural_networks, BmmEnsemble2):
             neural_networks.select_models(use_num_models)
+            self.use_num_models = neural_networks.use_num_models
         elif isinstance(neural_networks, Ensemble):
             size = len(neural_networks)
             if use_num_models is None:
@@ -137,9 +138,9 @@ class ANI2x(torch.nn.Module):
                 return
             assert use_num_models <= size, f"use_num_models {use_num_models} cannot be larger than size {size}"
             neural_networks = neural_networks[:use_num_models]
+            self.use_num_models = use_num_models
         else:
             raise RuntimeError("select_models method only works for BmmEnsemble2 or Ensemble neural networks")
-        self.use_num_models = use_num_models
 
 
 class ANI2xRef(torch.nn.Module):

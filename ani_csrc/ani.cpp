@@ -156,6 +156,7 @@ void ANI::compute(
   // rebuild
   if (ago == 0) {
     // nbrlist
+    ::nvtxMarkA("neighbor list rebuilt");
     ilist_unique_t = torch::from_blob(ilist_unique, {nlocal}, torch::dtype(torch::kInt32)).to(device);
     jlist_t = torch::from_blob(jlist, {npairs}, torch::dtype(torch::kInt32)).to(device);
     numneigh_t = torch::from_blob(numneigh, {nlocal}, torch::dtype(torch::kInt32)).to(device);

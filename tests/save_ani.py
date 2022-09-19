@@ -58,7 +58,7 @@ class ANI2x(torch.nn.Module):
     @torch.jit.export
     def forward_total(self, species, coordinates, species_ghost_as_padding, aev):
         # run neural networks
-        torch.ops.mnp.nvtx_range_push("NN forward")
+        torch.ops.mnp.nvtx_range_push(f"NN ({self.use_num_models}) forward")
         species_energies = self.neural_networks((species_ghost_as_padding, aev))
         # TODO force is independent of energy_shifter?
         species_energies = self.energy_shifter(species_energies)
@@ -80,7 +80,7 @@ class ANI2x(torch.nn.Module):
         nlocal = ntotal - nghost
 
         # run neural networks
-        torch.ops.mnp.nvtx_range_push("NN forward")
+        torch.ops.mnp.nvtx_range_push("NN ({self.use_num_models}) forward_atomic")
         atomic_energies = self.neural_networks._atomic_energies((species_ghost_as_padding, aev))
         atomic_energies += self.energy_shifter._atomic_saes(species_ghost_as_padding)
         energies = atomic_energies.sum(dim=1)

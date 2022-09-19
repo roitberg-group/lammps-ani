@@ -255,7 +255,7 @@ void PairANI::settings(int narg, char** arg) {
   model_file = arg[1];
   device_str = arg[2];
   int local_rank = get_local_rank(device_str); // -1 for cpu
-  use_num_models = narg > 3 ? utils::inumeric(FLERR, arg[3], false, lmp) : -1; // -1 for all models
+  use_num_models = narg > 3 ? utils::inumeric(FLERR, arg[3], false, lmp) : -1; // -1 to use all models
 
   // load model
   ani = ANI(model_file, local_rank, use_num_models);

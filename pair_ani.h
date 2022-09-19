@@ -47,6 +47,7 @@ class PairANI : public Pair {
   std::string model_file;
   std::string device_str;
   bool use_fullnbr;
+  int use_num_models;
   std::vector<double> out_force;
 
   virtual void allocate();

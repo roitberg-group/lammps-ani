@@ -2,3 +2,4 @@
 ani_csrc/*
 *.pt
 examples/*
+.vscode/*

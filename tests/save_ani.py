@@ -5,6 +5,8 @@ import argparse
 from typing import Tuple, Optional
 from torch import Tensor
 from torchani.nn import SpeciesEnergies
+from torchani.infer import BmmEnsemble2
+from torchani.models import Ensemble
 
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
@@ -23,6 +25,9 @@ class ANI2x(torch.nn.Module):
                                       use_fullnbr=use_fullnbr)
         self.use_cuaev = use_cuaev
         self.aev_computer = ani2x.aev_computer
+        # num_models
+        self.num_models = len(ani2x.neural_networks)
+        self.use_num_models = self.num_models
         # batched neural networks
         self.neural_networks = ani2x.neural_networks.to_infer_model(use_mnp=False)
         # self.neural_networks = ani2x.neural_networks
@@ -53,7 +58,7 @@ class ANI2x(torch.nn.Module):
     @torch.jit.export
     def forward_total(self, species, coordinates, species_ghost_as_padding, aev):
         # run neural networks
-        torch.ops.mnp.nvtx_range_push("NN forward")
+        torch.ops.mnp.nvtx_range_push(f"NN ({self.use_num_models}) forward")
         species_energies = self.neural_networks((species_ghost_as_padding, aev))
         # TODO force is independent of energy_shifter?
         species_energies = self.energy_shifter(species_energies)
@@ -75,7 +80,7 @@ class ANI2x(torch.nn.Module):
         nlocal = ntotal - nghost
 
         # run neural networks
-        torch.ops.mnp.nvtx_range_push("NN forward")
+        torch.ops.mnp.nvtx_range_push("NN ({self.use_num_models}) forward_atomic")
         atomic_energies = self.neural_networks._atomic_energies((species_ghost_as_padding, aev))
         atomic_energies += self.energy_shifter._atomic_saes(species_ghost_as_padding)
         energies = atomic_energies.sum(dim=1)
@@ -120,6 +125,23 @@ class ANI2x(torch.nn.Module):
 
         return aev
 
+    @torch.jit.export
+    def select_models(self, use_num_models: Optional[int] = None):
+        neural_networks = self.neural_networks
+        if isinstance(neural_networks, BmmEnsemble2):
+            neural_networks.select_models(use_num_models)
+            self.use_num_models = neural_networks.use_num_models
+        elif isinstance(neural_networks, Ensemble):
+            size = len(neural_networks)
+            if use_num_models is None:
+                use_num_models = size
+                return
+            assert use_num_models <= size, f"use_num_models {use_num_models} cannot be larger than size {size}"
+            neural_networks = neural_networks[:use_num_models]
+            self.use_num_models = use_num_models
+        else:
+            raise RuntimeError("select_models method only works for BmmEnsemble2 or Ensemble neural networks")
+
 
 class ANI2xRef(torch.nn.Module):
     """
@@ -131,6 +153,7 @@ class ANI2xRef(torch.nn.Module):
                                       use_cuaev_interface=use_cuaev, use_cuda_extension=use_cuaev,
                                       use_fullnbr=use_fullnbr)
         self.model = ani2x
+        self.model.neural_networks = self.model.neural_networks.to_infer_model(use_mnp=False)
         self.use_cuaev = use_cuaev
         self.register_buffer("dummy_buffer", torch.empty(0))
         self.use_fullnbr = use_fullnbr
@@ -149,6 +172,21 @@ class ANI2xRef(torch.nn.Module):
             species_aevs = self.model.aev_computer(species_coordinates, cell=cell, pbc=pbc)
         species_energies = self.model.neural_networks(species_aevs)
         return self.model.energy_shifter(species_energies)
+
+    @torch.jit.export
+    def select_models(self, use_num_models: Optional[int] = None):
+        neural_networks = self.model.neural_networks
+        if isinstance(neural_networks, BmmEnsemble2):
+            neural_networks.select_models(use_num_models)
+        elif isinstance(neural_networks, Ensemble):
+            size = len(neural_networks)
+            if use_num_models is None:
+                use_num_models = size
+                return
+            assert use_num_models <= size, f"use_num_models {use_num_models} cannot be larger than size {size}"
+            neural_networks = neural_networks[:use_num_models]
+        else:
+            raise RuntimeError("select_models method only works for BmmEnsemble2 or Ensemble neural networks")
 
 
 def save_ani2x_model(runpbc=False, device='cuda', use_double=True, use_cuaev=False, use_fullnbr=False):
@@ -171,8 +209,11 @@ def save_ani2x_model(runpbc=False, device='cuda', use_double=True, use_cuaev=Fal
         ani2x_ref.model.aev_computer = ani2x_ref.model.aev_computer.to(torch.float32)
 
     # we need a fewer iterations to tigger the fuser
-    for i in range(5):
-        test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr, dtype, verbose=(i==0))
+    for num_models in [None, 4]:
+        ani2x_ref.select_models(num_models)
+        ani2x_loaded.select_models(num_models)
+        for i in range(5):
+            test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr, dtype, verbose=(num_models is None and i==0))
 
 
 def test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr, dtype, verbose=False):

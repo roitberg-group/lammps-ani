@@ -7,7 +7,8 @@
 #include <tuple>
 #include <vector>
 
-ANI::ANI(const std::string& model_file, int local_rank) : device(local_rank == -1 ? torch::kCPU : torch::kCUDA, local_rank) {
+ANI::ANI(const std::string& model_file, int local_rank, int use_num_models)
+    : device(local_rank == -1 ? torch::kCPU : torch::kCUDA, local_rank) {
   at::globalContext().setAllowTF32CuBLAS(false);
   at::globalContext().setAllowTF32CuDNN(false);
   try {
@@ -32,6 +33,18 @@ ANI::ANI(const std::string& model_file, int local_rank) : device(local_rank == -
     use_fullnbr = model.attr("use_fullnbr").toBool();
     std::string nbrlist = use_fullnbr ? "full" : "half";
 
+    // select_models
+    int num_models = model.attr("num_models").toInt();
+    // use all models if not specified (-1)
+    if (use_num_models == -1) {
+      use_num_models = num_models;
+    }
+    // prepare inputs
+    std::vector<torch::jit::IValue> inputs;
+    inputs.push_back(use_num_models);
+    // select models
+    model.get_method("select_models")(inputs);
+
     // TODO we need to disable nvfuser
     // TORCH_CHECK(model.hasattr("nvfuser_enabled"), "nvfuser_enabled (bool) is not found in your model");
     // bool nvfuser_enabled = model.attr("nvfuser_enabled").toBool();
@@ -40,7 +53,8 @@ ANI::ANI(const std::string& model_file, int local_rank) : device(local_rank == -
     torch::jit::setGraphExecutorOptimize(false);
 
     std::cout << "Successfully loaded the model \nfile: '" << model_file << "' \ndevice: " << device << " \ndtype: " << dtype
-              << " \nnbrlist: " << nbrlist << std::endl
+              << " \nnbrlist: " << nbrlist << " \nuse_num_models: " << model.attr("use_num_models").toInt() << "/"
+              << model.attr("num_models").toInt() << std::endl
               << std::endl;
   } catch (const c10::Error& e) {
     std::cerr << "Error loading the model '" << model_file << "' on " << device << ". " << e.what();
@@ -142,6 +156,7 @@ void ANI::compute(
   // rebuild
   if (ago == 0) {
     // nbrlist
+    ::nvtxMarkA("neighbor list rebuilt");
     ilist_unique_t = torch::from_blob(ilist_unique, {nlocal}, torch::dtype(torch::kInt32)).to(device);
     jlist_t = torch::from_blob(jlist, {npairs}, torch::dtype(torch::kInt32)).to(device);
     numneigh_t = torch::from_blob(numneigh, {nlocal}, torch::dtype(torch::kInt32)).to(device);

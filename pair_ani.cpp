@@ -248,6 +248,7 @@ void PairANI::settings(int narg, char** arg) {
     error->all(FLERR, "Illegal pair_style command");
 
   // read cutoff
+  // TODO we could read cutoff from the model
   cutoff = utils::numeric(FLERR, arg[0], false, lmp);
 
   // parsing pairstyle argument
@@ -256,8 +257,12 @@ void PairANI::settings(int narg, char** arg) {
 
   int local_rank = get_local_rank(device_str);
 
+  std::cout << "narg: " << narg << std::endl;
+  use_num_models = narg > 3 ? utils::inumeric(FLERR, arg[3], false, lmp) : -1;
+  std::cout << "use_num_models: " << use_num_models << std::endl;
+
   // load model
-  ani = ANI(model_file, local_rank);
+  ani = ANI(model_file, local_rank, use_num_models);
 }
 
 /* ----------------------------------------------------------------------
@@ -328,6 +333,8 @@ void* PairANI::extract(const char* str, int& dim) {
 void PairANI::read_restart(FILE* fp) {
   // cutoff
   utils::sfread(FLERR, &cutoff, sizeof(double), 1, fp, nullptr, error);
+  // use_num_models
+  utils::sfread(FLERR, &use_num_models, sizeof(int), 1, fp, nullptr, error);
 
   // model_file_size device_str_size
   int model_file_size, device_str_size;
@@ -342,12 +349,14 @@ void PairANI::read_restart(FILE* fp) {
 
   // init model
   int local_rank = get_local_rank(device_str);
-  ani = ANI(model_file, local_rank);
+  ani = ANI(model_file, local_rank, use_num_models);
 }
 
 void PairANI::write_restart(FILE* fp) {
   // cutoff
   fwrite(&cutoff, sizeof(double), 1, fp);
+  // use_num_models
+  fwrite(&use_num_models, sizeof(int), 1, fp);
 
   // TODO fwrite string is a bad practice
   // model_file_size device_str_size

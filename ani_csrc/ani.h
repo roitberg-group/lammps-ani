@@ -27,7 +27,7 @@ class ANI {
   torch::Tensor numneigh_t;
 
   ANI() : device(torch::kCPU){};
-  ANI(const std::string& model_file, int local_rank);
+  ANI(const std::string& model_file, int local_rank, int use_num_models = -1);
 
   // compute with half nbrlist
   void compute(

@@ -254,12 +254,8 @@ void PairANI::settings(int narg, char** arg) {
   // parsing pairstyle argument
   model_file = arg[1];
   device_str = arg[2];
-
-  int local_rank = get_local_rank(device_str);
-
-  std::cout << "narg: " << narg << std::endl;
-  use_num_models = narg > 3 ? utils::inumeric(FLERR, arg[3], false, lmp) : -1;
-  std::cout << "use_num_models: " << use_num_models << std::endl;
+  int local_rank = get_local_rank(device_str); // -1 for cpu
+  use_num_models = narg > 3 ? utils::inumeric(FLERR, arg[3], false, lmp) : -1; // -1 for all models
 
   // load model
   ani = ANI(model_file, local_rank, use_num_models);

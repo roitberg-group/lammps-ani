@@ -14,6 +14,7 @@
 #include "pair_ani.h"
 
 #include <cuda_runtime.h>
+#include <nvToolsExt.h>
 #include <cmath>
 #include <cstring>
 #include <vector>
@@ -166,7 +167,9 @@ void PairANI::compute(int eflag, int vflag) {
   // ghost atoms' forces are not cleared.
   // https://github.com/lammps/lammps/blob/66bbfa67dcbca7dbb81a7be45184233e51022030/src/verlet.cpp#L382-L384
   if (!newton) {
+    ::nvtxRangePushA("reverse_comm");
     comm->reverse_comm(this);
+    ::nvtxRangePop();
   }
 
   // write out force

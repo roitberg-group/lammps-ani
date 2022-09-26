@@ -54,6 +54,21 @@ class ANI {
       int nlocal,
       int ago = 0,
       std::vector<double>* out_atomic_energies = nullptr);
+
+  // kokkos compute with full nbrlist
+  void compute(
+      torch::Tensor& out_energy,
+      torch::Tensor& out_force,
+      torch::Tensor& species,
+      torch::Tensor& coordinates,
+      int npairs,
+      torch::Tensor& ilist_unique,
+      torch::Tensor& jlist,
+      torch::Tensor& numneigh,
+      int nlocal,
+      int ago,
+      torch::Tensor& out_atomic_energies,
+      bool eflag_atom);
 };
 
 #endif

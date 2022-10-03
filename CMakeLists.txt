@@ -19,7 +19,7 @@ if(LAMMPS_DIR)
   set(LAMMPS_HEADER_DIR ${LAMMPS_SOURCE_DIR})
 else()
   # NOTE: the next line should be commented out when used outside of the LAMMPS package
-  get_filename_component(LAMMPS_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../../src ABSOLUTE)
+  # get_filename_component(LAMMPS_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../../src ABSOLUTE)
   set(LAMMPS_HEADER_DIR ${LAMMPS_SOURCE_DIR} CACHE PATH "Location of LAMMPS headers")
   if(NOT LAMMPS_HEADER_DIR)
     message(FATAL_ERROR "Must set LAMMPS_HEADER_DIR")

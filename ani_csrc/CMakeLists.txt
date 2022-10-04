@@ -29,6 +29,7 @@ target_include_directories(ani PRIVATE ./)
 target_link_libraries(ani ${TORCH_LIBRARIES})
 target_link_libraries(ani ${Python_LIBRARIES})
 target_link_libraries(ani OpenMP::OpenMP_CXX)
+target_link_libraries(ani -Wl,--no-as-needed cuaev)
 
 # test_model
 project(test_model LANGUAGES CXX)

@@ -37,7 +37,7 @@ cmake -DCMAKE_C_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DCMAKE_CXX_FLAGS=
 -DPKG_EXTRA-PAIR=yes -DPKG_MOLECULE=yes -DPKG_OPENMP=yes -DENABLE_TESTING=no -DLAMMPS_EXCEPTIONS=yes \
 $KOKKOS_FLAGS \
 ../cmake/
-make -j
+make -j3
 make install
 # test
 # mpirun -np 1 ${LAMMPS_ROOT}/build/test_pair_style ../unittest/force-styles/tests/mol-pair-morse.yaml

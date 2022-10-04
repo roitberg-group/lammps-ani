@@ -26,6 +26,18 @@ make -j
 make install
 cd ..
 
+# build lammps with unittest
+rm -rf build-test; mkdir -p build-test; cd build-test
+cmake -DCMAKE_C_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DLAMMPS_INSTALL_RPATH=yes \
+-DCMAKE_INSTALL_PREFIX=${HOME}/.local/lammps -DCMAKE_PREFIX_PATH=${HOME}/.local \
+-DPKG_PLUGIN=yes -DBUILD_MPI=yes -DBUILD_SHARED_LIBS=yes -DLAMMPS_MACHINE=mpi \
+-DPKG_EXTRA-PAIR=yes -DPKG_MOLECULE=yes -DPKG_OPENMP=yes -DENABLE_TESTING=yes -DLAMMPS_EXCEPTIONS=yes \
+../cmake/
+make -j
+# test
+mpirun -np 1 ${LAMMPS_ROOT}/build-test/test_pair_style ../unittest/force-styles/tests/mol-pair-morse.yaml
+cd ..
+
 # build lammps
 # kokkos flag
 KOKKOS_FLAGS="-DPKG_KOKKOS=yes -DEXTERNAL_KOKKOS=yes"
@@ -34,13 +46,11 @@ rm -rf build; mkdir -p build; cd build
 cmake -DCMAKE_C_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DLAMMPS_INSTALL_RPATH=yes \
 -DCMAKE_INSTALL_PREFIX=${HOME}/.local/lammps -DCMAKE_PREFIX_PATH=${HOME}/.local \
 -DPKG_PLUGIN=yes -DBUILD_MPI=yes -DBUILD_SHARED_LIBS=yes -DLAMMPS_MACHINE=mpi \
--DPKG_EXTRA-PAIR=yes -DPKG_MOLECULE=yes -DPKG_OPENMP=yes -DENABLE_TESTING=no -DLAMMPS_EXCEPTIONS=yes \
+-DPKG_EXTRA-PAIR=no -DPKG_MOLECULE=no -DPKG_OPENMP=yes -DENABLE_TESTING=no -DLAMMPS_EXCEPTIONS=no \
 $KOKKOS_FLAGS \
 ../cmake/
-make -j3
+make -j ${MAKE_J_THREADS}
 make install
-# test
-# mpirun -np 1 ${LAMMPS_ROOT}/build/test_pair_style ../unittest/force-styles/tests/mol-pair-morse.yaml
 cd ../../../
 
 # build lammps-ani

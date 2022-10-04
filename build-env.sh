@@ -20,3 +20,5 @@ else
     CUDNN_FLAGS=" "
 fi
 
+# Build Options
+export MAKE_J_THREADS=${MAKE_J_THREADS:=""}  # default as all threads

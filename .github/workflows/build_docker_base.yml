@@ -44,6 +44,9 @@ jobs:
           tags: |
             type=raw,value=base-master
 
+      - name: Push
+        run: docker push ghcr.io/roitberg-group/lammps-ani:base-master
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v3
         with:

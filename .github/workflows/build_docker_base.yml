@@ -44,20 +44,20 @@ jobs:
           tags: |
             type=raw,value=base-master
 
-      - name: Push
-        run: docker push ghcr.io/roitberg-group/lammps-ani:base-master
-
       - name: Build and push Docker image
         uses: docker/build-push-action@v3
         with:
           context: .
           # push: ${{ github.event_name != 'pull_request' }}
-          push: true
+          push: false  # TODO no idea why push failed here
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             MAKE_J_THREADS=5
           target: base
+
+      - name: Push
+        run: docker push ghcr.io/roitberg-group/lammps-ani:base-master
 
       - name: Remove image
         if: ${{ always() }}

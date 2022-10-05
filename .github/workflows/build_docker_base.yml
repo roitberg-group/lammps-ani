@@ -29,6 +29,11 @@ jobs:
           token: ${{ secrets.PAT }}
           submodules: recursive
 
+      - name: Set DOCKER_CONFIG
+        run: |
+          mkdir -p $HOME/.github_action_docker/${{ env.GITHUB_RUN_ID }}/.docker
+          echo "DOCKER_CONFIG=$HOME/${{ env.GITHUB_RUN_ID }}/.docker" >> $GITHUB_ENV
+
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v2
         with:

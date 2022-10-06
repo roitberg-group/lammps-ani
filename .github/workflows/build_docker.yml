@@ -24,10 +24,18 @@ jobs:
           token: ${{ secrets.PAT }}
           submodules: recursive
 
+      # To avoid docker login and post login have race conditions because of multiple jobs running
+      # on the same machine.
       - name: Set DOCKER_CONFIG
         run: |
           mkdir -p $HOME/.github_action_docker/${GITHUB_RUN_ID}/.docker
           echo "DOCKER_CONFIG=$HOME/.github_action_docker/${GITHUB_RUN_ID}/.docker" >> $GITHUB_ENV
+
+      - name: Post Set DOCKER_CONFIG
+        uses: webiny/action-post-run@2.0.1
+        id: post-run-command
+        with:
+          run: rm -rf $HOME/.github_action_docker/${GITHUB_RUN_ID}
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v2
@@ -60,11 +68,6 @@ jobs:
         if: ${{ always() }}
         continue-on-error: true
         run: docker image rm ${{ steps.meta.outputs.tags }}
-
-      - name: Post Set DOCKER_CONFIG
-        if: ${{ always() }}
-        run: |
-          rm -rf $HOME/.github_action_docker/${GITHUB_RUN_ID}
 
 concurrency:
   group: build_docker-${{ github.event.pull_request.number || github.sha }}

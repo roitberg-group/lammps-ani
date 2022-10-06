@@ -61,6 +61,11 @@ jobs:
         continue-on-error: true
         run: docker image rm ${{ steps.meta.outputs.tags }}
 
+      - name: Post Set DOCKER_CONFIG
+        if: ${{ always() }}
+        run: |
+          rm -rf $HOME/.github_action_docker/${GITHUB_RUN_ID}
+
 concurrency:
   group: build_docker-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true

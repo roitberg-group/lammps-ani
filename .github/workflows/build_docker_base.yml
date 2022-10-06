@@ -54,20 +54,22 @@ jobs:
         with:
           context: .
           # push: ${{ github.event_name != 'pull_request' }}
-          push: true  # TODO no idea why push failed here
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             MAKE_J_THREADS=5
           target: base
 
-      - name: Push
-        run: echo # docker push ghcr.io/roitberg-group/lammps-ani:base-master
-
       - name: Remove image
         if: ${{ always() }}
         continue-on-error: true
         run: echo # docker image rm ${{ steps.meta.outputs.tags }}
+
+      - name: Post Set DOCKER_CONFIG
+        if: ${{ always() }}
+        run: |
+          rm -rf $HOME/.github_action_docker/${GITHUB_RUN_ID}
 
 concurrency:
   group: build_docker_base-${{ github.event.pull_request.number || github.sha }}

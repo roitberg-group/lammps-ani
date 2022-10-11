@@ -16,7 +16,6 @@ static Pair* ani_creator(LAMMPS* lmp) {
 
 static Pair* ani_kokkos_creator(LAMMPS* lmp) {
   return new PairANIKokkos<LMPDeviceType>(lmp);
-  // return new PairANI(lmp);
 }
 
 extern "C" void lammpsplugin_init(void* lmp, void* handle, void* regfunc) {

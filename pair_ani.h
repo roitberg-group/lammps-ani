@@ -49,6 +49,7 @@ class PairANI : public Pair {
   bool use_fullnbr;
   int use_num_models;
   std::vector<double> out_force;
+  bool lammps_ani_profiling;
 
   virtual void allocate();
 };

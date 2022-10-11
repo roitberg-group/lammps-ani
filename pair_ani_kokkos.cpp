@@ -65,6 +65,10 @@ PairANIKokkos<DeviceType>::~PairANIKokkos() {
 
 template <class DeviceType>
 void PairANIKokkos<DeviceType>::compute(int eflag_in, int vflag_in) {
+  if (lammps_ani_profiling) {
+    torch::cuda::synchronize();
+  }
+
   eflag = eflag_in;
   vflag = vflag_in;
 
@@ -199,6 +203,9 @@ void PairANIKokkos<DeviceType>::compute(int eflag_in, int vflag_in) {
     d_eatom_tensor += out_atomic_energies.to(kokkos_device);
   }
 
+  if (lammps_ani_profiling) {
+    torch::cuda::synchronize();
+  }
   // copymode = 0;
 }
 

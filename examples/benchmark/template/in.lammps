@@ -8,7 +8,6 @@ variable       num_models      index  1
 
 # Intialization
 units          real
-boundary       p p p
 atom_style     atomic
 
 neighbor       2.0 bin

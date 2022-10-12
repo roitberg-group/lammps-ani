@@ -1,17 +1,22 @@
-name: build_docker
+name: build_docker_base
 
 on:
   push:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
+    paths:
+      - 'build*'
+      - 'external/**'
+  repository_dispatch:
+    types: [build-base-command]
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build_docker:
+  build_docker_base:
     runs-on: self-hosted
     permissions:
       contents: read
@@ -43,30 +48,30 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=base-master
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v3
         with:
           context: .
-          push: ${{ github.event_name != 'pull_request' }}
+          # push: ${{ github.event_name != 'pull_request' }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             MAKE_J_THREADS=5
-          target: lammps-ani-build_from_base
-
-      - name: Test
-        run: docker run --gpus all ${{ steps.meta.outputs.tags }} bash -c "nvidia-smi && cd /lammps-ani/tests/ && python save_ani.py && ./test_all.sh"
+          target: base
 
       - name: Remove image
         if: ${{ always() }}
         continue-on-error: true
-        run: docker image rm ${{ steps.meta.outputs.tags }}
+        run: echo # docker image rm ${{ steps.meta.outputs.tags }}
 
       - name: Post Set DOCKER_CONFIG
         if: ${{ always() }}
         run: rm -rf $HOME/.github_action_docker/${GITHUB_RUN_ID}
 
 concurrency:
-  group: build_docker-${{ github.event.pull_request.number || github.sha }}
+  group: build_docker_base-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true

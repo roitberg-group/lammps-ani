@@ -180,8 +180,8 @@ void ANI::compute(
   inputs.push_back(jlist_t);
   inputs.push_back(numneigh_t);
   inputs.push_back(species_ghost_as_padding_t);
-  bool atomic = out_atomic_energies != nullptr;
-  inputs.push_back(atomic);
+  bool eflag_atom = out_atomic_energies != nullptr;
+  inputs.push_back(eflag_atom);
 
   // run ani model
   torch::Tensor energy, force, atomic_energies;
@@ -194,10 +194,54 @@ void ANI::compute(
   out_energy = energy.item<double>();
   out_force_t.copy_(force);
 
-  // if atomic is false, atomic_energies will be an empty tensor
-  if (atomic) {
+  // if eflag_atom is false, atomic_energies will be an empty tensor
+  if (eflag_atom) {
     atomic_energies = outputs->elements()[2].toTensor() * hartree2kcalmol;
     auto out_atomic_energies_t = torch::from_blob(out_atomic_energies->data(), {1, nlocal}, torch::dtype(torch::kFloat64));
     out_atomic_energies_t.copy_(atomic_energies);
+  }
+}
+
+// kokkos compute with full nbrlist
+void ANI::compute(
+    torch::Tensor& out_energy,
+    torch::Tensor& out_force,
+    torch::Tensor& species,
+    torch::Tensor& coordinates,
+    int npairs, // TODO remove?
+    torch::Tensor& ilist_unique,
+    torch::Tensor& jlist,
+    torch::Tensor& numneigh,
+    int nlocal,
+    int ago,
+    torch::Tensor& out_atomic_energies,
+    bool eflag_atom) {
+  int ntotal = species.size(0);
+
+  torch::Tensor species_ghost_as_padding = species.detach().clone();
+  // TODO we don't need this parameter, we could use species and nlocal to create this tensor within python code
+  // equivalent to: species_ghost_as_padding[:, nlocal:] = -1
+  species_ghost_as_padding.index_put_({torch::indexing::Slice(), torch::indexing::Slice(nlocal, torch::indexing::None)}, -1);
+
+  // pack forward inputs
+  std::vector<torch::jit::IValue> inputs;
+  inputs.push_back(species);
+  inputs.push_back(coordinates.to(torch::kFloat64).requires_grad_(true));
+  inputs.push_back(ilist_unique);
+  inputs.push_back(jlist);
+  inputs.push_back(numneigh);
+  inputs.push_back(species_ghost_as_padding);
+  inputs.push_back(eflag_atom);
+
+  // run ani model
+  torch::Tensor energy, force, atomic_energies;
+  auto outputs = model.forward(inputs).toTuple();
+  // extract energy and force from model outputs, and convert the unit to kcal/mol
+  out_energy = outputs->elements()[0].toTensor() * hartree2kcalmol;
+  out_force = outputs->elements()[1].toTensor() * hartree2kcalmol;
+
+  // if eflag_atom is false, atomic_energies will be an empty tensor
+  if (eflag_atom) {
+    out_atomic_energies = outputs->elements()[2].toTensor() * hartree2kcalmol;
   }
 }

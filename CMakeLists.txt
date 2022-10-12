@@ -19,7 +19,7 @@ if(LAMMPS_DIR)
   set(LAMMPS_HEADER_DIR ${LAMMPS_SOURCE_DIR})
 else()
   # NOTE: the next line should be commented out when used outside of the LAMMPS package
-  get_filename_component(LAMMPS_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../../src ABSOLUTE)
+  # get_filename_component(LAMMPS_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../../src ABSOLUTE)
   set(LAMMPS_HEADER_DIR ${LAMMPS_SOURCE_DIR} CACHE PATH "Location of LAMMPS headers")
   if(NOT LAMMPS_HEADER_DIR)
     message(FATAL_ERROR "Must set LAMMPS_HEADER_DIR")
@@ -75,13 +75,16 @@ endif()
 # packages
 find_package(Torch REQUIRED)
 find_package(Python REQUIRED COMPONENTS Interpreter Development)
+find_package(Kokkos REQUIRED)
 add_subdirectory(ani_csrc)
 
 # building the plugins
-add_library(ani_plugin MODULE ani_plugin.cpp pair_ani.cpp)
+add_library(ani_plugin MODULE ani_plugin.cpp pair_ani.cpp pair_ani_kokkos.cpp)
 target_include_directories(ani_plugin PRIVATE "${LAMMPS_HEADER_DIR}/OPENMP")
+target_include_directories(ani_plugin PRIVATE "${LAMMPS_HEADER_DIR}/KOKKOS")
 target_include_directories(ani_plugin PRIVATE "ani_csrc")
 target_link_libraries(ani_plugin PRIVATE lammps)
+target_link_libraries(ani_plugin PRIVATE Kokkos::kokkos)
 
 # link to ani
 target_link_libraries(ani_plugin PRIVATE ${TORCH_LIBRARIES} ${Python_LIBRARIES})

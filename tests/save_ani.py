@@ -104,14 +104,15 @@ class ANI2x(torch.nn.Module):
         # compute aev
         assert species.shape[0] == 1, "Currently only support inference for single molecule"
         if self.use_cuaev:
+            # TODO, coordinates, diff_vector could be in float
             # diff_vector, distances, coordinates from lammps are always in double,
             # cuaev currently only works with single precision
-            diff_vector = diff_vector.to(torch.float32)
-            distances = distances.to(torch.float32)
             coordinates = coordinates.to(torch.float32)
             if self.use_fullnbr:
                 aev = self.aev_computer._compute_cuaev_with_full_nbrlist(species, coordinates, ilist_unique, jlist, numneigh)
             else:
+                diff_vector = diff_vector.to(torch.float32)
+                distances = distances.to(torch.float32)
                 aev = self.aev_computer._compute_cuaev_with_nbrlist(species, coordinates, atom_index12, diff_vector, distances)
             assert aev is not None
             # the neural network part will use whatever dtype the user specified

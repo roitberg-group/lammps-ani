@@ -1,6 +1,6 @@
-/* -*- c++ -*- ----------------------------------------------------------
+/* ----------------------------------------------------------------------
    LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
-   https://www.lammps.org/ Sandia National Laboratories
+   https://www.lammps.org/, Sandia National Laboratories
    Steve Plimpton, sjplimp@sandia.gov
 
    Copyright (2003) Sandia Corporation.  Under the terms of Contract
@@ -49,6 +49,7 @@ class PairANI : public Pair {
   bool use_fullnbr;
   int use_num_models;
   std::vector<double> out_force;
+  bool lammps_ani_profiling;
 
   virtual void allocate();
 };

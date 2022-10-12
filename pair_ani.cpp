@@ -27,6 +27,8 @@
 #include "neighbor.h"
 #include "update.h"
 
+#include <c10/util/env.h>
+
 using namespace LAMMPS_NS;
 
 /* ---------------------------------------------------------------------- */
@@ -44,6 +46,8 @@ PairANI::PairANI(LAMMPS* lmp) : Pair(lmp) {
   }
   comm_reverse = 3;
   comm_reverse_off = 3;
+  lammps_ani_profiling = c10::utils::check_env("LAMMPS_ANI_PROFILING") == true;
+  std::cout << "LAMMPS_ANI_PROFILING mode: " << lammps_ani_profiling << std::endl;
 }
 
 /* ---------------------------------------------------------------------- */

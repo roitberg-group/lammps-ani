@@ -1,6 +1,7 @@
 import torch
 import torchani
 import os
+import pytest
 import tempfile
 import yaml
 from typing import Dict
@@ -11,18 +12,16 @@ from ase.md.verlet import VelocityVerlet
 from ase.io.trajectory import Trajectory
 from ase import units
 
-import torchsnooper
-import snoop
-torchsnooper.register_snoop(verbose=True)
+lmp = os.path.join(os.environ["LAMMPS_ROOT"], "build/lmp_mpi")
 
 
 class LammpsRunner():
-    # @snoop
-    def __init__(self, lmp: str, input_file: str, var_dict: Dict):
+    def __init__(self, lmp: str, input_file: str, var_dict: Dict, kokkos: bool, num_tasks: int = 1):
         var_dict["dump_file"] = "dump.yaml"
         var_commands = " ".join([f"-var {var} {value}" for var, value in var_dict.items()])
-        run_commands = f"mpirun -np 1 {lmp} {var_commands} -in {input_file}"
-        print(run_commands)
+        kokkos_commands = f"-k on g {num_tasks} -sf kk" if kokkos else ""
+        run_commands = f"mpirun -np {num_tasks} {lmp} {var_commands} {kokkos_commands} -in {input_file}"
+        print(f"\n{run_commands}")
         self.run_commands = run_commands
         self.var_dict = var_dict
 
@@ -48,7 +47,7 @@ class AseRunner():
             use_cuda_extension=use_cuaev,
         )
         # TODO It is IMPORTANT to set cutoff as 7.1 to match lammps nbr cutoff
-        ani2x.aev_computer.neighborlist.cutoff = 7.1
+        ani2x.aev_computer.neighborlist.cutoff = 5.1
         # double precision
         if use_double:
             ani2x = ani2x.double()
@@ -92,27 +91,60 @@ def compare_lmp_ase(lmp_dump, ase_traj):
     num_traj = len(ase_traj)
     for i in range(num_traj):
         lmp_data = lmp_dump[i]
-        ase_atoms = ase_traj[i]
-        lmp_potEng = lmp_data["thermo"][1]["data"][8]
+        lmp_potEng = lmp_data["thermo"][1]["data"][1]
+        lmp_index = np.array(lmp_data["data"])[:, 0]
+        lmp_data["data"] = np.array(lmp_data["data"])[np.argsort(lmp_index)]
         lmp_pos = np.array(lmp_data["data"])[:, 2:5]
         lmp_force = np.array(lmp_data["data"])[:, 5:]
+
+        ase_atoms = ase_traj[i]
         hartree2kcalmol = 627.5094738898777
         ase_pos = ase_atoms.positions
         ase_force = ase_atoms.get_forces() / units.Hartree * hartree2kcalmol
-        ase_potEng = ase_atoms.get_potential_energy()/ units.Hartree * hartree2kcalmol
+        ase_potEng = ase_atoms.get_potential_energy() / units.Hartree * hartree2kcalmol
+        print(np.abs(ase_force - lmp_force).max())
+        assert np.allclose(ase_force, lmp_force, 1e-3, 1e-3)
+        assert np.allclose(ase_pos, lmp_pos)
+        if i > 0:
+            assert np.allclose(lmp_potEng, ase_potEng)
 
-lmp = os.path.join(os.environ["LAMMPS_ROOT"], "build/lmp_mpi")
-var_dict = {
-    "newton_pair": "off",
-    "num_models": 8,
-    "data_file": "water-0.8nm.data",
-    "model_file": "ani2x_cuaev_single_full.pt",
-    "device": "cuda"
-}
-lmprunner = LammpsRunner(lmp, "in.lammps", var_dict)
-lmp_dump = lmprunner.run()
-print(lmp_dump)
 
-aserunner = AseRunner(pbc=True, use_double=False, use_cuaev=True)
-ase_traj = aserunner.run()
-print(ase_traj)
+pbc_params = [
+    pytest.param(True, id="pbc_true"),
+    pytest.param(False, id="pbc_false"),
+]
+kokkos_params = [
+    pytest.param(True, id="kokkos_true"),
+    pytest.param(False, id="kokkos_false"),
+]
+num_tasks_params = [
+    pytest.param(1, id="num_tasks_1"),
+]
+if int(os.environ["SLURM_NTASKS"]) > 1:
+    num_tasks_params.append(pytest.param(2, id="num_tasks_2"))
+
+
+@pytest.mark.parametrize("pbc", pbc_params)
+@pytest.mark.parametrize("kokkos", kokkos_params)
+@pytest.mark.parametrize("num_tasks", num_tasks_params)
+def test_ani2x_cuaev_single_full(pbc, kokkos, num_tasks):
+    var_dict = {
+        "newton_pair": "off",
+        "num_models": 8,
+        "data_file": "water-0.8nm.data",
+        "model_file": "ani2x_cuaev_single_full.pt",
+        "device": "cuda",
+        "change_box": "'all boundary p p p'"
+    }
+    if not pbc:
+        var_dict["change_box"] = "'all boundary f f f'"
+    if kokkos:
+        var_dict["newton_pair"] = "on"
+
+    lmprunner = LammpsRunner(lmp, "in.lammps", var_dict, kokkos, num_tasks)
+    lmp_dump = lmprunner.run()
+
+    aserunner = AseRunner(pbc=pbc, use_double=False, use_cuaev=True)
+    ase_traj = aserunner.run()
+
+    compare_lmp_ase(lmp_dump, ase_traj)

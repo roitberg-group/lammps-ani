@@ -123,7 +123,7 @@ precision_params = [
 num_tasks_params = [
     pytest.param(1, id="num_tasks_1"),
 ]
-if int(os.environ["SLURM_NTASKS"]) > 1:
+if "SLURM_NTASKS" in os.environ and int(os.environ["SLURM_NTASKS"]) > 1:
     num_tasks_params.append(pytest.param(2, id="num_tasks_2"))
 
 

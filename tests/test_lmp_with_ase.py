@@ -123,7 +123,9 @@ precision_params = [
 num_tasks_params = [
     pytest.param(1, id="num_tasks_1"),
 ]
-if "SLURM_NTASKS" in os.environ and int(os.environ["SLURM_NTASKS"]) > 1:
+run_github_action_multi = "TEST_WITH_MULTI_PROCS" in os.environ and os.environ["TEST_WITH_MULTI_PROCS"] == "true"
+run_slurm_multi = "SLURM_NTASKS" in os.environ and int(os.environ["SLURM_NTASKS"]) > 1
+if run_github_action_multi or run_slurm_multi:
     num_tasks_params.append(pytest.param(2, id="num_tasks_2"))
 
 

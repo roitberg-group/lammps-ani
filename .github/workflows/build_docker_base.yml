@@ -55,8 +55,6 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=raw,value=base-master
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v3
@@ -65,7 +63,7 @@ jobs:
           # push: ${{ github.event_name != 'pull_request' }}
           push: true
           pull: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-base:latest
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             MAKE_J_THREADS=5

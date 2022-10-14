@@ -2,7 +2,6 @@ import torch
 import torchani
 import os
 import pytest
-import tempfile
 import yaml
 from typing import Dict
 import subprocess
@@ -33,7 +32,7 @@ class LammpsRunner():
 
 
 class AseRunner():
-    def __init__(self, pbc=False, use_double=True, use_cuaev=False):
+    def __init__(self, pbc: bool = False, use_double: bool = True, use_cuaev: bool = False, half_nbr: bool = True):
         input_file = "water-0.8nm.pdb"
         atoms = read(input_file)
 
@@ -46,8 +45,10 @@ class AseRunner():
             use_cuaev_interface=use_cuaev,
             use_cuda_extension=use_cuaev,
         )
-        # TODO It is IMPORTANT to set cutoff as 7.1 to match lammps nbr cutoff
-        ani2x.aev_computer.neighborlist.cutoff = 5.1
+        # When using half nbrlist, we have to set the cutoff as 7.1 to match lammps nbr cutoff.
+        # Full nbrlist still uses 5.1, which is fine.
+        if half_nbr:
+            ani2x.aev_computer.neighborlist.cutoff = 7.1
         # double precision
         if use_double:
             ani2x = ani2x.double()
@@ -84,10 +85,12 @@ class AseRunner():
         return traj
 
 
-def compare_lmp_ase(lmp_dump, ase_traj):
+def compare_lmp_ase(lmp_dump, ase_traj, high_prec):
     # with open("tests/dump.yaml", "r") as stream:
     #     lmp_dump = list(yaml.safe_load_all(stream))
     # ase_traj = list(Trajectory('tests/md.traj'))
+    atol = 1e-9 if high_prec else 1e-3
+    rtol = 1e-6 if high_prec else 1e-3
     num_traj = len(ase_traj)
     for i in range(num_traj):
         lmp_data = lmp_dump[i]
@@ -103,19 +106,19 @@ def compare_lmp_ase(lmp_dump, ase_traj):
         ase_force = ase_atoms.get_forces() / units.Hartree * hartree2kcalmol
         ase_potEng = ase_atoms.get_potential_energy() / units.Hartree * hartree2kcalmol
         print(np.abs(ase_force - lmp_force).max())
-        assert np.allclose(ase_force, lmp_force, 1e-3, 1e-3)
-        assert np.allclose(ase_pos, lmp_pos)
+        assert np.allclose(ase_force, lmp_force, rtol, atol)
+        assert np.allclose(ase_pos, lmp_pos, rtol, atol)
         if i > 0:
-            assert np.allclose(lmp_potEng, ase_potEng)
+            assert np.allclose(lmp_potEng, ase_potEng, rtol, atol)
 
 
 pbc_params = [
     pytest.param(True, id="pbc_true"),
     pytest.param(False, id="pbc_false"),
 ]
-kokkos_params = [
-    pytest.param(True, id="kokkos_true"),
-    pytest.param(False, id="kokkos_false"),
+precision_params = [
+    pytest.param("single", id="precision_single"),
+    pytest.param("double", id="precision_double"),
 ]
 num_tasks_params = [
     pytest.param(1, id="num_tasks_1"),
@@ -125,15 +128,41 @@ if int(os.environ["SLURM_NTASKS"]) > 1:
 
 
 @pytest.mark.parametrize("pbc", pbc_params)
-@pytest.mark.parametrize("kokkos", kokkos_params)
+@pytest.mark.parametrize("precision", precision_params)
 @pytest.mark.parametrize("num_tasks", num_tasks_params)
-def test_ani2x_cuaev_single_full(pbc, kokkos, num_tasks):
+@pytest.mark.parametrize(
+    "kokkos, cuaev, nbr, device",
+    [
+        # kokkos on, only works with cuaev and full nbr
+        pytest.param(
+            True, True, "full", "cuda", id="kokkos_full_cuda"
+        ),
+        # kokkos off, cuaev, works with full and half nbr
+        pytest.param(
+            False, True, "full", "cuda", id="cuaev_full_cuda"
+        ),
+        pytest.param(
+            False, True, "half", "cuda", id="cuaev_half_cuda"
+        ),
+        # kokkos off, nocuaev, only works with half nbr
+        pytest.param(
+            False, False, "half", "cuda", id="nocuaev_half_cuda"
+        ),
+        pytest.param(
+            False, False, "half", "cpu", id="nocuaev_half_cpu"
+        ),
+    ],
+)
+def test_ani2x_cuaev_single_full(
+        kokkos: bool, cuaev: bool, precision: str, nbr: str, pbc: bool, device: str, num_tasks: int):
+    # prepare configurations
+    cuaev_str = "cuaev" if cuaev else "nocuaev"
     var_dict = {
         "newton_pair": "off",
         "num_models": 8,
         "data_file": "water-0.8nm.data",
-        "model_file": "ani2x_cuaev_single_full.pt",
-        "device": "cuda",
+        "model_file": f"ani2x_{cuaev_str}_{precision}_{nbr}.pt",
+        "device": device,
         "change_box": "'all boundary p p p'"
     }
     if not pbc:
@@ -141,10 +170,20 @@ def test_ani2x_cuaev_single_full(pbc, kokkos, num_tasks):
     if kokkos:
         var_dict["newton_pair"] = "on"
 
+    # run lammps
     lmprunner = LammpsRunner(lmp, "in.lammps", var_dict, kokkos, num_tasks)
     lmp_dump = lmprunner.run()
 
-    aserunner = AseRunner(pbc=pbc, use_double=False, use_cuaev=True)
+    # cuaev and double do not work with ASE
+    if cuaev and precision == "double":
+        return
+
+    # run ase
+    use_double = precision == "double"
+    half_nbr = nbr == "half"
+    aserunner = AseRunner(pbc=pbc, use_double=use_double, use_cuaev=cuaev, half_nbr=half_nbr)
     ase_traj = aserunner.run()
 
-    compare_lmp_ase(lmp_dump, ase_traj)
+    # check result
+    high_prec = not cuaev and use_double
+    compare_lmp_ase(lmp_dump, ase_traj, high_prec)

@@ -21,7 +21,8 @@ rm -rf build-kokkos; mkdir -p build-kokkos; cd build-kokkos
 cmake -DCMAKE_C_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" \
 -DCMAKE_INSTALL_PREFIX=~/.local/kokkos -DBUILD_SHARED_LIBS=yes -DKokkos_ENABLE_CUDA=yes -DKokkos_ENABLE_OPENMP=yes -DKokkos_ENABLE_SERIAL=yes \
 -DKokkos_ARCH_HOSTARCH=yes -DKokkos_ARCH_GPUARCH=on \
--DKokkos_ARCH_AMPERE80=yes -DKokkos_ENABLE_CUDA_LAMBDA=yes ../lib/kokkos # -DKokkos_ARCH_TURING75=yes
+-DKokkos_ARCH_AMPERE80=yes -DKokkos_ARCH_TURING75=yes -DKokkos_ARCH_PASCAL60=yes -DKokkos_ENABLE_CUDA_LAMBDA=yes \
+../lib/kokkos
 make -j
 make install
 cd ..

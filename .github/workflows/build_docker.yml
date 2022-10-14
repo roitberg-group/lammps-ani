@@ -56,7 +56,7 @@ jobs:
           target: lammps-ani-build_from_base
 
       - name: Test
-        run: docker run --gpus all ${{ steps.meta.outputs.tags }} bash -c "nvidia-smi && cd /lammps-ani/tests/ && python save_ani.py && ./test_all.sh"
+        run: docker run --gpus all ${{ steps.meta.outputs.tags }} bash -c "nvidia-smi && cd /lammps-ani/tests/ && python save_ani.py && ./test_all.sh && pytest test_lmp_with_ase.py -s -v"
 
       - name: Remove image
         if: ${{ always() }}

@@ -38,6 +38,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Login to NGC Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: nvcr.io
+          username: $oauthtoken
+          password: ${{ secrets.NGC_API_KEY }}
+
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -56,7 +63,9 @@ jobs:
           target: lammps-ani-build_from_base
 
       - name: Test
-        run: docker run --gpus all ${{ steps.meta.outputs.tags }} bash -c "nvidia-smi && cd /lammps-ani/tests/ && python save_ani.py && ./test_all.sh"
+        env:
+          TEST_WITH_MULTI_PROCS: true
+        run: docker run --gpus all ${{ steps.meta.outputs.tags }} bash -c "nvidia-smi && cd /lammps-ani/tests/ && python save_ani.py && ./test_all.sh && pytest test_lmp_with_ase.py -s -v"
 
       - name: Remove image
         if: ${{ always() }}

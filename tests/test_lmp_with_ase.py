@@ -122,11 +122,8 @@ precision_params = [
 ]
 num_tasks_params = [
     pytest.param(1, id="num_tasks_1"),
+    pytest.param(2, id="num_tasks_2")
 ]
-run_github_action_multi = "TEST_WITH_MULTI_PROCS" in os.environ and os.environ["TEST_WITH_MULTI_PROCS"] == "true"
-run_slurm_multi = "SLURM_NTASKS" in os.environ and int(os.environ["SLURM_NTASKS"]) > 1
-if run_github_action_multi or run_slurm_multi:
-    num_tasks_params.append(pytest.param(2, id="num_tasks_2"))
 
 
 @pytest.mark.parametrize("pbc", pbc_params)
@@ -157,6 +154,18 @@ if run_github_action_multi or run_slurm_multi:
 )
 def test_ani2x_cuaev_single_full(
         kokkos: bool, cuaev: bool, precision: str, nbr: str, pbc: bool, device: str, num_tasks: int):
+    # SKIP: compiled kokkos only work on Ampere GPUs
+    SM = torch.cuda.get_device_capability(0)
+    SM = int(f'{SM[0]}{SM[1]}')
+    if kokkos and SM < 80:
+        pytest.skip("compiled kokkos only work on Ampere GPUs")
+
+    # SKIP
+    run_github_action_multi = "TEST_WITH_MULTI_PROCS" in os.environ and os.environ["TEST_WITH_MULTI_PROCS"] == "true"
+    run_slurm_multi = "SLURM_NTASKS" in os.environ and int(os.environ["SLURM_NTASKS"]) > 1
+    if not run_github_action_multi and not run_slurm_multi:
+        pytest.skip("Skip running on 2 MPI Processes")
+
     # prepare configurations
     cuaev_str = "cuaev" if cuaev else "nocuaev"
     var_dict = {
@@ -176,9 +185,9 @@ def test_ani2x_cuaev_single_full(
     lmprunner = LammpsRunner(lmp, "in.lammps", var_dict, kokkos, num_tasks)
     lmp_dump = lmprunner.run()
 
-    # cuaev and double do not work with ASE
+    # SKIP: cuaev and double precision do not work with ASE
     if cuaev and precision == "double":
-        return
+        pytest.skip("cuaev and double precision do not work with ASE")
 
     # run ase
     use_double = precision == "double"

@@ -1,6 +1,6 @@
 # Usage:
 # 1. build base image, with lammps, kokkos and torchani
-#     docker build --target base -t ghcr.io/roitberg-group/lammps-ani:base -f Dockerfile .
+#     docker build --target base -t ghcr.io/roitberg-group/lammps-ani-base:latest -f Dockerfile .
 # 2. build from a base image
 #     docker build --target lammps-ani-build_from_base -t ghcr.io/roitberg-group/lammps-ani:latest -f Dockerfile .
 # 3. build from scratch
@@ -41,7 +41,7 @@ RUN cd $LAMMPS_ANI_ROOT \
 WORKDIR $LAMMPS_ANI_ROOT
 
 # ==================== lammps-ani-build_from_base ====================
-FROM ghcr.io/roitberg-group/lammps-ani:base-master AS lammps-ani-build_from_base
+FROM ghcr.io/roitberg-group/lammps-ani-base:latest AS lammps-ani-build_from_base
 COPY . $LAMMPS_ANI_ROOT
 RUN ./build-lammps-ani.sh
 

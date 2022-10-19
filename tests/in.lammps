@@ -36,7 +36,7 @@ timestep       0.1
 dump           myDump all yaml 1 dump.yaml id type x y z fx fy fz  # c_atomicenergies
 dump_modify    myDump time yes units yes thermo yes format float "% 10.10e"
 thermo_style   custom step pe ke etotal temp press vol
-thermo         4
+thermo         1 
 
 # Run the simulation: first run (5 ps)
 run            4

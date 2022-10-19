@@ -69,7 +69,7 @@ class AseRunner():
             print(
                 "Energy: Epot = %.13f kcal/mol  Ekin = %.13f kcal/mol (T=%3.0fK)  "
                 "Etot = %.13f kcal/mol"
-                % (epot, ekin, ekin / len(a) / (1.5 * units.kB), epot + ekin)
+                % (epot, ekin, a.get_temperature(), epot + ekin)
             )
 
         dyn = VelocityVerlet(

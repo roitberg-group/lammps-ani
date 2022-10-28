@@ -3,3 +3,4 @@ ani_csrc/*
 *.pt
 examples/*
 .vscode/*
+**/__pycache__/*

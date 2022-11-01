@@ -25,7 +25,7 @@ class LammpsRunner():
         self.var_dict = var_dict
 
     def run(self):
-        stdout = subprocess.run(self.run_commands, shell=True, stdout=subprocess.PIPE, check=True)
+        stdout = subprocess.run(self.run_commands, shell=True, check=True)
         with open(self.var_dict["dump_file"], "r") as stream:
             documents = list(yaml.safe_load_all(stream))
         return documents
@@ -67,7 +67,7 @@ class AseRunner():
             ekin = a.get_kinetic_energy() / units.Hartree * hartree2kcalmol
             # forces = atoms.get_forces().astype(np.double) / units.Hartree * hartree2kcalmol
             print(
-                "Energy: Epot = %.13f kcal/mol  Ekin = %.13f kcal/mol (T=%3.0fK)  "
+                "Energy: Epot = %.13f kcal/mol  Ekin = %.13f kcal/mol (T=%3.2fK)  "
                 "Etot = %.13f kcal/mol"
                 % (epot, ekin, a.get_temperature(), epot + ekin)
             )
@@ -146,6 +146,9 @@ num_tasks_params = [
         # kokkos off, nocuaev, only works with half nbr
         pytest.param(
             False, False, "half", "cuda", id="nocuaev_half_cuda"
+        ),
+        pytest.param(
+            False, False, "full", "cuda", id="nocuaev_full_cuda"
         ),
         pytest.param(
             False, False, "half", "cpu", id="nocuaev_half_cpu"

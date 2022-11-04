@@ -102,10 +102,6 @@ void PairANI::compute(int eflag, int vflag) {
 
   int ago = neighbor->ago;
 
-  // if (ago == 0) {
-  //   std::cout << "neighborlist rebuild" << std::endl;
-  // }
-
   // convert neighbor list data
   if (ago == 0) {
     // species

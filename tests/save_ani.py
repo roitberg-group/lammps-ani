@@ -53,10 +53,10 @@ class ANI2x(torch.nn.Module):
         if atomic:
             return self.forward_atomic(species, coordinates, species_ghost_as_padding, aev)
         else:
-            return self.forward_total(species, coordinates, species_ghost_as_padding, aev)
+            return self.forward_total(species, coordinates, species_ghost_as_padding, aev, para1, para2, para3)
 
     @torch.jit.export
-    def forward_total(self, species, coordinates, species_ghost_as_padding, aev):
+    def forward_total(self, species, coordinates, species_ghost_as_padding, aev, para1, para2, para3):
         # run neural networks
         torch.ops.mnp.nvtx_range_push(f"NN ({self.use_num_models}) forward")
         species_energies = self.neural_networks((species_ghost_as_padding, aev))
@@ -70,6 +70,28 @@ class ANI2x(torch.nn.Module):
         assert force is not None
         force = -force
         torch.ops.mnp.nvtx_range_pop()
+        # print(f"AEV: {aev}")
+        # print(f"Energy: {energies}")
+        # print(f"Force: {force}")
+        not_finite = torch.all(energies.isfinite()).item() is False
+        if not_finite:
+            ilist_unique, jlist, numneigh = para1, para2, para3
+            print(f"{species.device} ========================")
+            print(f"{species.device} ===nan species: {species}")
+            print(f"{species.device} ===nan coordinates: {coordinates}")
+            print(f"{species.device} ===nan ilist_unique: {ilist_unique}")
+            print(f"{species.device} ===nan jlist: {jlist}")
+            print(f"{species.device} ===nan numneigh: {numneigh}")
+            print(f"{species.device} ===nan energies: {energies}")
+            print(f"{species.device} ===nan energies: {energies}")
+            aev_is_nan = torch.logical_not(torch.all(aev.squeeze(0).isfinite(), dim=-1))
+            aev_is_nan_index = aev_is_nan.nonzero()
+            print(f"{species.device} ===nan aev with nan index: {aev_is_nan_index}")
+            print(f"{species.device} ===nan aev with nan: {aev[:, aev_is_nan_index, :]}")
+            print(f"{species.device} ===nan aev: {aev.shape}")
+            print(f"{species.device} ===nan species: {species.shape}")
+            print(f"{species.device} ===nan coordinates: {coordinates.shape}")
+            # print(aev)
 
         return energies, force, torch.empty(0)
 
@@ -120,6 +142,14 @@ class ANI2x(torch.nn.Module):
         else:
             # diff_vector, distances from lammps are always in double,
             # we need to convert it to single precision if needed
+            if self.use_fullnbr:
+                atom_index12 = self.aev_computer._full_to_half_nbrlist(ilist_unique, jlist, numneigh, species)
+                # print(f"{atom_index12.device}, max_neighbor_index {atom_index12.max().item()}, num_atoms {coordinates.shape[1]}")
+                assert atom_index12.max() < coordinates.shape[1], f"neighbor {atom_index12.max().item()} larger than num_atoms {coordinates.shape[1]}"
+                coords0 = coordinates.view(-1, 3).index_select(0, atom_index12[0])
+                coords1 = coordinates.view(-1, 3).index_select(0, atom_index12[1])
+                diff_vector = coords0 - coords1
+                distances = diff_vector.norm(2, -1)
             diff_vector = diff_vector.to(dtype)
             distances = distances.to(dtype)
             aev = self.aev_computer._compute_aev(species, atom_index12, diff_vector, distances)

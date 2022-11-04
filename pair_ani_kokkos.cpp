@@ -162,21 +162,44 @@ void PairANIKokkos<DeviceType>::compute(int eflag_in, int vflag_in) {
 
   // transpose jlist if it is LayoutLeft (column-major)
   typedef typename decltype(d_neighbors)::array_layout d_neighbors_layout;
+  int kokkos_ntotal = d_neighbors.extent(0);
   if (std::is_same<d_neighbors_layout, Kokkos::LayoutLeft>::value) {
     // std::cout << "d_neighbors layout == LayoutLeft" << std::endl;
-    jlist = torch::from_blob(d_neighbors.data(), {max_neighs, nlocal}, tensor_kokkos_int32_option).to(ani.device);
+    jlist = torch::from_blob(d_neighbors.data(), {max_neighs, kokkos_ntotal}, tensor_kokkos_int32_option).to(ani.device);
     jlist = jlist.transpose(0, 1);
   } else {
-    jlist = torch::from_blob(d_neighbors.data(), {nlocal, max_neighs}, tensor_kokkos_int32_option).to(ani.device);
+    std::cout << "d_neighbors layout == LayoutRight" << std::endl;
+    jlist = torch::from_blob(d_neighbors.data(), {kokkos_ntotal, max_neighs}, tensor_kokkos_int32_option).to(ani.device);
   }
   // TODO, because of the current API design, we have to flatten the jlist and remove the padding
+  // std::cout << ani.device << ", ago: " << ago << ", jlist shape before: " << jlist.sizes() << std::endl;
+  jlist = jlist.index({torch::indexing::Slice(0, nlocal), torch::indexing::Slice()});
+  // std::cout << ani.device << ", ago: " << ago << ", jlist shape after: " << jlist.sizes() << std::endl;
   torch::Tensor mask = torch::arange(max_neighs, ani.device).unsqueeze(0) < numneigh.unsqueeze(1);
   // std::cout << "jlist: " << jlist.index({torch::indexing::Slice(), torch::indexing::Slice(80, 90)}) << std::endl;
   // std::cout << "numneigh: " << numneigh << std::endl;
   // std::cout << "mask: " << mask.index({torch::indexing::Slice(), torch::indexing::Slice(80, 90)}) << std::endl;
+  // std::cout << ani.device << ", ago: " << ago << ", jlist: " << jlist << std::endl;
   jlist = jlist.masked_select(mask);
+  // auto maxindex = jlist.argmax();
+  // std::cout << ani.device << ", ago: " << ago << ", numneigh: " << numneigh << std::endl;
+  // std::cout << ani.device << ", ago: " << ago << ", numneigh.cumsum: " << numneigh.cumsum(0) << std::endl;
+  // std::cout << ani.device << ", ago: " << ago << ", maxindex: " << maxindex.item() << std::endl;
+
   int npairs = jlist.size(0);
   // std::cout << "npairs: " << npairs << std::endl;
+  // const AtomNeighborsConst neighbors_i = k_list.get_neighbors_const(0);
+  // int stride = neighbors_i(0);
+  // << ", stride: " << stride
+  // std::cout << ani.device << ", ago: " << ago << ", ntotal: "  << ntotal << ", nlocal: "  << nlocal << ", max_neighs: "  << max_neighs << ", jlist.min: "  << jlist.min().item() << ", jlist.max: "  << jlist.max().item() << std::endl;
+
+  // if (ago == 0) {
+  //   std::cout << "============== neighborlist rebuild ============== " << std::endl;
+  // }
+
+  // if (jlist.max().item().toInt() > ntotal) {
+  //   std::cout << ani.device << ", ago: " << ago << " ====================================================== wrong " << std::endl;
+  // }
 
   ani.compute(
       out_energy,
@@ -192,16 +215,21 @@ void PairANIKokkos<DeviceType>::compute(int eflag_in, int vflag_in) {
       out_atomic_energies,
       eflag_atom);
 
+  out_force = torch::rand({1, ntotal, 3}) + out_force.to(torch::kCPU);
+  // out_force = torch::rand({1, ntotal, 3});
+  // std::cout << ani.device << ", ago: " << ago << ", ilist_unique: "  << ilist_unique << std::endl;
+  // std::cout << ani.device << ", ago: " << ago << ", ilist_unique: "  << jlist << std::endl;
+
   torch::Tensor d_force_tensor = torch::from_blob(f.data(), {1, ntotal, 3}, tensor_kokkos_force_option);
   d_force_tensor += out_force.to(kokkos_device);
 
-  if (eflag) {
-    eng_vdwl += out_energy.item<double>();
-  }
-  if (eflag_atom) {
-    torch::Tensor d_eatom_tensor = torch::from_blob(d_eatom.data(), {1, nlocal}, tensor_kokkos_float64_option);
-    d_eatom_tensor += out_atomic_energies.to(kokkos_device);
-  }
+  // if (eflag) {
+  //   eng_vdwl += out_energy.item<double>();
+  // }
+  // if (eflag_atom) {
+  //   torch::Tensor d_eatom_tensor = torch::from_blob(d_eatom.data(), {1, nlocal}, tensor_kokkos_float64_option);
+  //   d_eatom_tensor += out_atomic_energies.to(kokkos_device);
+  // }
 
   if (lammps_ani_profiling) {
     torch::cuda::synchronize();

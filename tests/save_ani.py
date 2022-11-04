@@ -53,10 +53,10 @@ class ANI2x(torch.nn.Module):
         if atomic:
             return self.forward_atomic(species, coordinates, species_ghost_as_padding, aev)
         else:
-            return self.forward_total(species, coordinates, species_ghost_as_padding, aev, para1, para2, para3)
+            return self.forward_total(species, coordinates, species_ghost_as_padding, aev)
 
     @torch.jit.export
-    def forward_total(self, species, coordinates, species_ghost_as_padding, aev, para1, para2, para3):
+    def forward_total(self, species, coordinates, species_ghost_as_padding, aev):
         # run neural networks
         torch.ops.mnp.nvtx_range_push(f"NN ({self.use_num_models}) forward")
         species_energies = self.neural_networks((species_ghost_as_padding, aev))
@@ -70,28 +70,6 @@ class ANI2x(torch.nn.Module):
         assert force is not None
         force = -force
         torch.ops.mnp.nvtx_range_pop()
-        # print(f"AEV: {aev}")
-        # print(f"Energy: {energies}")
-        # print(f"Force: {force}")
-        not_finite = torch.all(energies.isfinite()).item() is False
-        if not_finite:
-            ilist_unique, jlist, numneigh = para1, para2, para3
-            print(f"{species.device} ========================")
-            print(f"{species.device} ===nan species: {species}")
-            print(f"{species.device} ===nan coordinates: {coordinates}")
-            print(f"{species.device} ===nan ilist_unique: {ilist_unique}")
-            print(f"{species.device} ===nan jlist: {jlist}")
-            print(f"{species.device} ===nan numneigh: {numneigh}")
-            print(f"{species.device} ===nan energies: {energies}")
-            print(f"{species.device} ===nan energies: {energies}")
-            aev_is_nan = torch.logical_not(torch.all(aev.squeeze(0).isfinite(), dim=-1))
-            aev_is_nan_index = aev_is_nan.nonzero()
-            print(f"{species.device} ===nan aev with nan index: {aev_is_nan_index}")
-            print(f"{species.device} ===nan aev with nan: {aev[:, aev_is_nan_index, :]}")
-            print(f"{species.device} ===nan aev: {aev.shape}")
-            print(f"{species.device} ===nan species: {species.shape}")
-            print(f"{species.device} ===nan coordinates: {coordinates.shape}")
-            # print(aev)
 
         return energies, force, torch.empty(0)
 

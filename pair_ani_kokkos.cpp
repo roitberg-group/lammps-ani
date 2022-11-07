@@ -123,8 +123,6 @@ void PairANIKokkos<DeviceType>::compute(int eflag_in, int vflag_in) {
 
   int max_neighs = d_neighbors.extent(1);
 
-  // Check https://github.com/roitberg-group/lammps-ani/pull/49 for Kokkos data views shape
-  // information of: x, f, type, d_neighbors, d_ilist, d_numneigh
   torch::Tensor out_energy, out_force, out_atomic_energies;
   torch::Tensor species, coordinates, ilist_unique, jlist, numneigh;
 
@@ -152,14 +150,16 @@ void PairANIKokkos<DeviceType>::compute(int eflag_in, int vflag_in) {
                 .to(torch::TensorOptions().dtype(torch::kInt64).device(ani.device));
   // lammps type from 1 to n
   species = species - 1;
+  // Check https://github.com/roitberg-group/lammps-ani/pull/49 for Kokkos data views shape
+  // information of: x, f, type, d_neighbors, d_ilist, d_numneigh.
   coordinates = torch::from_blob(x.data(), {1, ntotal, 3}, tensor_kokkos_force_option).to(ani.device);
   ilist_unique = torch::from_blob(d_ilist.data(), {nlocal}, tensor_kokkos_int32_option).to(ani.device);
   numneigh = torch::from_blob(d_numneigh.data(), {nlocal}, tensor_kokkos_int32_option).to(ani.device);
 
-  // transpose jlist if it is LayoutLeft (column-major)
-  typedef typename decltype(d_neighbors)::array_layout d_neighbors_layout;
-  // kokkos k_list contains number of atoms (kokkos_nlocal) larger than nlocal
+  // Kokkos k_list could contain number of atoms (`kokkos_nlocal`) larger than `nlocal` when running on multi-domains.
   int kokkos_nlocal = d_neighbors.extent(0);
+  // We need to transpose jlist if it is LayoutLeft (column-major).
+  typedef typename decltype(d_neighbors)::array_layout d_neighbors_layout;
   if (std::is_same<d_neighbors_layout, Kokkos::LayoutLeft>::value) {
     // std::cout << "d_neighbors layout == LayoutLeft" << std::endl;
     jlist = torch::from_blob(d_neighbors.data(), {max_neighs, kokkos_nlocal}, tensor_kokkos_int32_option).to(ani.device);

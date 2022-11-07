@@ -164,7 +164,7 @@ void PairANIKokkos<DeviceType>::compute(int eflag_in, int vflag_in) {
     jlist = torch::from_blob(d_neighbors.data(), {max_neighs, kokkos_ntotal}, tensor_kokkos_int32_option).to(ani.device);
     jlist = jlist.transpose(0, 1);
   } else {
-    std::cout << "d_neighbors layout == LayoutRight" << std::endl;
+    // std::cout << "d_neighbors layout == LayoutRight" << std::endl;
     jlist = torch::from_blob(d_neighbors.data(), {kokkos_ntotal, max_neighs}, tensor_kokkos_int32_option).to(ani.device);
   }
   // TODO, because of the current API design, we have to flatten the jlist and remove the padding

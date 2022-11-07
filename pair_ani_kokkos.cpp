@@ -122,48 +122,9 @@ void PairANIKokkos<DeviceType>::compute(int eflag_in, int vflag_in) {
   FloatView2D d_xfloat;
 
   int max_neighs = d_neighbors.extent(1);
-  /* Kokkos view shape informations
-  TLDR:
-    1. x, f, type could have atoms more than ntotal
-    2. k_list (d_neighbors, d_ilist, d_numneigh) could have atoms more than nlocal
-  Samples:
-    1. single domain:
-      cuda:0, ago: 0, x view shape: 770, 3
-      cuda:0, ago: 0, f view shape: 770, 3
-      cuda:0, ago: 0, type view shape: 770
-      cuda:0, ago: 0, d_neighbors view shape: 30, 118
-      cuda:0, ago: 0, d_ilist view shape: 30
-      cuda:0, ago: 0, d_numneigh view shape: 30
-      cuda:0, ago: 0, ntotal: 534, nlocal: 30, max_neighs: 118
 
-    2. multi domain:
-      cuda:0, ago: 0, x view shape: 610, 3
-      cuda:0, ago: 0, f view shape: 610, 3
-      cuda:0, ago: 0, type view shape: 610
-      cuda:0, ago: 0, d_neighbors view shape: 21, 103
-      cuda:0, ago: 0, d_ilist view shape: 21
-      cuda:0, ago: 0, d_numneigh view shape: 21
-      cuda:0, ago: 0, ntotal: 603, nlocal: 20, max_neighs: 103
-
-      cuda:1, ago: 0, x view shape: 610, 3
-      cuda:1, ago: 0, f view shape: 610, 3
-      cuda:1, ago: 0, type view shape: 610
-      cuda:1, ago: 0, d_neighbors view shape: 22, 118
-      cuda:1, ago: 0, d_ilist view shape: 22
-      cuda:1, ago: 0, d_numneigh view shape: 22
-      cuda:1, ago: 0, ntotal: 528, nlocal: 10, max_neighs: 118
-  */
-
-  // std::cout << ani.device << ", ago: " << ago << ", x view shape: " << x.extent(0) << ", " << x.extent(1) << std::endl;
-  // std::cout << ani.device << ", ago: " << ago << ", f view shape: " << f.extent(0) << ", " << f.extent(1) << std::endl;
-  // std::cout << ani.device << ", ago: " << ago << ", type view shape: " << type.extent(0) << std::endl;
-  // std::cout << ani.device << ", ago: " << ago << ", d_neighbors view shape: " << d_neighbors.extent(0) << ", "
-  //           << d_neighbors.extent(1) << std::endl;
-  // std::cout << ani.device << ", ago: " << ago << ", d_ilist view shape: " << d_ilist.extent(0) << std::endl;
-  // std::cout << ani.device << ", ago: " << ago << ", d_numneigh view shape: " << d_numneigh.extent(0) << std::endl;
-  // std::cout << ani.device << ", ago: " << ago << ", ntotal: " << ntotal << ", nlocal: " << nlocal
-  //           << ", max_neighs: " << max_neighs << std::endl;
-
+  // Check https://github.com/roitberg-group/lammps-ani/pull/49 for Kokkos data views shape
+  // information of: x, f, type, d_neighbors, d_ilist, d_numneigh
   torch::Tensor out_energy, out_force, out_atomic_energies;
   torch::Tensor species, coordinates, ilist_unique, jlist, numneigh;
 

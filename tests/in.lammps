@@ -10,13 +10,15 @@ variable       model_file      index  ${lammps_ani_root}/tests/ani2x_cuaev_singl
 variable       dump_file       index  dump.yaml
 variable       device          index  cuda
 variable       change_box      index  'all boundary p p p'
+variable       steps           index  4
 
 # Intialization
 units          real
 atom_style     atomic
 
 neighbor       2.0 bin
-neigh_modify   every 10 delay 0 check yes
+# always rebuild neighbor list every 2 steps
+neigh_modify   every 2 delay 0 check no
 newton         ${newton_pair} off
 
 # Atom Definition
@@ -36,10 +38,10 @@ timestep       0.1
 dump           myDump all yaml 1 dump.yaml id type x y z fx fy fz  # c_atomicenergies
 dump_modify    myDump time yes units yes thermo yes format float "% 10.10e"
 thermo_style   custom step pe ke etotal temp press vol
-thermo         1 
+thermo         1
 
 # Run the simulation: first run (5 ps)
-run            4
+run            ${steps}
 
 # write final state of simulation
 # write_data    water.final

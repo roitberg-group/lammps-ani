@@ -158,14 +158,15 @@ void PairANIKokkos<DeviceType>::compute(int eflag_in, int vflag_in) {
 
   // transpose jlist if it is LayoutLeft (column-major)
   typedef typename decltype(d_neighbors)::array_layout d_neighbors_layout;
-  int kokkos_ntotal = d_neighbors.extent(0);
+  // kokkos k_list contains number of atoms (kokkos_nlocal) larger than nlocal
+  int kokkos_nlocal = d_neighbors.extent(0);
   if (std::is_same<d_neighbors_layout, Kokkos::LayoutLeft>::value) {
     // std::cout << "d_neighbors layout == LayoutLeft" << std::endl;
-    jlist = torch::from_blob(d_neighbors.data(), {max_neighs, kokkos_ntotal}, tensor_kokkos_int32_option).to(ani.device);
+    jlist = torch::from_blob(d_neighbors.data(), {max_neighs, kokkos_nlocal}, tensor_kokkos_int32_option).to(ani.device);
     jlist = jlist.transpose(0, 1);
   } else {
     // std::cout << "d_neighbors layout == LayoutRight" << std::endl;
-    jlist = torch::from_blob(d_neighbors.data(), {kokkos_ntotal, max_neighs}, tensor_kokkos_int32_option).to(ani.device);
+    jlist = torch::from_blob(d_neighbors.data(), {kokkos_nlocal, max_neighs}, tensor_kokkos_int32_option).to(ani.device);
   }
   // TODO, because of the current API design, we have to flatten the jlist and remove the padding
   jlist = jlist.index({torch::indexing::Slice(0, nlocal), torch::indexing::Slice()});

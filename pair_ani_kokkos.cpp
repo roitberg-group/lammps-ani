@@ -122,12 +122,6 @@ void PairANIKokkos<DeviceType>::compute(int eflag_in, int vflag_in) {
   FloatView2D d_xfloat;
 
   int max_neighs = d_neighbors.extent(1);
-  // std::cout << "x view shape: " << x.extent(0) << ", " << x.extent(1) << std::endl;
-  // std::cout << "f view shape: " << f.extent(0) << ", " << f.extent(1) << std::endl;
-  // std::cout << "type view shape: " << type.extent(0) << std::endl;
-  // std::cout << "d_neighbors view shape: " << d_neighbors.extent(0) << ", " << d_neighbors.extent(1) << std::endl;
-  // std::cout << "d_ilist view shape: " << d_ilist.extent(0) << std::endl;
-  // std::cout << "d_numneigh view shape: " << d_numneigh.extent(0) << std::endl;
 
   torch::Tensor out_energy, out_force, out_atomic_energies;
   torch::Tensor species, coordinates, ilist_unique, jlist, numneigh;
@@ -156,27 +150,29 @@ void PairANIKokkos<DeviceType>::compute(int eflag_in, int vflag_in) {
                 .to(torch::TensorOptions().dtype(torch::kInt64).device(ani.device));
   // lammps type from 1 to n
   species = species - 1;
+  // Check https://github.com/roitberg-group/lammps-ani/pull/49 for Kokkos data views shape
+  // information of: x, f, type, d_neighbors, d_ilist, d_numneigh.
   coordinates = torch::from_blob(x.data(), {1, ntotal, 3}, tensor_kokkos_force_option).to(ani.device);
   ilist_unique = torch::from_blob(d_ilist.data(), {nlocal}, tensor_kokkos_int32_option).to(ani.device);
   numneigh = torch::from_blob(d_numneigh.data(), {nlocal}, tensor_kokkos_int32_option).to(ani.device);
 
-  // transpose jlist if it is LayoutLeft (column-major)
+  // Kokkos k_list could contain number of atoms (`kokkos_nlocal`) larger than `nlocal` when running on multi-domains.
+  int kokkos_nlocal = d_neighbors.extent(0);
+  // We need to transpose jlist if it is LayoutLeft (column-major).
   typedef typename decltype(d_neighbors)::array_layout d_neighbors_layout;
   if (std::is_same<d_neighbors_layout, Kokkos::LayoutLeft>::value) {
     // std::cout << "d_neighbors layout == LayoutLeft" << std::endl;
-    jlist = torch::from_blob(d_neighbors.data(), {max_neighs, nlocal}, tensor_kokkos_int32_option).to(ani.device);
+    jlist = torch::from_blob(d_neighbors.data(), {max_neighs, kokkos_nlocal}, tensor_kokkos_int32_option).to(ani.device);
     jlist = jlist.transpose(0, 1);
   } else {
-    jlist = torch::from_blob(d_neighbors.data(), {nlocal, max_neighs}, tensor_kokkos_int32_option).to(ani.device);
+    // std::cout << "d_neighbors layout == LayoutRight" << std::endl;
+    jlist = torch::from_blob(d_neighbors.data(), {kokkos_nlocal, max_neighs}, tensor_kokkos_int32_option).to(ani.device);
   }
   // TODO, because of the current API design, we have to flatten the jlist and remove the padding
+  jlist = jlist.index({torch::indexing::Slice(0, nlocal), torch::indexing::Slice()});
   torch::Tensor mask = torch::arange(max_neighs, ani.device).unsqueeze(0) < numneigh.unsqueeze(1);
-  // std::cout << "jlist: " << jlist.index({torch::indexing::Slice(), torch::indexing::Slice(80, 90)}) << std::endl;
-  // std::cout << "numneigh: " << numneigh << std::endl;
-  // std::cout << "mask: " << mask.index({torch::indexing::Slice(), torch::indexing::Slice(80, 90)}) << std::endl;
   jlist = jlist.masked_select(mask);
   int npairs = jlist.size(0);
-  // std::cout << "npairs: " << npairs << std::endl;
 
   ani.compute(
       out_energy,

@@ -122,6 +122,8 @@ class ANI2x(torch.nn.Module):
             # we need to convert it to single precision if needed
             if self.use_fullnbr:
                 atom_index12 = self.aev_computer._full_to_half_nbrlist(ilist_unique, jlist, numneigh, species)
+                # print(f"{atom_index12.device}, max_neighbor_index {atom_index12.max().item()}, num_atoms {coordinates.shape[1]}")
+                assert atom_index12.max() < coordinates.shape[1], f"neighbor {atom_index12.max().item()} larger than num_atoms {coordinates.shape[1]}"
                 coords0 = coordinates.view(-1, 3).index_select(0, atom_index12[0])
                 coords1 = coordinates.view(-1, 3).index_select(0, atom_index12[1])
                 diff_vector = coords0 - coords1

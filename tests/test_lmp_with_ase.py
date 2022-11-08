@@ -12,6 +12,7 @@ from ase.io.trajectory import Trajectory
 from ase import units
 
 lmp = os.path.join(os.environ["LAMMPS_ROOT"], "build/lmp_mpi")
+STEPS = 4
 
 
 class LammpsRunner():
@@ -19,7 +20,7 @@ class LammpsRunner():
         var_dict["dump_file"] = "dump.yaml"
         var_commands = " ".join([f"-var {var} {value}" for var, value in var_dict.items()])
         kokkos_commands = f"-k on g {num_tasks} -sf kk" if kokkos else ""
-        run_commands = f"mpirun -np {num_tasks} {lmp} {var_commands} {kokkos_commands} -in {input_file}"
+        run_commands = f"mpirun -np {num_tasks} {lmp} {var_commands} -var steps {STEPS} {kokkos_commands} -in {input_file}"
         print(f"\n{run_commands}")
         self.run_commands = run_commands
         self.var_dict = var_dict
@@ -80,7 +81,7 @@ class AseRunner():
 
     def run(self):
         print("Beginning dynamics...")
-        self.dyn.run(4)  # take 1000 steps
+        self.dyn.run(STEPS)  # take 1000 steps
         traj = list(Trajectory('md.traj'))
         return traj
 

@@ -5,6 +5,8 @@
 export LAMMPS_ANI_ROOT=${LAMMPS_ANI_ROOT:=${PWD}}  # default as PWD
 export LAMMPS_ROOT=${LAMMPS_ANI_ROOT}/external/lammps/
 export LAMMPS_PLUGIN_PATH=${LAMMPS_ANI_ROOT}/build/
+# Install Dir
+export INSTALL_DIR=${INSTALL_DIR:=${HOME}/.local}  # default as $HOME/.local
 # CUDA_ARCH
 export CMAKE_CUDA_ARCHITECTURES="6.0+PTX;7.5;8.0"
 export TORCH_CUDA_ARCH_LIST="6.0+PTX;7.5;8.0"

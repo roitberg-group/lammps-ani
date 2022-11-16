@@ -1,2 +1,5 @@
 md.log
 md.traj
+dump.yaml
+log.lammps
+water.final

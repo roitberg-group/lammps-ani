@@ -120,14 +120,14 @@ class ANI2x(torch.nn.Module):
         else:
             # diff_vector, distances from lammps are always in double,
             # we need to convert it to single precision if needed
-            # if self.use_fullnbr:
-            #     atom_index12 = self.aev_computer._full_to_half_nbrlist(ilist_unique, jlist, numneigh, species)
-            #     # print(f"{atom_index12.device}, max_neighbor_index {atom_index12.max().item()}, num_atoms {coordinates.shape[1]}")
-            #     assert atom_index12.max() < coordinates.shape[1], f"neighbor {atom_index12.max().item()} larger than num_atoms {coordinates.shape[1]}"
-            #     coords0 = coordinates.view(-1, 3).index_select(0, atom_index12[0])
-            #     coords1 = coordinates.view(-1, 3).index_select(0, atom_index12[1])
-            #     diff_vector = coords0 - coords1
-            #     distances = diff_vector.norm(2, -1)
+            if self.use_fullnbr:
+                atom_index12 = self.aev_computer._full_to_half_nbrlist(ilist_unique, jlist, numneigh, species)
+                # print(f"{atom_index12.device}, max_neighbor_index {atom_index12.max().item()}, num_atoms {coordinates.shape[1]}")
+                assert atom_index12.max() < coordinates.shape[1], f"neighbor {atom_index12.max().item()} larger than num_atoms {coordinates.shape[1]}"
+                coords0 = coordinates.view(-1, 3).index_select(0, atom_index12[0])
+                coords1 = coordinates.view(-1, 3).index_select(0, atom_index12[1])
+                diff_vector = coords0 - coords1
+                distances = diff_vector.norm(2, -1)
             diff_vector = diff_vector.to(dtype)
             distances = distances.to(dtype)
             aev = self.aev_computer._compute_aev(species, atom_index12, diff_vector, distances)
@@ -316,7 +316,7 @@ if __name__ == '__main__':
             devices.append('cuda:0')
 
     for use_cuaev in [True, False]:
-        full_nbrlist = [True, False] if use_cuaev else [False]
+        full_nbrlist = [True, False]
         for use_fullnbr in full_nbrlist:
             full_or_half = "full" if use_fullnbr else "half"
             cuaev_or_nocuaev = "cuaev" if use_cuaev else "nocuaev"
@@ -324,7 +324,8 @@ if __name__ == '__main__':
                 double_or_single = "double" if use_double else "single"
                 output_file = f'ani2x_{cuaev_or_nocuaev}_{double_or_single}_{full_or_half}.pt'
                 print(output_file)
-                for pbc in [False, True]:
+                run_pbc = [False] if (use_fullnbr and not use_cuaev) else [True, False]
+                for pbc in run_pbc:
                     for d in devices:
                         if use_cuaev and d == "cpu":
                             continue

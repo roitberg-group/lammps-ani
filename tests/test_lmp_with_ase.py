@@ -47,8 +47,9 @@ class AseRunner():
             use_cuda_extension=use_cuaev,
         )
         # When using half nbrlist, we have to set the cutoff as 7.1 to match lammps nbr cutoff.
+        # When using full nbrlist with nocuaev, it is actually still using half_nbr, we also need 7.1 cutoff.
         # Full nbrlist still uses 5.1, which is fine.
-        if half_nbr:
+        if half_nbr or (not half_nbr and not use_cuaev):
             ani2x.aev_computer.neighborlist.cutoff = 7.1
         # double precision
         if use_double:
@@ -133,18 +134,25 @@ num_tasks_params = [
 @pytest.mark.parametrize(
     "kokkos, cuaev, nbr, device",
     [
-        # kokkos on, only works with cuaev and full nbr
+        # kokkos on, only support full nbr
+        # kokkos works with cuaev (only cuda), nocuaev (cuda and cpu)
         pytest.param(
-            True, True, "full", "cuda", id="kokkos_full_cuda"
+            True, True, "full", "cuda", id="kokkos_full_cuaev"
         ),
-        # kokkos off, cuaev, works with full and half nbr
+        pytest.param(
+            True, False, "full", "cuda", id="kokkos_full_nocuaev_cuda"
+        ),
+        pytest.param(
+            True, False, "full", "cpu", id="kokkos_full_nocuaev_cpu"
+        ),
+        # kokkos off, cuaev, works with full and half nbr, only support cuda
         pytest.param(
             False, True, "full", "cuda", id="cuaev_full_cuda"
         ),
         pytest.param(
             False, True, "half", "cuda", id="cuaev_half_cuda"
         ),
-        # kokkos off, nocuaev, only works with half nbr
+        # kokkos off, nocuaev, works with full and half nbr
         pytest.param(
             False, False, "half", "cuda", id="nocuaev_half_cuda"
         ),
@@ -154,9 +162,13 @@ num_tasks_params = [
         pytest.param(
             False, False, "half", "cpu", id="nocuaev_half_cpu"
         ),
+        # full nbr on cpu actually just manually convert full to half nbr
+        pytest.param(
+            False, False, "full", "cpu", id="nocuaev_full_cpu"
+        ),
     ],
 )
-def test_ani2x_cuaev_single_full(
+def test_lmp_with_ase(
         kokkos: bool, cuaev: bool, precision: str, nbr: str, pbc: bool, device: str, num_tasks: int):
     # SKIP: compiled kokkos only work on Ampere GPUs
     SM = torch.cuda.get_device_capability(0)

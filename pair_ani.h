@@ -46,7 +46,6 @@ class PairANI : public Pair {
   int npairs_max; // if exceed this max number the allocated atom_index12 needs to grow
   std::string model_file;
   std::string device_str;
-  bool use_fullnbr;
   int use_num_models;
   std::vector<double> out_force;
   bool lammps_ani_profiling;

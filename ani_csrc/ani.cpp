@@ -7,8 +7,8 @@
 #include <tuple>
 #include <vector>
 
-ANI::ANI(const std::string& model_file, int local_rank, int use_num_models)
-    : device(local_rank == -1 ? torch::kCPU : torch::kCUDA, local_rank) {
+ANI::ANI(const std::string& model_file, int local_rank, int use_num_models, bool use_cuaev_, bool use_fullnbr_)
+    : device(local_rank == -1 ? torch::kCPU : torch::kCUDA, local_rank), use_cuaev(use_cuaev_), use_fullnbr(use_fullnbr_) {
   at::globalContext().setAllowTF32CuBLAS(false);
   at::globalContext().setAllowTF32CuDNN(false);
   try {
@@ -28,9 +28,17 @@ ANI::ANI(const std::string& model_file, int local_rank, int use_num_models)
         "dummy_buffer is not found in your model, please register one with: "
         "self.register_buffer('dummy_buffer', torch.empty(0))");
 
-    // use_fullnbr
-    TORCH_CHECK(model.hasattr("use_fullnbr"), "use_fullnbr (bool) is not found in your model");
-    use_fullnbr = model.attr("use_fullnbr").toBool();
+    // TORCH_CHECK(model.hasattr("use_fullnbr"), "use_fullnbr (bool) is not found in your model");
+    // model.setattr("use_fullnbr", use_fullnbr);
+    // TORCH_CHECK(model.hasattr("use_cuaev"), "use_cuaev (bool) is not found in your model");
+    // model.setattr("use_cuaev", use_cuaev);
+    // prepare inputs
+    std::vector<torch::jit::IValue> init_inputs;
+    init_inputs.push_back(use_cuaev);
+    init_inputs.push_back(use_fullnbr);
+    model.get_method("init")(init_inputs);
+
+    std::string ani_aev = use_cuaev ? "cuaev" : "pyaev";
     std::string nbrlist = use_fullnbr ? "full" : "half";
 
     // select_models
@@ -40,10 +48,10 @@ ANI::ANI(const std::string& model_file, int local_rank, int use_num_models)
       use_num_models = num_models;
     }
     // prepare inputs
-    std::vector<torch::jit::IValue> inputs;
-    inputs.push_back(use_num_models);
+    std::vector<torch::jit::IValue> select_models_inputs;
+    select_models_inputs.push_back(use_num_models);
     // select models
-    model.get_method("select_models")(inputs);
+    model.get_method("select_models")(select_models_inputs);
 
     // TODO we need to disable nvfuser
     // TORCH_CHECK(model.hasattr("nvfuser_enabled"), "nvfuser_enabled (bool) is not found in your model");
@@ -53,8 +61,9 @@ ANI::ANI(const std::string& model_file, int local_rank, int use_num_models)
     torch::jit::setGraphExecutorOptimize(false);
 
     std::cout << "Successfully loaded the model \nfile: '" << model_file << "' \ndevice: " << device << " \ndtype: " << dtype
-              << " \nnbrlist: " << nbrlist << " \nuse_num_models: " << model.attr("use_num_models").toInt() << "/"
-              << model.attr("num_models").toInt() << std::endl
+              << " \nnbrlist: " << nbrlist << " \nani_aev: " << ani_aev
+              << " \nuse_num_models: " << model.attr("use_num_models").toInt() << "/" << model.attr("num_models").toInt()
+              << std::endl
               << std::endl;
   } catch (const c10::Error& e) {
     std::cerr << "Error loading the model '" << model_file << "' on " << device << ". " << e.what();

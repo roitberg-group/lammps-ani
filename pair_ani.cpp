@@ -260,9 +260,36 @@ void PairANI::settings(int narg, char** arg) {
   device_str = arg[2];
   int local_rank = get_local_rank(device_str); // -1 for cpu
   use_num_models = narg > 3 ? utils::inumeric(FLERR, arg[3], false, lmp) : -1; // -1 to use all models
+  bool use_cuaev, use_fullnbr;
+  // cuaev (default) or pyaev
+  if (narg > 4) {
+    std::string aev_str = arg[4];
+    if (aev_str == "cuaev") {
+      use_cuaev = true;
+    } else if (aev_str == "pyaev") {
+      use_cuaev = false;
+    } else {
+      error->all(FLERR, "ani_aev should be cuaev or pyaev");
+    }
+  } else {
+    use_cuaev = true;
+  }
+  // full_nbr (default) or half_nbr
+  if (narg > 5) {
+    std::string nbr_str = arg[5];
+    if (nbr_str == "full") {
+      use_fullnbr = true;
+    } else if (nbr_str == "half") {
+      use_fullnbr = false;
+    } else {
+      error->all(FLERR, "ani_neighbor should be full or half");
+    }
+  } else {
+    use_fullnbr = true;
+  }
 
   // load model
-  ani = ANI(model_file, local_rank, use_num_models);
+  ani = ANI(model_file, local_rank, use_num_models, use_cuaev, use_fullnbr);
 }
 
 /* ----------------------------------------------------------------------
@@ -335,6 +362,10 @@ void PairANI::read_restart(FILE* fp) {
   utils::sfread(FLERR, &cutoff, sizeof(double), 1, fp, nullptr, error);
   // use_num_models
   utils::sfread(FLERR, &use_num_models, sizeof(int), 1, fp, nullptr, error);
+  // use_cuaev and use_fullnbr
+  bool use_cuaev, use_fullnbr;
+  utils::sfread(FLERR, &use_cuaev, sizeof(bool), 1, fp, nullptr, error);
+  utils::sfread(FLERR, &use_fullnbr, sizeof(bool), 1, fp, nullptr, error);
 
   // model_file_size device_str_size
   int model_file_size, device_str_size;
@@ -349,7 +380,7 @@ void PairANI::read_restart(FILE* fp) {
 
   // init model
   int local_rank = get_local_rank(device_str);
-  ani = ANI(model_file, local_rank, use_num_models);
+  ani = ANI(model_file, local_rank, use_num_models, use_cuaev, use_fullnbr);
 }
 
 void PairANI::write_restart(FILE* fp) {
@@ -357,6 +388,9 @@ void PairANI::write_restart(FILE* fp) {
   fwrite(&cutoff, sizeof(double), 1, fp);
   // use_num_models
   fwrite(&use_num_models, sizeof(int), 1, fp);
+  // use_cuaev and use_fullnbr
+  fwrite(&ani.use_cuaev, sizeof(bool), 1, fp);
+  fwrite(&ani.use_fullnbr, sizeof(bool), 1, fp);
 
   // TODO fwrite string is a bad practice
   // model_file_size device_str_size

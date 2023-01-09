@@ -209,6 +209,9 @@ void PairANIKokkos<DeviceType>::compute(int eflag_in, int vflag_in) {
 
 template <class DeviceType>
 void PairANIKokkos<DeviceType>::init_style() {
+  if (!ani.use_fullnbr)
+    error->all(FLERR, "Pair style ANI requires full neighbor list when using kokkos");
+
   // PairANI::init_style();
   neighbor->add_request(this, NeighConst::REQ_FULL);
 
@@ -217,7 +220,7 @@ void PairANIKokkos<DeviceType>::init_style() {
   request->set_kokkos_host(std::is_same<DeviceType, LMPHostType>::value && !std::is_same<DeviceType, LMPDeviceType>::value);
   request->set_kokkos_device(std::is_same<DeviceType, LMPDeviceType>::value);
   // TODO requires full neighbor list and newton on
-  if (neighflag != FULL || !ani.use_fullnbr)
+  if (neighflag != FULL)
     error->all(FLERR, "Pair style ANI requires full neighbor list when using kokkos");
   if (force->newton_pair == 0)
     error->all(FLERR, "Pair style ANI requires newton pair on when using kokkos");

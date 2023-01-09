@@ -362,6 +362,10 @@ void PairANI::read_restart(FILE* fp) {
   utils::sfread(FLERR, &cutoff, sizeof(double), 1, fp, nullptr, error);
   // use_num_models
   utils::sfread(FLERR, &use_num_models, sizeof(int), 1, fp, nullptr, error);
+  // use_cuaev and use_fullnbr
+  bool use_cuaev, use_fullnbr;
+  utils::sfread(FLERR, &use_cuaev, sizeof(bool), 1, fp, nullptr, error);
+  utils::sfread(FLERR, &use_fullnbr, sizeof(bool), 1, fp, nullptr, error);
 
   // model_file_size device_str_size
   int model_file_size, device_str_size;
@@ -376,7 +380,7 @@ void PairANI::read_restart(FILE* fp) {
 
   // init model
   int local_rank = get_local_rank(device_str);
-  ani = ANI(model_file, local_rank, use_num_models);
+  ani = ANI(model_file, local_rank, use_num_models, use_cuaev, use_fullnbr);
 }
 
 void PairANI::write_restart(FILE* fp) {
@@ -384,6 +388,9 @@ void PairANI::write_restart(FILE* fp) {
   fwrite(&cutoff, sizeof(double), 1, fp);
   // use_num_models
   fwrite(&use_num_models, sizeof(int), 1, fp);
+  // use_cuaev and use_fullnbr
+  fwrite(&ani.use_cuaev, sizeof(bool), 1, fp);
+  fwrite(&ani.use_fullnbr, sizeof(bool), 1, fp);
 
   // TODO fwrite string is a bad practice
   // model_file_size device_str_size

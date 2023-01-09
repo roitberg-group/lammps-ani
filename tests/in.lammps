@@ -32,8 +32,8 @@ change_box     ${change_box}
 # 0. model_file = path to the model file
 # 1. device = cuda/cpu
 # 2. num_models = number of models to use
-# 3. ani_aev = cuaev/pyaev
-# 4. ani_neighbor = full/half
+# 3. ani_aev = cuaev/pyaev, default as cuaev
+# 4. ani_neighbor = full/half, default as full
 
 pair_style     ani 5.1 ${ani_model_file} ${ani_device} ${ani_num_models} ${ani_aev} ${ani_neighbor}
 pair_coeff     * *

@@ -28,13 +28,15 @@ ANI::ANI(const std::string& model_file, int local_rank, int use_num_models, bool
         "dummy_buffer is not found in your model, please register one with: "
         "self.register_buffer('dummy_buffer', torch.empty(0))");
 
-    // set use_fullnbr
-    TORCH_CHECK(model.hasattr("use_fullnbr"), "use_fullnbr (bool) is not found in your model");
-    model.setattr("use_fullnbr", use_fullnbr);
-
-    // set use_cuaev
-    TORCH_CHECK(model.hasattr("use_cuaev"), "use_cuaev (bool) is not found in your model");
-    model.setattr("use_cuaev", use_cuaev);
+    // TORCH_CHECK(model.hasattr("use_fullnbr"), "use_fullnbr (bool) is not found in your model");
+    // model.setattr("use_fullnbr", use_fullnbr);
+    // TORCH_CHECK(model.hasattr("use_cuaev"), "use_cuaev (bool) is not found in your model");
+    // model.setattr("use_cuaev", use_cuaev);
+    // prepare inputs
+    std::vector<torch::jit::IValue> init_inputs;
+    init_inputs.push_back(use_cuaev);
+    init_inputs.push_back(use_fullnbr);
+    model.get_method("init")(init_inputs);
 
     std::string ani_aev = use_cuaev ? "cuaev" : "pyaev";
     std::string nbrlist = use_fullnbr ? "full" : "half";
@@ -46,10 +48,10 @@ ANI::ANI(const std::string& model_file, int local_rank, int use_num_models, bool
       use_num_models = num_models;
     }
     // prepare inputs
-    std::vector<torch::jit::IValue> inputs;
-    inputs.push_back(use_num_models);
+    std::vector<torch::jit::IValue> select_models_inputs;
+    select_models_inputs.push_back(use_num_models);
     // select models
-    model.get_method("select_models")(inputs);
+    model.get_method("select_models")(select_models_inputs);
 
     // TODO we need to disable nvfuser
     // TORCH_CHECK(model.hasattr("nvfuser_enabled"), "nvfuser_enabled (bool) is not found in your model");

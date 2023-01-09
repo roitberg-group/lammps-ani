@@ -4,11 +4,13 @@
 # variables
 variable       lammps_ani_root getenv LAMMPS_ANI_ROOT
 variable       newton_pair     index  off
-variable       num_models      index  1
 variable       data_file       index  water-0.8nm.data
-variable       model_file      index  ${lammps_ani_root}/tests/ani2x_cuaev_single_full.pt
+variable       ani_model_file  index  ${lammps_ani_root}/tests/ani2x_cuaev_single_full.pt
+variable       ani_device      index  cuda
+variable       ani_num_models  index  1
+variable       ani_aev         index  cuaev
+variable       ani_neighbor    index  full
 variable       dump_file       index  dump.yaml
-variable       device          index  cuda
 variable       change_box      index  'all boundary p p p'
 variable       steps           index  4
 
@@ -25,7 +27,15 @@ newton         ${newton_pair} off
 read_data      ${data_file}
 change_box     ${change_box}
 
-pair_style     ani 5.1 ${model_file} ${device} ${num_models}
+# TODO remove 5.1 cutoff
+# pair_style ani 5.1 model_file device num_models ani_aev ani_neighbor
+# 0. model_file = path to the model file
+# 1. device = cuda/cpu
+# 2. num_models = number of models to use
+# 3. ani_aev = cuaev/pyaev
+# 4. ani_neighbor = full/half
+
+pair_style     ani 5.1 ${ani_model_file} ${ani_device} ${ani_num_models} ${ani_aev} ${ani_neighbor}
 pair_coeff     * *
 
 # timestep (0.1 fs)

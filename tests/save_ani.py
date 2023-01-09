@@ -1,7 +1,7 @@
 import torch
+import pytest
 import torchani
 from ase.io import read
-import argparse
 from typing import Tuple, Optional
 from torch import Tensor
 from torchani.nn import SpeciesEnergies
@@ -18,13 +18,21 @@ torch._C._get_graph_executor_optimize(False)
 
 
 class ANI2x(torch.nn.Module):
-    def __init__(self, use_cuaev, use_fullnbr):
+    def __init__(self):
         super().__init__()
+
+        # setup model
+        self.use_cuaev = True
+        self.use_fullnbr = True
+        self.initialized = False
+
+        # create model
         ani2x = torchani.models.ANI2x(periodic_table_index=False, model_index=None, cell_list=False,
-                                      use_cuaev_interface=use_cuaev, use_cuda_extension=use_cuaev,
-                                      use_fullnbr=use_fullnbr)
-        self.use_cuaev = use_cuaev
+                                      use_cuaev_interface=self.use_cuaev,
+                                      use_cuda_extension=self.use_cuaev,
+                                      use_fullnbr=self.use_fullnbr)
         self.aev_computer = ani2x.aev_computer
+
         # num_models
         self.num_models = len(ani2x.neural_networks)
         self.use_num_models = self.num_models
@@ -33,15 +41,24 @@ class ANI2x(torch.nn.Module):
         # self.neural_networks = ani2x.neural_networks
         self.energy_shifter = ani2x.energy_shifter
         self.register_buffer("dummy_buffer", torch.empty(0))
-        self.use_fullnbr = use_fullnbr
         # self.nvfuser_enabled = torch._C._jit_nvfuser_enabled()
 
         # we don't need weight gradient when calculating force
         for name, param in self.neural_networks.named_parameters():
             param.requires_grad_(False)
 
+
+    @torch.jit.export
+    def init(self, use_cuaev: bool, use_fullnbr: bool):
+        self.use_cuaev = use_cuaev
+        self.use_fullnbr = use_fullnbr
+        self.aev_computer.use_fullnbr = use_fullnbr
+        self.initialized = True
+
     @torch.jit.export
     def forward(self, species, coordinates, para1, para2, para3, species_ghost_as_padding, atomic: bool=False):
+        assert self.initialized, "Model is not initialized, You need to call init() method before forward function"
+
         if self.use_cuaev and not self.aev_computer.cuaev_is_initialized:
             self.aev_computer._init_cuaev_computer()
             self.aev_computer.cuaev_is_initialized = True
@@ -113,6 +130,7 @@ class ANI2x(torch.nn.Module):
             else:
                 diff_vector = diff_vector.to(torch.float32)
                 distances = distances.to(torch.float32)
+                # TODO, should separate full or half nbrlist method in aev_computer.py?
                 aev = self.aev_computer._compute_cuaev_with_nbrlist(species, coordinates, atom_index12, diff_vector, distances)
             assert aev is not None
             # the neural network part will use whatever dtype the user specified
@@ -198,20 +216,67 @@ class ANI2xRef(torch.nn.Module):
             raise RuntimeError("select_models method only works for BmmEnsemble2 or Ensemble neural networks")
 
 
-def save_ani2x_model(runpbc=False, device='cuda', use_double=True, use_cuaev=False, use_fullnbr=False):
+def save_ani2x_model():
+    for dtype in [torch.float32, torch.float64]:
+        double_or_single = "double" if dtype == torch.float64 else "single"
+        output_file = f'ani2x_{double_or_single}.pt'
+
+        ani2x = ANI2x().to(dtype)
+        script_module = torch.jit.script(ani2x)
+        script_module.save(output_file)
+
+# Save all ani2x models by using session-scoped "autouse" fixture, this will run ahead of all tests.
+@pytest.fixture(scope='session', autouse=True)
+def session_start():
+    print('Pytest session started, saving all models')
+    save_ani2x_model()
+
+runpbc_params = [
+    pytest.param(True, id="pbc_true"),
+    pytest.param(False, id="pbc_false"),
+]
+device_params = [
+    pytest.param("cuda", id="cuda"),
+    pytest.param("cpu", id="cpu"),
+]
+use_double_params = [
+    pytest.param(True, id="double"),
+    pytest.param(False, id="single"),
+]
+use_cuaev_params = [
+    pytest.param(True, id="cuaev"),
+    pytest.param(False, id="nocuaev"),
+]
+use_fullnbr_params = [
+    pytest.param(True, id="full"),
+    pytest.param(False, id="half"),
+]
+
+@pytest.mark.parametrize("runpbc", runpbc_params)
+@pytest.mark.parametrize("device", device_params)
+@pytest.mark.parametrize("use_double", use_double_params)
+@pytest.mark.parametrize("use_cuaev", use_cuaev_params)
+@pytest.mark.parametrize("use_fullnbr", use_fullnbr_params)
+def test_ani2x_models(runpbc, device, use_double, use_cuaev, use_fullnbr):
+    if use_fullnbr and (not use_cuaev) and runpbc:
+        pytest.skip("Does not support full neighbor list on CPU when pbc is on")
+    if use_cuaev and device == 'cpu':
+        pytest.skip("Cuaev does not support CPU")
+    if device == 'cuda' and (not torch.cuda.is_available()):
+        pytest.skip("GPU is not available")
+
     # dtype
     dtype = torch.float64 if use_double else torch.float32
+    double_or_single = "double" if dtype == torch.float64 else "single"
+    output_file = f'ani2x_{double_or_single}.pt'
 
-    ani2x = ANI2x(use_cuaev, use_fullnbr)
-    ani2x = ani2x.to(dtype)
     # cuaev currently only works with single precision
-    if use_cuaev:
-        ani2x.aev_computer = ani2x.aev_computer.to(torch.float32)
-    script_module = torch.jit.script(ani2x)
-    script_module.save(output_file)
-
     ani2x_loaded = torch.jit.load(output_file).to(device)
-    # ani2x_loaded = ani2x.to(device)
+    # ani2x_loaded = ANI2x().to(dtype).to(device)
+    ani2x_loaded.init(use_cuaev, use_fullnbr)
+    if use_cuaev:
+        ani2x_loaded.aev_computer = ani2x_loaded.aev_computer.to(torch.float32)
+
     ani2x_ref = ANI2xRef(use_cuaev, use_fullnbr).to(device).to(dtype)
     # cuaev currently only works with single precision
     if use_cuaev:
@@ -222,10 +287,11 @@ def save_ani2x_model(runpbc=False, device='cuda', use_double=True, use_cuaev=Fal
         ani2x_ref.select_models(num_models)
         ani2x_loaded.select_models(num_models)
         for i in range(5):
-            test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr, dtype, verbose=(num_models is None and i==0))
+            run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr, dtype, verbose=(num_models is None and i==0))
 
 
-def test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr, dtype, verbose=False):
+def run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr, dtype, verbose=False):
+    input_file = "water-0.8nm.pdb"
     mol = read(input_file)
 
     species = torch.tensor(mol.get_atomic_numbers(), device=device).unsqueeze(0)
@@ -269,6 +335,7 @@ def test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr, dtype,
     if use_cuaev:
         threshold = 9.5e-5
     else:
+        use_double = dtype == torch.float64
         threshold = 1e-7 if use_double else 3e-5
 
     assert torch.allclose(energy, energy_, atol=threshold), f"error {(energy - energy_).abs().max()}"
@@ -299,35 +366,3 @@ def test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr, dtype,
 
     assert torch.allclose(energy, energy_ref, atol=threshold), f"error {(energy - energy_ref).abs().max()}"
     assert torch.allclose(force, force_ref, atol=threshold), f"error {(force - force_ref).abs().max()}"
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    # parser.add_argument('--pbc', default=False, action='store_true')
-    args = parser.parse_args()
-    input_file = "water-0.8nm.pdb"
-
-    devices = ['cpu']
-    if torch.cuda.is_available():
-        if torch.cuda.device_count() > 1:
-            # avoid the bug that could only use the 0th gpu
-            devices.append('cuda:1')
-        else:
-            devices.append('cuda:0')
-
-    for use_cuaev in [True, False]:
-        full_nbrlist = [True, False]
-        for use_fullnbr in full_nbrlist:
-            full_or_half = "full" if use_fullnbr else "half"
-            cuaev_or_nocuaev = "cuaev" if use_cuaev else "nocuaev"
-            for use_double in [True, False]:
-                double_or_single = "double" if use_double else "single"
-                output_file = f'ani2x_{cuaev_or_nocuaev}_{double_or_single}_{full_or_half}.pt'
-                print(output_file)
-                run_pbc = [False] if (use_fullnbr and not use_cuaev) else [True, False]
-                for pbc in run_pbc:
-                    for d in devices:
-                        if use_cuaev and d == "cpu":
-                            continue
-                        print(f"====================== {cuaev_or_nocuaev} | {full_or_half} | {double_or_single} | pbc: {pbc} | device: {d} ======================")
-                        save_ani2x_model(pbc, d, use_double, use_cuaev, use_fullnbr)

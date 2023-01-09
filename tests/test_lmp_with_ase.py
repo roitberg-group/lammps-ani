@@ -184,13 +184,16 @@ def test_lmp_with_ase(
 
     # prepare configurations
     cuaev_str = "cuaev" if cuaev else "nocuaev"
+    ani_aev_str = "cuaev" if cuaev else "pyaev"
     var_dict = {
         "newton_pair": "off",
-        "num_models": 8,
         "data_file": "water-0.8nm.data",
-        "model_file": f"ani2x_{cuaev_str}_{precision}_{nbr}.pt",
-        "device": device,
-        "change_box": "'all boundary p p p'"
+        "change_box": "'all boundary p p p'",
+        "ani_model_file": f"ani2x_{precision}.pt",
+        "ani_device": device,
+        "ani_num_models": 8,
+        "ani_aev": ani_aev_str,
+        "ani_neighbor": nbr
     }
     if not pbc:
         var_dict["change_box"] = "'all boundary f f f'"

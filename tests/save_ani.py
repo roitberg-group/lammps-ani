@@ -123,13 +123,9 @@ class ANI2x(torch.nn.Module):
         if self.use_cuaev:
             # TODO, coordinates, diff_vector could be in float
             # diff_vector, distances, coordinates from lammps are always in double,
-            # cuaev currently only works with single precision
-            coordinates = coordinates.to(torch.float32)
             if self.use_fullnbr:
                 aev = self.aev_computer._compute_cuaev_with_full_nbrlist(species, coordinates, ilist_unique, jlist, numneigh)
             else:
-                diff_vector = diff_vector.to(torch.float32)
-                distances = distances.to(torch.float32)
                 # TODO, should separate full or half nbrlist method in aev_computer.py?
                 aev = self.aev_computer._compute_cuaev_with_nbrlist(species, coordinates, atom_index12, diff_vector, distances)
             assert aev is not None
@@ -190,9 +186,6 @@ class ANI2xRef(torch.nn.Module):
                 pbc: Optional[Tensor] = None) -> SpeciesEnergies:
         species_coordinates = self.model._maybe_convert_species(species_coordinates)
         if self.use_cuaev:
-            species_coordinates = (species_coordinates[0], species_coordinates[1].to(torch.float32))
-            if cell is not None:
-                cell = cell.to(torch.float32)
             species_aevs = self.model.aev_computer(species_coordinates, cell=cell, pbc=pbc)
             species_aevs = (species_aevs[0], species_aevs[1].to(self.dummy_buffer.dtype))
         else:
@@ -274,13 +267,8 @@ def test_ani2x_models(runpbc, device, use_double, use_cuaev, use_fullnbr):
     ani2x_loaded = torch.jit.load(output_file).to(device)
     # ani2x_loaded = ANI2x().to(dtype).to(device)
     ani2x_loaded.init(use_cuaev, use_fullnbr)
-    if use_cuaev:
-        ani2x_loaded.aev_computer = ani2x_loaded.aev_computer.to(torch.float32)
 
     ani2x_ref = ANI2xRef(use_cuaev, use_fullnbr).to(device).to(dtype)
-    # cuaev currently only works with single precision
-    if use_cuaev:
-        ani2x_ref.model.aev_computer = ani2x_ref.model.aev_computer.to(torch.float32)
 
     # we need a fewer iterations to tigger the fuser
     for num_models in [None, 4]:
@@ -302,9 +290,6 @@ def run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr
 
     # TODO It is IMPORTANT to set cutoff as 7.1 to match lammps nbr cutoff
     ani2x_ref.model.aev_computer.neighborlist.cutoff = 7.1
-    if use_cuaev:
-        coordinates = coordinates.to(torch.float32)
-        cell = cell.to(torch.float32)
     if runpbc:
         atom_index12, _, diff_vector, distances = ani2x_ref.model.aev_computer.neighborlist(species, coordinates, cell, pbc)
     else:

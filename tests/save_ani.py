@@ -213,13 +213,10 @@ class ANI2xRef(torch.nn.Module):
 
 
 def save_ani2x_model():
-    for dtype in [torch.float32, torch.float64]:
-        double_or_single = "double" if dtype == torch.float64 else "single"
-        output_file = f'ani2x_{double_or_single}.pt'
-
-        ani2x = ANI2x().to(dtype)
-        script_module = torch.jit.script(ani2x)
-        script_module.save(output_file)
+    ani2x = ANI2x()
+    output_file = "ani2x.pt"
+    script_module = torch.jit.script(ani2x)
+    script_module.save(output_file)
 
 # Save all ani2x models by using session-scoped "autouse" fixture, this will run ahead of all tests.
 @pytest.fixture(scope='session', autouse=True)
@@ -263,15 +260,14 @@ def test_ani2x_models(runpbc, device, use_double, use_cuaev, use_fullnbr):
 
     # dtype
     dtype = torch.float64 if use_double else torch.float32
-    double_or_single = "double" if dtype == torch.float64 else "single"
-    output_file = f'ani2x_{double_or_single}.pt'
+    output_file = "ani2x.pt"
 
     # cuaev currently only works with single precision
-    ani2x_loaded = torch.jit.load(output_file).to(device)
+    ani2x_loaded = torch.jit.load(output_file).to(dtype).to(device)
     # ani2x_loaded = ANI2x().to(dtype).to(device)
     ani2x_loaded.init(use_cuaev, use_fullnbr)
 
-    ani2x_ref = ANI2xRef(use_cuaev, use_fullnbr).to(device).to(dtype)
+    ani2x_ref = ANI2xRef(use_cuaev, use_fullnbr).to(dtype).to(device)
 
     # we need a fewer iterations to tigger the fuser
     for num_models in [None, 4]:

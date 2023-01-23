@@ -179,7 +179,7 @@ def test_lmp_with_ase(
     # SKIP
     run_github_action_multi = "TEST_WITH_MULTI_PROCS" in os.environ and os.environ["TEST_WITH_MULTI_PROCS"] == "true"
     run_slurm_multi = "SLURM_NTASKS" in os.environ and int(os.environ["SLURM_NTASKS"]) > 1
-    if not run_github_action_multi and not run_slurm_multi:
+    if num_tasks > 1 and (not run_github_action_multi) and (not run_slurm_multi):
         pytest.skip("Skip running on 2 MPI Processes")
 
     # prepare configurations

@@ -7,7 +7,7 @@ source build-env.sh
 # build torchani
 cd external/torchani_sandbox
 rm -rf build && python setup.py install --ext
-pip install h5py ase pytest
+pip install h5py ase pytest pyyaml
 cd ../../
 
 # save model

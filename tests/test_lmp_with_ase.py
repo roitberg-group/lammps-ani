@@ -204,9 +204,10 @@ def test_lmp_with_ase(
     lmprunner = LammpsRunner(lmp, "in.lammps", var_dict, kokkos, num_tasks)
     lmp_dump = lmprunner.run()
 
+    # TODO cuaev work with double now
     # SKIP: cuaev and double precision do not work with ASE
-    if cuaev and precision == "double":
-        pytest.skip("cuaev and double precision do not work with ASE")
+    # if cuaev and precision == "double":
+    #     pytest.skip("cuaev and double precision do not work with ASE")
 
     # run ase
     use_double = precision == "double"

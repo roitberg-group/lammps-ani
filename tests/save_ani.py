@@ -123,10 +123,13 @@ class ANI2x(torch.nn.Module):
         if self.use_cuaev:
             # TODO, coordinates, diff_vector could be in float
             # diff_vector, distances, coordinates from lammps are always in double,
+            coordinates = coordinates.to(dtype)
             if self.use_fullnbr:
                 aev = self.aev_computer._compute_cuaev_with_full_nbrlist(species, coordinates, ilist_unique, jlist, numneigh)
             else:
                 # TODO, should separate full or half nbrlist method in aev_computer.py?
+                diff_vector = diff_vector.to(dtype)
+                distances = distances.to(dtype)
                 aev = self.aev_computer._compute_cuaev_with_nbrlist(species, coordinates, atom_index12, diff_vector, distances)
             assert aev is not None
             # the neural network part will use whatever dtype the user specified
@@ -317,11 +320,8 @@ def run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr
         print(f"{'energy:'.ljust(15)} shape: {energy.shape}, value: {energy.item()}, dtype: {energy.dtype}, unit: (kcal/mol)")
         print(f"{'force:'.ljust(15)} shape: {force.shape}, dtype: {force.dtype}, unit: (kcal/mol/A)")
 
-    if use_cuaev:
-        threshold = 9.5e-5
-    else:
-        use_double = dtype == torch.float64
-        threshold = 1e-7 if use_double else 3e-5
+    use_double = dtype == torch.float64
+    threshold = 1e-13 if use_double else 3e-5
 
     assert torch.allclose(energy, energy_, atol=threshold), f"error {(energy - energy_).abs().max()}"
     assert torch.allclose(force, force_, atol=threshold), f"error {(force - force_).abs().max()}"

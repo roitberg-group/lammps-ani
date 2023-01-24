@@ -249,7 +249,7 @@ use_fullnbr_params = [
 @pytest.mark.parametrize("use_fullnbr", use_fullnbr_params)
 def test_ani2x_models(runpbc, device, use_double, use_cuaev, use_fullnbr):
     if use_fullnbr and (not use_cuaev) and runpbc:
-        pytest.skip("Does not support full neighbor list on CPU when pbc is on")
+        pytest.skip("Does not support full neighbor list using pyaev when pbc is on")
     if use_cuaev and device == 'cpu':
         pytest.skip("Cuaev does not support CPU")
     if device == 'cuda' and (not torch.cuda.is_available()):

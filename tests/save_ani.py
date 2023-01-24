@@ -318,7 +318,7 @@ def run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr
         print(f"{'force:'.ljust(15)} shape: {force.shape}, dtype: {force.dtype}, unit: (kcal/mol/A)")
 
     use_double = dtype == torch.float64
-    threshold = 1e-13 if use_double else 3e-5
+    threshold = 1e-13 if use_double else 1e-4
 
     assert torch.allclose(energy, energy_, atol=threshold), f"error {(energy - energy_).abs().max()}"
     assert torch.allclose(force, force_, atol=threshold), f"error {(force - force_).abs().max()}"

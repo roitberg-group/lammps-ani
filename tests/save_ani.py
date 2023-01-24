@@ -40,13 +40,14 @@ class ANI2x(torch.nn.Module):
         self.neural_networks = ani2x.neural_networks.to_infer_model(use_mnp=False)
         # self.neural_networks = ani2x.neural_networks
         self.energy_shifter = ani2x.energy_shifter
+        # Because the dtype of coordinates is always double when passed to the model, we need
+        # dummy_buffer to convert coordinates dtype
         self.register_buffer("dummy_buffer", torch.empty(0))
         # self.nvfuser_enabled = torch._C._jit_nvfuser_enabled()
 
         # we don't need weight gradient when calculating force
         for name, param in self.neural_networks.named_parameters():
             param.requires_grad_(False)
-
 
     @torch.jit.export
     def init(self, use_cuaev: bool, use_fullnbr: bool):

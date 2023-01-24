@@ -260,7 +260,7 @@ void PairANI::settings(int narg, char** arg) {
   device_str = arg[2];
   int local_rank = get_local_rank(device_str); // -1 for cpu
   use_num_models = narg > 3 ? utils::inumeric(FLERR, arg[3], false, lmp) : -1; // -1 to use all models
-  bool use_cuaev, use_fullnbr;
+  bool use_cuaev, use_fullnbr, use_single;
   // cuaev (default) or pyaev
   if (narg > 4) {
     std::string aev_str = arg[4];
@@ -287,9 +287,22 @@ void PairANI::settings(int narg, char** arg) {
   } else {
     use_fullnbr = true;
   }
+  // single (default) or double precision
+  if (narg > 6) {
+    std::string nbr_str = arg[6];
+    if (nbr_str == "single") {
+      use_single = true;
+    } else if (nbr_str == "double") {
+      use_single = false;
+    } else {
+      error->all(FLERR, "precision should be single or double");
+    }
+  } else {
+    use_single = true;
+  }
 
   // load model
-  ani = ANI(model_file, local_rank, use_num_models, use_cuaev, use_fullnbr);
+  ani = ANI(model_file, local_rank, use_num_models, use_cuaev, use_fullnbr, use_single);
 }
 
 /* ----------------------------------------------------------------------
@@ -362,10 +375,11 @@ void PairANI::read_restart(FILE* fp) {
   utils::sfread(FLERR, &cutoff, sizeof(double), 1, fp, nullptr, error);
   // use_num_models
   utils::sfread(FLERR, &use_num_models, sizeof(int), 1, fp, nullptr, error);
-  // use_cuaev and use_fullnbr
-  bool use_cuaev, use_fullnbr;
+  // use_cuaev, use_fullnbr and use_single
+  bool use_cuaev, use_fullnbr, use_single;
   utils::sfread(FLERR, &use_cuaev, sizeof(bool), 1, fp, nullptr, error);
   utils::sfread(FLERR, &use_fullnbr, sizeof(bool), 1, fp, nullptr, error);
+  utils::sfread(FLERR, &use_single, sizeof(bool), 1, fp, nullptr, error);
 
   // model_file_size device_str_size
   int model_file_size, device_str_size;
@@ -380,7 +394,7 @@ void PairANI::read_restart(FILE* fp) {
 
   // init model
   int local_rank = get_local_rank(device_str);
-  ani = ANI(model_file, local_rank, use_num_models, use_cuaev, use_fullnbr);
+  ani = ANI(model_file, local_rank, use_num_models, use_cuaev, use_fullnbr, use_single);
 }
 
 void PairANI::write_restart(FILE* fp) {
@@ -391,6 +405,7 @@ void PairANI::write_restart(FILE* fp) {
   // use_cuaev and use_fullnbr
   fwrite(&ani.use_cuaev, sizeof(bool), 1, fp);
   fwrite(&ani.use_fullnbr, sizeof(bool), 1, fp);
+  fwrite(&ani.use_single, sizeof(bool), 1, fp);
 
   // TODO fwrite string is a bad practice
   // model_file_size device_str_size

@@ -15,6 +15,7 @@ class ANI {
   torch::Dtype dtype;
   bool use_fullnbr;
   bool use_cuaev;
+  bool use_single;
 
   torch::Tensor species_t;
   torch::Tensor species_ghost_as_padding_t;
@@ -28,7 +29,12 @@ class ANI {
   torch::Tensor numneigh_t;
 
   ANI() : device(torch::kCPU){};
-  ANI(const std::string& model_file, int local_rank, int use_num_models = -1, bool use_cuaev_ = true, bool use_fullnbr_ = true);
+  ANI(const std::string& model_file,
+      int local_rank,
+      int use_num_models = -1,
+      bool use_cuaev_ = true,
+      bool use_fullnbr_ = true,
+      bool use_single_ = true);
 
   // compute with half nbrlist
   void compute(

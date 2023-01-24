@@ -189,11 +189,12 @@ def test_lmp_with_ase(
         "newton_pair": "off",
         "data_file": "water-0.8nm.data",
         "change_box": "'all boundary p p p'",
-        "ani_model_file": f"ani2x_{precision}.pt",
+        "ani_model_file": "ani2x.pt",
         "ani_device": device,
         "ani_num_models": 8,
         "ani_aev": ani_aev_str,
-        "ani_neighbor": nbr
+        "ani_neighbor": nbr,
+        "ani_precision": precision
     }
     if not pbc:
         var_dict["change_box"] = "'all boundary f f f'"

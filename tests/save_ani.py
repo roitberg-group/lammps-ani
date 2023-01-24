@@ -40,13 +40,14 @@ class ANI2x(torch.nn.Module):
         self.neural_networks = ani2x.neural_networks.to_infer_model(use_mnp=False)
         # self.neural_networks = ani2x.neural_networks
         self.energy_shifter = ani2x.energy_shifter
+        # Because the dtype of coordinates is always double when passed to the model, we need
+        # dummy_buffer to convert coordinates dtype
         self.register_buffer("dummy_buffer", torch.empty(0))
         # self.nvfuser_enabled = torch._C._jit_nvfuser_enabled()
 
         # we don't need weight gradient when calculating force
         for name, param in self.neural_networks.named_parameters():
             param.requires_grad_(False)
-
 
     @torch.jit.export
     def init(self, use_cuaev: bool, use_fullnbr: bool):
@@ -123,14 +124,13 @@ class ANI2x(torch.nn.Module):
         if self.use_cuaev:
             # TODO, coordinates, diff_vector could be in float
             # diff_vector, distances, coordinates from lammps are always in double,
-            # cuaev currently only works with single precision
-            coordinates = coordinates.to(torch.float32)
+            coordinates = coordinates.to(dtype)
             if self.use_fullnbr:
                 aev = self.aev_computer._compute_cuaev_with_full_nbrlist(species, coordinates, ilist_unique, jlist, numneigh)
             else:
-                diff_vector = diff_vector.to(torch.float32)
-                distances = distances.to(torch.float32)
                 # TODO, should separate full or half nbrlist method in aev_computer.py?
+                diff_vector = diff_vector.to(dtype)
+                distances = distances.to(dtype)
                 aev = self.aev_computer._compute_cuaev_with_nbrlist(species, coordinates, atom_index12, diff_vector, distances)
             assert aev is not None
             # the neural network part will use whatever dtype the user specified
@@ -190,9 +190,6 @@ class ANI2xRef(torch.nn.Module):
                 pbc: Optional[Tensor] = None) -> SpeciesEnergies:
         species_coordinates = self.model._maybe_convert_species(species_coordinates)
         if self.use_cuaev:
-            species_coordinates = (species_coordinates[0], species_coordinates[1].to(torch.float32))
-            if cell is not None:
-                cell = cell.to(torch.float32)
             species_aevs = self.model.aev_computer(species_coordinates, cell=cell, pbc=pbc)
             species_aevs = (species_aevs[0], species_aevs[1].to(self.dummy_buffer.dtype))
         else:
@@ -217,13 +214,10 @@ class ANI2xRef(torch.nn.Module):
 
 
 def save_ani2x_model():
-    for dtype in [torch.float32, torch.float64]:
-        double_or_single = "double" if dtype == torch.float64 else "single"
-        output_file = f'ani2x_{double_or_single}.pt'
-
-        ani2x = ANI2x().to(dtype)
-        script_module = torch.jit.script(ani2x)
-        script_module.save(output_file)
+    ani2x = ANI2x()
+    output_file = "ani2x.pt"
+    script_module = torch.jit.script(ani2x)
+    script_module.save(output_file)
 
 # Save all ani2x models by using session-scoped "autouse" fixture, this will run ahead of all tests.
 @pytest.fixture(scope='session', autouse=True)
@@ -267,20 +261,14 @@ def test_ani2x_models(runpbc, device, use_double, use_cuaev, use_fullnbr):
 
     # dtype
     dtype = torch.float64 if use_double else torch.float32
-    double_or_single = "double" if dtype == torch.float64 else "single"
-    output_file = f'ani2x_{double_or_single}.pt'
+    output_file = "ani2x.pt"
 
     # cuaev currently only works with single precision
-    ani2x_loaded = torch.jit.load(output_file).to(device)
+    ani2x_loaded = torch.jit.load(output_file).to(dtype).to(device)
     # ani2x_loaded = ANI2x().to(dtype).to(device)
     ani2x_loaded.init(use_cuaev, use_fullnbr)
-    if use_cuaev:
-        ani2x_loaded.aev_computer = ani2x_loaded.aev_computer.to(torch.float32)
 
-    ani2x_ref = ANI2xRef(use_cuaev, use_fullnbr).to(device).to(dtype)
-    # cuaev currently only works with single precision
-    if use_cuaev:
-        ani2x_ref.model.aev_computer = ani2x_ref.model.aev_computer.to(torch.float32)
+    ani2x_ref = ANI2xRef(use_cuaev, use_fullnbr).to(dtype).to(device)
 
     # we need a fewer iterations to tigger the fuser
     for num_models in [None, 4]:
@@ -302,9 +290,6 @@ def run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr
 
     # TODO It is IMPORTANT to set cutoff as 7.1 to match lammps nbr cutoff
     ani2x_ref.model.aev_computer.neighborlist.cutoff = 7.1
-    if use_cuaev:
-        coordinates = coordinates.to(torch.float32)
-        cell = cell.to(torch.float32)
     if runpbc:
         atom_index12, _, diff_vector, distances = ani2x_ref.model.aev_computer.neighborlist(species, coordinates, cell, pbc)
     else:
@@ -332,11 +317,8 @@ def run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr
         print(f"{'energy:'.ljust(15)} shape: {energy.shape}, value: {energy.item()}, dtype: {energy.dtype}, unit: (kcal/mol)")
         print(f"{'force:'.ljust(15)} shape: {force.shape}, dtype: {force.dtype}, unit: (kcal/mol/A)")
 
-    if use_cuaev:
-        threshold = 9.5e-5
-    else:
-        use_double = dtype == torch.float64
-        threshold = 1e-7 if use_double else 3e-5
+    use_double = dtype == torch.float64
+    threshold = 1e-13 if use_double else 1e-4
 
     assert torch.allclose(energy, energy_, atol=threshold), f"error {(energy - energy_).abs().max()}"
     assert torch.allclose(force, force_, atol=threshold), f"error {(force - force_).abs().max()}"

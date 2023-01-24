@@ -179,7 +179,7 @@ def test_lmp_with_ase(
     # SKIP
     run_github_action_multi = "TEST_WITH_MULTI_PROCS" in os.environ and os.environ["TEST_WITH_MULTI_PROCS"] == "true"
     run_slurm_multi = "SLURM_NTASKS" in os.environ and int(os.environ["SLURM_NTASKS"]) > 1
-    if not run_github_action_multi and not run_slurm_multi:
+    if num_tasks > 1 and (not run_github_action_multi) and (not run_slurm_multi):
         pytest.skip("Skip running on 2 MPI Processes")
 
     # prepare configurations
@@ -189,11 +189,12 @@ def test_lmp_with_ase(
         "newton_pair": "off",
         "data_file": "water-0.8nm.data",
         "change_box": "'all boundary p p p'",
-        "ani_model_file": f"ani2x_{precision}.pt",
+        "ani_model_file": "ani2x.pt",
         "ani_device": device,
         "ani_num_models": 8,
         "ani_aev": ani_aev_str,
-        "ani_neighbor": nbr
+        "ani_neighbor": nbr,
+        "ani_precision": precision
     }
     if not pbc:
         var_dict["change_box"] = "'all boundary f f f'"
@@ -204,9 +205,10 @@ def test_lmp_with_ase(
     lmprunner = LammpsRunner(lmp, "in.lammps", var_dict, kokkos, num_tasks)
     lmp_dump = lmprunner.run()
 
+    # TODO cuaev work with double now
     # SKIP: cuaev and double precision do not work with ASE
-    if cuaev and precision == "double":
-        pytest.skip("cuaev and double precision do not work with ASE")
+    # if cuaev and precision == "double":
+    #     pytest.skip("cuaev and double precision do not work with ASE")
 
     # run ase
     use_double = precision == "double"

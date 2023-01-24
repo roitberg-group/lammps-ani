@@ -7,31 +7,47 @@
 #include <tuple>
 #include <vector>
 
-ANI::ANI(const std::string& model_file, int local_rank, int use_num_models, bool use_cuaev_, bool use_fullnbr_)
-    : device(local_rank == -1 ? torch::kCPU : torch::kCUDA, local_rank), use_cuaev(use_cuaev_), use_fullnbr(use_fullnbr_) {
+// Modified from the following URL, so it **only** casts floating point parameters and buffers, and skips non-floating ones.
+// https://github.com/pytorch/pytorch/blob/1237cf6b6ca86ac6afd5c0a8d3075c9a2d85b6e4/torch/csrc/jit/api/module.cpp#L166-L190
+void module_state_to(const torch::autograd::Variable& variable, const at::ScalarType& dtype) {
+  // Need to access the `at::Tensor` as a `Variable` here.
+  auto new_data = variable.to(
+      variable.device(),
+      dtype,
+      /*non_blocking=*/false);
+  variable.set_data(new_data);
+}
+
+void module_to_dtype(torch::jit::script::Module model, const at::ScalarType& dtype) {
+  for (at::Tensor e : model.parameters()) {
+    if (e.is_floating_point()) {
+      module_state_to(e, dtype);
+    }
+  }
+  for (at::Tensor e : model.buffers()) {
+    if (e.is_floating_point()) {
+      module_state_to(e, dtype);
+    }
+  }
+}
+
+ANI::ANI(const std::string& model_file, int local_rank, int use_num_models, bool use_cuaev_, bool use_fullnbr_, bool use_single_)
+    : device(local_rank == -1 ? torch::kCPU : torch::kCUDA, local_rank),
+      use_cuaev(use_cuaev_),
+      use_fullnbr(use_fullnbr_),
+      use_single(use_single_) {
   at::globalContext().setAllowTF32CuBLAS(false);
   at::globalContext().setAllowTF32CuDNN(false);
   try {
     model = torch::jit::load(model_file, device);
 
     // std::cout << model.dump_to_str(false, false, false) << std::endl;
-    // dummy_buffer
-    bool found_dummy_buffer = false;
-    for (const torch::jit::NameTensor& p : model.named_buffers(/*recurse=*/false)) {
-      if (p.name == "dummy_buffer") {
-        dtype = p.value.scalar_type();
-        found_dummy_buffer = true;
-      }
-    }
-    TORCH_CHECK(
-        found_dummy_buffer,
-        "dummy_buffer is not found in your model, please register one with: "
-        "self.register_buffer('dummy_buffer', torch.empty(0))");
 
-    // TORCH_CHECK(model.hasattr("use_fullnbr"), "use_fullnbr (bool) is not found in your model");
-    // model.setattr("use_fullnbr", use_fullnbr);
-    // TORCH_CHECK(model.hasattr("use_cuaev"), "use_cuaev (bool) is not found in your model");
-    // model.setattr("use_cuaev", use_cuaev);
+    // change precision
+    // Torchscript Module API Reference: https://pytorch.org/cppdocs/api/structtorch_1_1jit_1_1_module.html
+    dtype = use_single ? torch::kFloat32 : torch::kFloat64;
+    module_to_dtype(model, dtype);
+
     // prepare inputs
     std::vector<torch::jit::IValue> init_inputs;
     init_inputs.push_back(use_cuaev);

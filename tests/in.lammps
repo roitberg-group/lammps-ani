@@ -10,6 +10,7 @@ variable       ani_device      index  cuda
 variable       ani_num_models  index  1
 variable       ani_aev         index  cuaev
 variable       ani_neighbor    index  full
+variable       ani_precision   index  single
 variable       dump_file       index  dump.yaml
 variable       change_box      index  'all boundary p p p'
 variable       steps           index  4
@@ -29,13 +30,14 @@ change_box     ${change_box}
 
 # TODO remove 5.1 cutoff
 # pair_style ani 5.1 model_file device num_models ani_aev ani_neighbor
-# 0. model_file              = path to the model file
-# 1. device                  = cuda/cpu
-# 2. num_models (Optional)   = number of models to use, default as -1 to use all models
-# 3. ani_aev (Optional)      = cuaev/pyaev, default as cuaev
-# 4. ani_neighbor (Optional) = full/half, default as full
+# 0. model_file               = path to the model file
+# 1. device                   = cuda/cpu
+# 2. num_models (Optional)    = number of models to use, default as -1 to use all models
+# 3. ani_aev (Optional)       = cuaev/pyaev, default as cuaev
+# 4. ani_neighbor (Optional)  = full/half, default as full
+# 5. ani_precision (Optional) = single/double, default as single
 
-pair_style     ani 5.1 ${ani_model_file} ${ani_device} ${ani_num_models} ${ani_aev} ${ani_neighbor}
+pair_style     ani 5.1 ${ani_model_file} ${ani_device} ${ani_num_models} ${ani_aev} ${ani_neighbor} ${ani_precision}
 pair_coeff     * *
 
 # timestep (0.1 fs)

@@ -108,8 +108,8 @@ void PairANIKokkos<DeviceType>::compute(int eflag_in, int vflag_in) {
   // copymode = 1;
   // TODO we could save some computations and only run when ago == 0
 
-  const int inum = list->inum;
-  const int ignum = inum + list->gnum;
+  // const int inum = list->inum;
+  // const int ignum = inum + list->gnum;
   NeighListKokkos<DeviceType>* k_list = static_cast<NeighListKokkos<DeviceType>*>(list);
   auto d_numneigh = k_list->d_numneigh;
   auto d_ilist = k_list->d_ilist;

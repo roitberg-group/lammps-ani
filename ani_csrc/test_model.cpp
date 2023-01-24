@@ -8,19 +8,24 @@
 
 int test_cuaev(int argc, const char* argv[]) {
   // Get the path of the model and the device type
-  if (argc != 3) {
-    std::cerr << "usage: test_model <model.pt> <cpu/cuda>\n";
+  if (argc != 4) {
+    std::cerr << "usage: test_model <model.pt> <cpu/cuda> <single/double>\n";
     return -1;
   }
   std::string model_file = argv[1];
   std::string device_str = argv[2];
+  std::string precision = argv[3];
   int local_rank;
   if (device_str != "cpu" && device_str != "cuda") {
     std::cerr << "2nd argument must be <cpu/cuda>\n";
     return -1;
   }
+  if (precision != "single" && precision != "double") {
+    std::cerr << "3rd argument must be <single/double>\n";
+    return -1;
+  }
   local_rank = device_str == "cpu" ? -1 : 0;
-  ANI ani{model_file, local_rank, -1, /* use_cuaev_ =*/ false, /* use_fullnbr =*/ false};
+  ANI ani{model_file, local_rank, -1, /* use_cuaev_ =*/false, /* use_fullnbr =*/false, /* use_single = */ precision == "single"};
 
   torch::Tensor coords = torch::tensor(
       {{{0.03192167, 0.00638559, 0.01301679},
@@ -58,19 +63,24 @@ int test_cuaev(int argc, const char* argv[]) {
 
 int test_ani2x_withnbr(int argc, const char* argv[]) {
   // Get the path of the model and the device type
-  if (argc != 3) {
-    std::cerr << "Error: usage is test_model <model.pt> <cpu/cuda>\n";
+  if (argc != 4) {
+    std::cerr << "Error: usage is test_model <model.pt> <cpu/cuda> <single/double>\n";
     return -1;
   }
   std::string model_file = argv[1];
   std::string device_str = argv[2];
+  std::string precision = argv[3];
   int local_rank;
   if (device_str != "cpu" && device_str != "cuda") {
     std::cerr << "Error: 2nd argument must be <cpu/cuda>\n";
     return -1;
   }
+  if (precision != "single" && precision != "double") {
+    std::cerr << "3rd argument must be <single/double>\n";
+    return -1;
+  }
   local_rank = device_str == "cpu" ? -1 : 0;
-  ANI ani{model_file, local_rank, -1, /* use_cuaev_ =*/ false, /* use_fullnbr =*/ false};
+  ANI ani{model_file, local_rank, -1, /* use_cuaev_ =*/false, /* use_fullnbr =*/false, /* use_single = */ precision == "single"};
   std::vector<double> coords = {
       2.0110,  -3.1160, 0.4630,  2.8600,  -3.5250, 0.2940,  2.1650,  -2.1810, 0.3310,  2.3860,  -0.1180, 2.2780,  2.8280,
       0.1650,  3.0780,  2.7810,  0.4120,  1.5850,  1.3800,  1.8550,  0.5400,  1.9420,  2.5970,  0.3170,  1.1310,  2.0080,

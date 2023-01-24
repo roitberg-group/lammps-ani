@@ -189,11 +189,7 @@ class ANI2xRef(torch.nn.Module):
                 cell: Optional[Tensor] = None,
                 pbc: Optional[Tensor] = None) -> SpeciesEnergies:
         species_coordinates = self.model._maybe_convert_species(species_coordinates)
-        if self.use_cuaev:
-            species_aevs = self.model.aev_computer(species_coordinates, cell=cell, pbc=pbc)
-            species_aevs = (species_aevs[0], species_aevs[1].to(self.dummy_buffer.dtype))
-        else:
-            species_aevs = self.model.aev_computer(species_coordinates, cell=cell, pbc=pbc)
+        species_aevs = self.model.aev_computer(species_coordinates, cell=cell, pbc=pbc)
         species_energies = self.model.neural_networks(species_aevs)
         return self.model.energy_shifter(species_energies)
 

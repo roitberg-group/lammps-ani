@@ -42,28 +42,12 @@ ANI::ANI(const std::string& model_file, int local_rank, int use_num_models, bool
     model = torch::jit::load(model_file, device);
 
     // std::cout << model.dump_to_str(false, false, false) << std::endl;
-    // dummy_buffer
-    // bool found_dummy_buffer = false;
-    // for (const torch::jit::NameTensor& p : model.named_buffers(/*recurse=*/false)) {
-    //   if (p.name == "dummy_buffer") {
-    //     dtype = p.value.scalar_type();
-    //     found_dummy_buffer = true;
-    //   }
-    // }
-    // TORCH_CHECK(
-    //     found_dummy_buffer,
-    //     "dummy_buffer is not found in your model, please register one with: "
-    //     "self.register_buffer('dummy_buffer', torch.empty(0))");
 
     // change precision
     // Torchscript Module API Reference: https://pytorch.org/cppdocs/api/structtorch_1_1jit_1_1_module.html
     dtype = use_single ? torch::kFloat32 : torch::kFloat64;
     module_to_dtype(model, dtype);
 
-    // TORCH_CHECK(model.hasattr("use_fullnbr"), "use_fullnbr (bool) is not found in your model");
-    // model.setattr("use_fullnbr", use_fullnbr);
-    // TORCH_CHECK(model.hasattr("use_cuaev"), "use_cuaev (bool) is not found in your model");
-    // model.setattr("use_cuaev", use_cuaev);
     // prepare inputs
     std::vector<torch::jit::IValue> init_inputs;
     init_inputs.push_back(use_cuaev);

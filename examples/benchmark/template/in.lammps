@@ -19,7 +19,7 @@ read_data      water.data
 # replicate      3 3 3
 change_box     all boundary p p p
 
-pair_style     ani 5.1 ${lammps_ani_root}/tests/ani2x_single.pt cuda ${num_models} cuaev full
+pair_style     ani 5.1 ${lammps_ani_root}/tests/ani2x.pt cuda ${num_models} cuaev full single
 pair_coeff     * *
 
 # Settings: temperature at 300 K, timestep (0.5 fs)

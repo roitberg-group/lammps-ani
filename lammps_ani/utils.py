@@ -1,7 +1,5 @@
 import torch
 import torchani
-import os
-import pytest
 import yaml
 from typing import Dict
 import subprocess
@@ -11,7 +9,6 @@ from ase.md.verlet import VelocityVerlet
 from ase.io.trajectory import Trajectory
 from ase import units
 
-LAMMPS_PATH = os.path.join(os.environ["LAMMPS_ROOT"], "build/lmp_mpi")
 STEPS = 4
 
 class LammpsRunner():
@@ -32,8 +29,7 @@ class LammpsRunner():
 
 
 class AseRunner():
-    def __init__(self, pbc: bool = False, use_double: bool = True, use_cuaev: bool = False, half_nbr: bool = True):
-        input_file = "water-0.8nm.pdb"
+    def __init__(self, input_file: str, pbc: bool = False, use_double: bool = True, use_cuaev: bool = False, half_nbr: bool = True):
         atoms = read(input_file)
 
         # use cpu for reference result if not for cuaev

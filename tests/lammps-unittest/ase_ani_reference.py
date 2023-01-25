@@ -14,7 +14,7 @@ pd.set_option("display.precision", 15)
 
 
 def run(pbc=False, use_double=True, use_cuaev=False):
-    input_file = "water-0.8nm.pdb"
+    input_file = "../water-0.8nm.pdb"
     atoms = read(input_file)
 
     # use cpu for reference result if not for cuaev

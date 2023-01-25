@@ -4,3 +4,8 @@ lammps_ani/ani_csrc/*
 examples/*
 .vscode/*
 **/__pycache__/*
+.eggs/
+lammps_ani.egg-info/
+*.qdrep
+*.sqlite
+*.sif

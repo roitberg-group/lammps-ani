@@ -40,8 +40,6 @@ class ANI2x(torch.nn.Module):
         self.neural_networks = ani2x.neural_networks.to_infer_model(use_mnp=False)
         # self.neural_networks = ani2x.neural_networks
         self.energy_shifter = ani2x.energy_shifter
-        # Because the dtype of coordinates is always double when passed to the model, we need
-        # dummy_buffer to convert coordinates dtype
         self.register_buffer("dummy_buffer", torch.empty(0))
         # self.nvfuser_enabled = torch._C._jit_nvfuser_enabled()
 
@@ -122,19 +120,12 @@ class ANI2x(torch.nn.Module):
         # compute aev
         assert species.shape[0] == 1, "Currently only support inference for single molecule"
         if self.use_cuaev:
-            # TODO, coordinates, diff_vector could be in float
-            # diff_vector, distances, coordinates from lammps are always in double,
-            coordinates = coordinates.to(dtype)
             if self.use_fullnbr:
                 aev = self.aev_computer._compute_cuaev_with_full_nbrlist(species, coordinates, ilist_unique, jlist, numneigh)
             else:
                 # TODO, should separate full or half nbrlist method in aev_computer.py?
-                diff_vector = diff_vector.to(dtype)
-                distances = distances.to(dtype)
                 aev = self.aev_computer._compute_cuaev_with_nbrlist(species, coordinates, atom_index12, diff_vector, distances)
             assert aev is not None
-            # the neural network part will use whatever dtype the user specified
-            aev = aev.to(dtype)
         else:
             # diff_vector, distances from lammps are always in double,
             # we need to convert it to single precision if needed
@@ -146,8 +137,6 @@ class ANI2x(torch.nn.Module):
                 coords1 = coordinates.view(-1, 3).index_select(0, atom_index12[1])
                 diff_vector = coords0 - coords1
                 distances = diff_vector.norm(2, -1)
-            diff_vector = diff_vector.to(dtype)
-            distances = distances.to(dtype)
             aev = self.aev_computer._compute_aev(species, atom_index12, diff_vector, distances)
 
         return aev
@@ -182,7 +171,6 @@ class ANI2xRef(torch.nn.Module):
         self.model = ani2x
         self.model.neural_networks = self.model.neural_networks.to_infer_model(use_mnp=False)
         self.use_cuaev = use_cuaev
-        self.register_buffer("dummy_buffer", torch.empty(0))
         self.use_fullnbr = use_fullnbr
 
     def forward(self, species_coordinates: Tuple[Tensor, Tensor],

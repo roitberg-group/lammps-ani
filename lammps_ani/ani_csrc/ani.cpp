@@ -129,10 +129,10 @@ void ANI::compute(
   // pack forward inputs
   std::vector<torch::jit::IValue> inputs;
   inputs.push_back(species_t);
-  inputs.push_back(coordinates_t);
+  inputs.push_back(coordinates_t.to(dtype));
   inputs.push_back(atom_index12_t);
-  inputs.push_back(diff_vector_t);
-  inputs.push_back(distances_t);
+  inputs.push_back(diff_vector_t.to(dtype));
+  inputs.push_back(distances_t.to(dtype));
   inputs.push_back(species_ghost_as_padding_t);
   bool atomic = out_atomic_energies != nullptr;
   inputs.push_back(atomic);
@@ -200,7 +200,7 @@ void ANI::compute(
   // pack forward inputs
   std::vector<torch::jit::IValue> inputs;
   inputs.push_back(species_t);
-  inputs.push_back(coordinates_t);
+  inputs.push_back(coordinates_t.to(dtype));
   inputs.push_back(ilist_unique_t);
   inputs.push_back(jlist_t);
   inputs.push_back(numneigh_t);
@@ -251,7 +251,7 @@ void ANI::compute(
   // pack forward inputs
   std::vector<torch::jit::IValue> inputs;
   inputs.push_back(species);
-  inputs.push_back(coordinates.to(torch::kFloat64).requires_grad_(true));
+  inputs.push_back(coordinates.to(dtype).requires_grad_(true));
   inputs.push_back(ilist_unique);
   inputs.push_back(jlist);
   inputs.push_back(numneigh);

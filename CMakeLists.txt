@@ -76,13 +76,13 @@ endif()
 find_package(Torch REQUIRED)
 find_package(Python REQUIRED COMPONENTS Interpreter Development)
 find_package(Kokkos REQUIRED)
-add_subdirectory(lammps-ani/ani_csrc)
+add_subdirectory(lammps_ani/ani_csrc)
 
 # building the plugins
-add_library(ani_plugin MODULE lammps-ani/ani_plugin.cpp lammps-ani/pair_ani.cpp lammps-ani/pair_ani_kokkos.cpp)
+add_library(ani_plugin MODULE lammps_ani/ani_plugin.cpp lammps_ani/pair_ani.cpp lammps_ani/pair_ani_kokkos.cpp)
 target_include_directories(ani_plugin PRIVATE "${LAMMPS_HEADER_DIR}/OPENMP")
 target_include_directories(ani_plugin PRIVATE "${LAMMPS_HEADER_DIR}/KOKKOS")
-target_include_directories(ani_plugin PRIVATE "lammps-ani/ani_csrc")
+target_include_directories(ani_plugin PRIVATE "lammps_ani/ani_csrc")
 target_link_libraries(ani_plugin PRIVATE lammps)
 target_link_libraries(ani_plugin PRIVATE Kokkos::kokkos)
 

@@ -1,5 +1,3 @@
-import torch
-import torchani
 import yaml
 from typing import Dict
 import subprocess
@@ -29,27 +27,8 @@ class LammpsRunner():
 
 
 class AseRunner():
-    def __init__(self, input_file: str, pbc: bool = False, use_double: bool = True, use_cuaev: bool = False, half_nbr: bool = True):
+    def __init__(self, input_file: str, calculator, pbc: bool = False):
         atoms = read(input_file)
-
-        # use cpu for reference result if not for cuaev
-        device = torch.device("cuda") if use_cuaev else torch.device("cpu")
-        ani2x = torchani.models.ANI2x(
-            periodic_table_index=True,
-            model_index=None,
-            cell_list=False,
-            use_cuaev_interface=use_cuaev,
-            use_cuda_extension=use_cuaev,
-        )
-        # When using half nbrlist, we have to set the cutoff as 7.1 to match lammps nbr cutoff.
-        # When using full nbrlist with nocuaev, it is actually still using half_nbr, we also need 7.1 cutoff.
-        # Full nbrlist still uses 5.1, which is fine.
-        if half_nbr or (not half_nbr and not use_cuaev):
-            ani2x.aev_computer.neighborlist.cutoff = 7.1
-        # double precision
-        if use_double:
-            ani2x = ani2x.double()
-        calculator = ani2x.to(device).ase()
 
         print(len(atoms), "atoms in the cell")
         atoms.set_calculator(calculator)

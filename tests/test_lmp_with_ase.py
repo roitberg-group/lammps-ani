@@ -25,7 +25,7 @@ num_tasks_params = [
 @pytest.mark.parametrize("precision", precision_params)
 @pytest.mark.parametrize("num_tasks", num_tasks_params)
 @pytest.mark.parametrize(
-    "kokkos, cuaev, nbr, device",
+    "kokkos, use_cuaev, nbr, device",
     [
         # kokkos on, only support full nbr
         # kokkos works with cuaev (only cuda), nocuaev (cuda and cpu)
@@ -62,7 +62,7 @@ num_tasks_params = [
     ],
 )
 def test_lmp_with_ase(
-        kokkos: bool, cuaev: bool, precision: str, nbr: str, pbc: bool, device: str, num_tasks: int):
+        kokkos: bool, use_cuaev: bool, precision: str, nbr: str, pbc: bool, device: str, num_tasks: int):
     # SKIP: compiled kokkos only work on Ampere GPUs
     SM = torch.cuda.get_device_capability(0)
     SM = int(f'{SM[0]}{SM[1]}')
@@ -76,7 +76,7 @@ def test_lmp_with_ase(
         pytest.skip("Skip running on 2 MPI Processes")
 
     # prepare configurations
-    ani_aev_str = "cuaev" if cuaev else "pyaev"
+    ani_aev_str = "cuaev" if use_cuaev else "pyaev"
     var_dict = {
         "newton_pair": "off",
         "data_file": "water-0.8nm.data",
@@ -97,12 +97,29 @@ def test_lmp_with_ase(
     lmprunner = lammps_ani.utils.LammpsRunner(LAMMPS_PATH, "in.lammps", var_dict, kokkos, num_tasks)
     lmp_dump = lmprunner.run()
 
-    # run ase
-    use_double = precision == "double"
+    # setup ase calculator
+    # use cpu for reference result if not for cuaev
+    # device = torch.device("cuda") if use_cuaev else torch.device("cpu")
+    ani2x = torchani.models.ANI2x(
+        periodic_table_index=True,
+        model_index=None,
+        cell_list=False,
+        use_cuaev_interface=use_cuaev,
+        use_cuda_extension=use_cuaev,
+    )
+    # When using half nbrlist, we have to set the cutoff as 7.1 to match lammps nbr cutoff.
+    # When using full nbrlist with nocuaev, it is actually still using half_nbr, we also need 7.1 cutoff.
+    # Full nbrlist still uses 5.1, which is fine.
     half_nbr = nbr == "half"
-    aserunner = lammps_ani.utils.AseRunner("water-0.8nm.pdb", pbc=pbc, use_double=use_double, use_cuaev=cuaev, half_nbr=half_nbr)
+    if half_nbr or (not half_nbr and not use_cuaev):
+        ani2x.aev_computer.neighborlist.cutoff = 7.1
+    use_double = precision == "double"
+    dtype = torch.float64 if use_double else torch.float32
+    calculator = ani2x.to(dtype).to(device).ase()
+
+    # run ase
+    aserunner = lammps_ani.utils.AseRunner("water-0.8nm.pdb", calculator=calculator, pbc=pbc)
     ase_traj = aserunner.run()
 
     # check result
-    high_prec = not cuaev and use_double
-    lammps_ani.utils.compare_lmp_ase(lmp_dump, ase_traj, high_prec)
+    lammps_ani.utils.compare_lmp_ase(lmp_dump, ase_traj, high_prec=use_double)

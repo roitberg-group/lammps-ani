@@ -104,7 +104,7 @@ void ANI::compute(
   auto out_force_t = torch::from_blob(out_force.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat64));
   // input tensor
   auto coordinates_t =
-      torch::from_blob(coordinates.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat64)).to(device).requires_grad_(true);
+      torch::from_blob(coordinates.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat64)).to(dtype).to(device).requires_grad_(true);
 
   // species_t and atom_index12_t are cloned/cached on devices and only needs to be updated when neigh_list rebuild
   if (ago == 0) {
@@ -129,10 +129,10 @@ void ANI::compute(
   // pack forward inputs
   std::vector<torch::jit::IValue> inputs;
   inputs.push_back(species_t);
-  inputs.push_back(coordinates_t.to(dtype));
+  inputs.push_back(coordinates_t);
   inputs.push_back(atom_index12_t);
-  inputs.push_back(diff_vector_t.to(dtype));
-  inputs.push_back(distances_t.to(dtype));
+  inputs.push_back(diff_vector_t);
+  inputs.push_back(distances_t);
   inputs.push_back(species_ghost_as_padding_t);
   bool atomic = out_atomic_energies != nullptr;
   inputs.push_back(atomic);
@@ -175,7 +175,7 @@ void ANI::compute(
   auto out_force_t = torch::from_blob(out_force.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat64));
   // input tensor
   auto coordinates_t =
-      torch::from_blob(coordinates.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat64)).to(device).requires_grad_(true);
+      torch::from_blob(coordinates.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat64)).to(dtype).to(device).requires_grad_(true);
 
   // species_t, ilist_unique_t, jlist_t and numneigh_t are cloned/cached on devices and only needs to be updated when neigh_list
   // rebuild
@@ -200,7 +200,7 @@ void ANI::compute(
   // pack forward inputs
   std::vector<torch::jit::IValue> inputs;
   inputs.push_back(species_t);
-  inputs.push_back(coordinates_t.to(dtype));
+  inputs.push_back(coordinates_t);
   inputs.push_back(ilist_unique_t);
   inputs.push_back(jlist_t);
   inputs.push_back(numneigh_t);

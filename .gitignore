@@ -1,5 +1,5 @@
 **/build/
-ani_csrc/*
+lammps-ani/ani_csrc/*
 *.pt
 examples/*
 .vscode/*

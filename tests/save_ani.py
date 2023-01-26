@@ -29,8 +29,7 @@ class ANI2x(torch.nn.Module):
         # create model
         ani2x = torchani.models.ANI2x(periodic_table_index=False, model_index=None, cell_list=False,
                                       use_cuaev_interface=self.use_cuaev,
-                                      use_cuda_extension=self.use_cuaev,
-                                      use_fullnbr=self.use_fullnbr)
+                                      use_cuda_extension=self.use_cuaev)
         self.aev_computer = ani2x.aev_computer
 
         # num_models
@@ -51,7 +50,6 @@ class ANI2x(torch.nn.Module):
     def init(self, use_cuaev: bool, use_fullnbr: bool):
         self.use_cuaev = use_cuaev
         self.use_fullnbr = use_fullnbr
-        self.aev_computer.use_fullnbr = use_fullnbr
         self.initialized = True
 
     @torch.jit.export
@@ -165,12 +163,14 @@ class ANI2xRef(torch.nn.Module):
     def __init__(self, use_cuaev, use_fullnbr):
         super().__init__()
         ani2x = torchani.models.ANI2x(periodic_table_index=False, model_index=None, cell_list=False,
-                                      use_cuaev_interface=use_cuaev, use_cuda_extension=use_cuaev,
-                                      use_fullnbr=use_fullnbr)
+                                      use_cuaev_interface=use_cuaev, use_cuda_extension=use_cuaev)
         self.model = ani2x
         self.model.neural_networks = self.model.neural_networks.to_infer_model(use_mnp=False)
         self.use_cuaev = use_cuaev
         self.use_fullnbr = use_fullnbr
+        # We need to set use_fullnbr method mannually.
+        # To make tests match with each other, it will convert half nbrlist to full nbrlist.
+        self.model.aev_computer.use_fullnbr = use_fullnbr
 
     def forward(self, species_coordinates: Tuple[Tensor, Tensor],
                 cell: Optional[Tensor] = None,

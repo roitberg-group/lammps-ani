@@ -97,6 +97,9 @@ class ANI2x(torch.nn.Module):
         torch.ops.mnp.nvtx_range_push("NN ({self.use_num_models}) forward_atomic")
         atomic_energies = self.neural_networks._atomic_energies((species_ghost_as_padding, aev))
         atomic_energies += self.energy_shifter._atomic_saes(species_ghost_as_padding)
+        # when using ANI ensemble (not batchmm), atomic_energies shape is [models, C, A]
+        if len(atomic_energies.shape) > 2:
+            atomic_energies = atomic_energies.mean(0)
         energies = atomic_energies.sum(dim=1)
         torch.ops.mnp.nvtx_range_pop()
 
@@ -144,16 +147,8 @@ class ANI2x(torch.nn.Module):
         if isinstance(neural_networks, BmmEnsemble2):
             neural_networks.select_models(use_num_models)
             self.use_num_models = neural_networks.use_num_models
-        elif isinstance(neural_networks, Ensemble):
-            size = len(neural_networks)
-            if use_num_models is None:
-                use_num_models = size
-                return
-            assert use_num_models <= size, f"use_num_models {use_num_models} cannot be larger than size {size}"
-            neural_networks = neural_networks[:use_num_models]
-            self.use_num_models = use_num_models
         else:
-            raise RuntimeError("select_models method only works for BmmEnsemble2 or Ensemble neural networks")
+            raise RuntimeError("select_models method only works for BmmEnsemble2")
 
 
 class ANI2xRef(torch.nn.Module):
@@ -254,7 +249,8 @@ def test_ani2x_models(runpbc, device, use_double, use_cuaev, use_fullnbr):
     ani2x_ref = ANI2xRef(use_cuaev, use_fullnbr).to(dtype).to(device)
 
     # we need a fewer iterations to tigger the fuser
-    for num_models in [None, 4]:
+    # for num_models in [len(ani2x_ref.model.neural_networks), 4]:
+    for num_models in [ani2x_ref.model.neural_networks.use_num_models, 4]:
         ani2x_ref.select_models(num_models)
         ani2x_loaded.select_models(num_models)
         for i in range(5):

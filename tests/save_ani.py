@@ -123,8 +123,7 @@ class ANI2x(torch.nn.Module):
             if self.use_fullnbr:
                 aev = self.aev_computer._compute_cuaev_with_full_nbrlist(species, coordinates, ilist_unique, jlist, numneigh)
             else:
-                # TODO, should separate full or half nbrlist method in aev_computer.py?
-                aev = self.aev_computer._compute_cuaev_with_nbrlist(species, coordinates, atom_index12, diff_vector, distances)
+                aev = self.aev_computer._compute_cuaev_with_half_nbrlist(species, coordinates, atom_index12, diff_vector, distances)
             assert aev is not None
         else:
             # diff_vector, distances from lammps are always in double,

@@ -9,3 +9,5 @@ lammps_ani.egg-info/
 *.qdrep
 *.sqlite
 *.sif
+._.DS_Store
+.DS_Store

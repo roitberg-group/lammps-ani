@@ -7,6 +7,7 @@ from torch import Tensor
 from torchani.nn import SpeciesEnergies
 from torchani.infer import BmmEnsemble2
 from torchani.models import Ensemble
+from torchani.repulsion import RepulsionCalculator
 
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
@@ -18,19 +19,21 @@ torch._C._get_graph_executor_optimize(False)
 
 
 class ANI2x(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, use_repulsion):
         super().__init__()
 
         # setup model
         self.use_cuaev = True
         self.use_fullnbr = True
         self.initialized = False
+        self.use_repulsion = use_repulsion
 
         # create model
         ani2x = torchani.models.ANI2x(periodic_table_index=False, model_index=None, cell_list=False,
                                       use_cuaev_interface=self.use_cuaev,
                                       use_cuda_extension=self.use_cuaev)
         self.aev_computer = ani2x.aev_computer
+        self.rep_calc = RepulsionCalculator()
 
         # num_models
         self.num_models = len(ani2x.neural_networks)
@@ -53,7 +56,8 @@ class ANI2x(torch.nn.Module):
         self.initialized = True
 
     @torch.jit.export
-    def forward(self, species, coordinates, para1, para2, para3, species_ghost_as_padding, atomic: bool=False):
+    def forward(self, species: Tensor, coordinates: Tensor, para1: Tensor, para2: Tensor, para3: Tensor,
+                species_ghost_as_padding: Tensor, atomic: bool=False):
         assert self.initialized, "Model is not initialized, You need to call init() method before forward function"
 
         if self.use_cuaev and not self.aev_computer.cuaev_is_initialized:
@@ -64,13 +68,29 @@ class ANI2x(torch.nn.Module):
         torch.ops.mnp.nvtx_range_push("AEV forward")
         aev = self.compute_aev(species, coordinates, para1, para2, para3)
         torch.ops.mnp.nvtx_range_pop()
+
         if atomic:
-            return self.forward_atomic(species, coordinates, species_ghost_as_padding, aev)
+            energies, atomic_energies = self.forward_atomic(species, coordinates, species_ghost_as_padding, aev)
         else:
-            return self.forward_total(species, coordinates, species_ghost_as_padding, aev)
+            energies, atomic_energies = self.forward_total(species, coordinates, species_ghost_as_padding, aev)
+
+        if self.use_repulsion:
+            torch.ops.mnp.nvtx_range_push("Repulsion forward")
+            ghost_flags = (species_ghost_as_padding == -1)
+            rep_energies = self.compute_repulsion(species, coordinates, para1, para2, para3, ghost_flags)
+            energies += rep_energies
+            torch.ops.mnp.nvtx_range_pop()
+
+        torch.ops.mnp.nvtx_range_push("Force")
+        force = torch.autograd.grad([energies.sum()], [coordinates], create_graph=True, retain_graph=True)[0]
+        assert force is not None
+        force = -force
+        torch.ops.mnp.nvtx_range_pop()
+
+        return energies, force, atomic_energies
 
     @torch.jit.export
-    def forward_total(self, species, coordinates, species_ghost_as_padding, aev):
+    def forward_total(self, species: Tensor, coordinates: Tensor, species_ghost_as_padding: Tensor, aev: Tensor):
         # run neural networks
         torch.ops.mnp.nvtx_range_push(f"NN ({self.use_num_models}) forward")
         species_energies = self.neural_networks((species_ghost_as_padding, aev))
@@ -79,16 +99,10 @@ class ANI2x(torch.nn.Module):
         energies = species_energies[1]
         torch.ops.mnp.nvtx_range_pop()
 
-        torch.ops.mnp.nvtx_range_push("Force")
-        force = torch.autograd.grad([energies.sum()], [coordinates], create_graph=True, retain_graph=True)[0]
-        assert force is not None
-        force = -force
-        torch.ops.mnp.nvtx_range_pop()
-
-        return energies, force, torch.empty(0)
+        return energies, torch.empty(0)
 
     @torch.jit.export
-    def forward_atomic(self, species, coordinates, species_ghost_as_padding, aev):
+    def forward_atomic(self, species: Tensor, coordinates: Tensor, species_ghost_as_padding: Tensor, aev: Tensor):
         ntotal = species.shape[1]
         nghost = (species_ghost_as_padding == -1).flatten().sum()
         nlocal = ntotal - nghost
@@ -103,19 +117,10 @@ class ANI2x(torch.nn.Module):
         energies = atomic_energies.sum(dim=1)
         torch.ops.mnp.nvtx_range_pop()
 
-        torch.ops.mnp.nvtx_range_push("Force")
-        force = torch.autograd.grad([energies.sum()], [coordinates], create_graph=True, retain_graph=True)[0]
-        assert force is not None
-        force = -force
-        torch.ops.mnp.nvtx_range_pop()
-
-        return energies, force, atomic_energies[:, :nlocal]
+        return energies, atomic_energies[:, :nlocal]
 
     @torch.jit.export
-    def compute_aev(self, species, coordinates, para1, para2, para3):
-        # dtype
-        dtype = self.dummy_buffer.dtype
-
+    def compute_aev(self, species: Tensor, coordinates: Tensor, para1: Tensor, para2: Tensor, para3: Tensor):
         atom_index12, diff_vector, distances = para1, para2, para3
         ilist_unique, jlist, numneigh = para1, para2, para3
         # compute aev
@@ -142,6 +147,20 @@ class ANI2x(torch.nn.Module):
         return aev
 
     @torch.jit.export
+    def compute_repulsion(self, species: Tensor, coordinates: Tensor, para1: Tensor, para2: Tensor, para3: Tensor, ghost_flags: Tensor):
+        atom_index12, diff_vector, distances = para1, para2, para3
+        ilist_unique, jlist, numneigh = para1, para2, para3
+        if self.use_fullnbr:
+            atom_index12 = self.aev_computer._full_to_half_nbrlist(ilist_unique, jlist, numneigh, species)
+            assert atom_index12.max() < coordinates.shape[1], f"neighbor {atom_index12.max().item()} larger than num_atoms {coordinates.shape[1]}"
+            coords0 = coordinates.view(-1, 3).index_select(0, atom_index12[0])
+            coords1 = coordinates.view(-1, 3).index_select(0, atom_index12[1])
+            diff_vector = coords0 - coords1
+            distances = diff_vector.norm(2, -1)
+        repulsion_energies = self.rep_calc((species, torch.scalar_tensor(0)), atom_index12, distances, ghost_flags)[1]
+        return repulsion_energies
+
+    @torch.jit.export
     def select_models(self, use_num_models: Optional[int] = None):
         neural_networks = self.neural_networks
         if isinstance(neural_networks, BmmEnsemble2):
@@ -152,20 +171,20 @@ class ANI2x(torch.nn.Module):
 
 
 class ANI2xRef(torch.nn.Module):
-    """
-    This is used to handel cuaev_computer that currently only works with single precision.
-    """
-    def __init__(self, use_cuaev, use_fullnbr):
+    def __init__(self, use_cuaev, use_repulsion):
         super().__init__()
-        ani2x = torchani.models.ANI2x(periodic_table_index=False, model_index=None, cell_list=False,
+        ani2x = torchani.models.ANI2x(periodic_table_index=True, model_index=None, cell_list=False,
                                       use_cuaev_interface=use_cuaev, use_cuda_extension=use_cuaev)
         self.model = ani2x
         self.model.neural_networks = self.model.neural_networks.to_infer_model(use_mnp=False)
         self.use_cuaev = use_cuaev
-        self.use_fullnbr = use_fullnbr
-        # We need to set use_fullnbr method mannually.
-        # To make tests match with each other, it will convert half nbrlist to full nbrlist.
-        self.model.aev_computer.use_fullnbr = use_fullnbr
+        # we only use halfnbr for ANI2xRef
+        # self.use_fullnbr = use_fullnbr
+        # self.model.aev_computer.use_fullnbr = use_fullnbr
+        self.use_repulsion = use_repulsion
+        self.rep_calc = RepulsionCalculator()
+        self.periodic_table_index = self.model.periodic_table_index
+        self.aev_computer = self.model.aev_computer
 
     def forward(self, species_coordinates: Tuple[Tensor, Tensor],
                 cell: Optional[Tensor] = None,
@@ -173,7 +192,16 @@ class ANI2xRef(torch.nn.Module):
         species_coordinates = self.model._maybe_convert_species(species_coordinates)
         species_aevs = self.model.aev_computer(species_coordinates, cell=cell, pbc=pbc)
         species_energies = self.model.neural_networks(species_aevs)
-        return self.model.energy_shifter(species_energies)
+        energies = self.model.energy_shifter(species_energies).energies
+        if self.use_repulsion:
+            energies += self.compute_repulsion(species_coordinates, cell, pbc)
+        return SpeciesEnergies(species_coordinates[0], energies)
+
+    def compute_repulsion(self, species_coordinates: Tuple[Tensor, Tensor],
+                          cell: Optional[Tensor] = None, pbc: Optional[Tensor] = None):
+        species, coordinates = species_coordinates
+        atom_index12, _, _, distances = self.model.aev_computer.neighborlist(species, coordinates, cell, pbc)
+        return self.rep_calc((species, torch.scalar_tensor(0)), atom_index12, distances)[1]
 
     @torch.jit.export
     def select_models(self, use_num_models: Optional[int] = None):
@@ -192,8 +220,13 @@ class ANI2xRef(torch.nn.Module):
 
 
 def save_ani2x_model():
-    ani2x = ANI2x()
+    ani2x = ANI2x(use_repulsion=False)
     output_file = "ani2x.pt"
+    script_module = torch.jit.script(ani2x)
+    script_module.save(output_file)
+
+    ani2x = ANI2x(use_repulsion=True)
+    output_file = "ani2x_repulsion.pt"
     script_module = torch.jit.script(ani2x)
     script_module.save(output_file)
 
@@ -223,14 +256,20 @@ use_fullnbr_params = [
     pytest.param(True, id="full"),
     pytest.param(False, id="half"),
 ]
+use_repulsion_params = [
+    pytest.param(False, id="repulsion-no"),
+    pytest.param(True, id="repulsion-yes"),
+]
 
 @pytest.mark.parametrize("runpbc", runpbc_params)
 @pytest.mark.parametrize("device", device_params)
 @pytest.mark.parametrize("use_double", use_double_params)
 @pytest.mark.parametrize("use_cuaev", use_cuaev_params)
 @pytest.mark.parametrize("use_fullnbr", use_fullnbr_params)
-def test_ani2x_models(runpbc, device, use_double, use_cuaev, use_fullnbr):
-    if use_fullnbr and (not use_cuaev) and runpbc:
+@pytest.mark.parametrize("use_repulsion", use_repulsion_params)
+def test_ani2x_models(runpbc, device, use_double, use_cuaev, use_fullnbr, use_repulsion):
+    # when pbc is on, full nbrlist converted from half nbrlist is not correct
+    if use_fullnbr and runpbc:
         pytest.skip("Does not support full neighbor list using pyaev when pbc is on")
     if use_cuaev and device == 'cpu':
         pytest.skip("Cuaev does not support CPU")
@@ -239,36 +278,38 @@ def test_ani2x_models(runpbc, device, use_double, use_cuaev, use_fullnbr):
 
     # dtype
     dtype = torch.float64 if use_double else torch.float32
-    output_file = "ani2x.pt"
+    if use_repulsion:
+        output_file = "ani2x_repulsion.pt"
+    else:
+        output_file = "ani2x.pt"
 
     # cuaev currently only works with single precision
     ani2x_loaded = torch.jit.load(output_file).to(dtype).to(device)
     # ani2x_loaded = ANI2x().to(dtype).to(device)
     ani2x_loaded.init(use_cuaev, use_fullnbr)
 
-    ani2x_ref = ANI2xRef(use_cuaev, use_fullnbr).to(dtype).to(device)
+    ani2x_ref = ANI2xRef(use_cuaev, use_repulsion).to(dtype).to(device)
 
     # we need a fewer iterations to tigger the fuser
     # for num_models in [len(ani2x_ref.model.neural_networks), 4]:
-    for num_models in [ani2x_ref.model.neural_networks.use_num_models, 4]:
+    total_num_models = ani2x_ref.model.neural_networks.use_num_models
+    for num_models in [total_num_models, 4]:
         ani2x_ref.select_models(num_models)
         ani2x_loaded.select_models(num_models)
         for i in range(5):
-            run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr, dtype, verbose=(num_models is None and i==0))
+            run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr, use_repulsion, dtype, verbose=(num_models == total_num_models and i==0))
 
 
-def run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr, dtype, verbose=False):
+def run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr, use_repulsion, dtype, verbose=False):
     input_file = "water-0.8nm.pdb"
     mol = read(input_file)
 
-    species = torch.tensor(mol.get_atomic_numbers(), device=device).unsqueeze(0)
+    species_periodic_table = torch.tensor(mol.get_atomic_numbers(), device=device).unsqueeze(0)
     coordinates = torch.tensor(mol.get_positions(), dtype=dtype, requires_grad=True, device=device).unsqueeze(0)
-    species, coordinates = ani2x_ref.model.species_converter((species, coordinates))
+    species, coordinates = ani2x_ref.model.species_converter((species_periodic_table, coordinates))
     cell = torch.tensor(mol.cell, device=device, dtype=dtype)
     pbc = torch.tensor(mol.pbc, device=device)
 
-    # TODO It is IMPORTANT to set cutoff as 7.1 to match lammps nbr cutoff
-    ani2x_ref.model.aev_computer.neighborlist.cutoff = 7.1
     if runpbc:
         atom_index12, _, diff_vector, distances = ani2x_ref.model.aev_computer.neighborlist(species, coordinates, cell, pbc)
     else:
@@ -301,7 +342,8 @@ def run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr
 
     assert torch.allclose(energy, energy_, atol=threshold), f"error {(energy - energy_).abs().max()}"
     assert torch.allclose(force, force_, atol=threshold), f"error {(force - force_).abs().max()}"
-    assert torch.allclose(energy, atomic_energies.sum(dim=-1), atol=threshold), f"error {(energy - atomic_energies.sum(dim=-1)).abs().max()}"
+    if not use_repulsion:
+        assert torch.allclose(energy, atomic_energies.sum(dim=-1), atol=threshold), f"error {(energy - atomic_energies.sum(dim=-1)).abs().max()}"
 
     # for test_model inputs
     # print(coordinates.flatten())
@@ -310,9 +352,9 @@ def run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr
     # print(force.flatten())
 
     if runpbc:
-        _, energy_ref = ani2x_ref((species, coordinates), cell, pbc)
+        _, energy_ref = ani2x_ref((species_periodic_table, coordinates), cell, pbc)
     else:
-        _, energy_ref = ani2x_ref((species, coordinates))
+        _, energy_ref = ani2x_ref((species_periodic_table, coordinates))
     force_ref = -torch.autograd.grad(energy_ref.sum(), coordinates, create_graph=True, retain_graph=True)[0]
     energy_ref, force_ref = energy_ref * hartree2kcalmol, force_ref * hartree2kcalmol
 
@@ -325,5 +367,6 @@ def run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr
         print("energy max err: ".ljust(15), energy_err.item())
         print("force  max err: ".ljust(15), force_err.item())
 
-    assert torch.allclose(energy, energy_ref, atol=threshold), f"error {(energy - energy_ref).abs().max()}"
+    # print(f"error {(energy - energy_ref).abs().max()}")
+    assert torch.allclose(energy, energy_ref), f"error {(energy - energy_ref).abs().max()}"
     assert torch.allclose(force, force_ref, atol=threshold), f"error {(force - force_ref).abs().max()}"

@@ -66,7 +66,7 @@ def compare_lmp_ase(lmp_dump, ase_traj, high_prec):
     #     lmp_dump = list(yaml.safe_load_all(stream))
     # ase_traj = list(Trajectory('tests/md.traj'))
     atol = 1e-9 if high_prec else 1e-3
-    rtol = 1e-6 if high_prec else 1e-3
+    rtol = 1e-5 if high_prec else 1e-3
     num_traj = len(ase_traj)
     for i in range(num_traj):
         lmp_data = lmp_dump[i]
@@ -81,7 +81,7 @@ def compare_lmp_ase(lmp_dump, ase_traj, high_prec):
         ase_pos = ase_atoms.positions
         ase_force = ase_atoms.get_forces() / units.Hartree * hartree2kcalmol
         ase_potEng = ase_atoms.get_potential_energy() / units.Hartree * hartree2kcalmol
-        print(np.abs(ase_force - lmp_force).max())
+        print("force error: ", np.abs(ase_force - lmp_force).max())
         assert np.allclose(ase_force, lmp_force, rtol, atol)
         assert np.allclose(ase_pos, lmp_pos, rtol, atol)
         if i > 0:

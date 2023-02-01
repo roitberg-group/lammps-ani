@@ -3,7 +3,7 @@ import torchani
 import os
 import pytest
 import lammps_ani
-
+import save_ani
 
 LAMMPS_PATH = os.path.join(os.environ["LAMMPS_ROOT"], "build/lmp_mpi")
 
@@ -19,7 +19,10 @@ num_tasks_params = [
     pytest.param(1, id="num_tasks_1"),
     pytest.param(2, id="num_tasks_2")
 ]
-
+use_repulsion_params = [
+    pytest.param(False, id="repulsion-no"),
+    pytest.param(True, id="repulsion-yes"),
+]
 
 @pytest.mark.parametrize("pbc", pbc_params)
 @pytest.mark.parametrize("precision", precision_params)
@@ -61,8 +64,9 @@ num_tasks_params = [
         ),
     ],
 )
+@pytest.mark.parametrize("use_repulsion", use_repulsion_params)
 def test_lmp_with_ase(
-        kokkos: bool, use_cuaev: bool, precision: str, nbr: str, pbc: bool, device: str, num_tasks: int):
+        kokkos: bool, use_cuaev: bool, precision: str, nbr: str, pbc: bool, device: str, num_tasks: int, use_repulsion: bool):
     # SKIP: compiled kokkos only work on Ampere GPUs
     SM = torch.cuda.get_device_capability(0)
     SM = int(f'{SM[0]}{SM[1]}')
@@ -75,13 +79,14 @@ def test_lmp_with_ase(
     if num_tasks > 1 and (not run_github_action_multi) and (not run_slurm_multi):
         pytest.skip("Skip running on 2 MPI Processes")
 
+    ani_model = "ani2x_repulsion.pt" if use_repulsion else "ani2x.pt"
     # prepare configurations
     ani_aev_str = "cuaev" if use_cuaev else "pyaev"
     var_dict = {
         "newton_pair": "off",
         "data_file": "water-0.8nm.data",
         "change_box": "'all boundary p p p'",
-        "ani_model_file": "ani2x.pt",
+        "ani_model_file": ani_model,
         "ani_device": device,
         "ani_num_models": 8,
         "ani_aev": ani_aev_str,
@@ -100,22 +105,24 @@ def test_lmp_with_ase(
     # setup ase calculator
     # use cpu for reference result if not for cuaev
     # device = torch.device("cuda") if use_cuaev else torch.device("cpu")
-    ani2x = torchani.models.ANI2x(
-        periodic_table_index=True,
-        model_index=None,
-        cell_list=False,
-        use_cuaev_interface=use_cuaev,
-        use_cuda_extension=use_cuaev,
-    )
+    # ani2x = torchani.models.ANI2x(
+    #     periodic_table_index=True,
+    #     model_index=None,
+    #     cell_list=False,
+    #     use_cuaev_interface=use_cuaev,
+    #     use_cuda_extension=use_cuaev,
+    # )
+    ani2x = save_ani.ANI2xRef(use_cuaev=use_cuaev, use_repulsion=use_repulsion)
     # When using half nbrlist, we have to set the cutoff as 7.1 to match lammps nbr cutoff.
     # When using full nbrlist with nocuaev, it is actually still using half_nbr, we also need 7.1 cutoff.
     # Full nbrlist still uses 5.1, which is fine.
     half_nbr = nbr == "half"
     if half_nbr or (not half_nbr and not use_cuaev):
-        ani2x.aev_computer.neighborlist.cutoff = 7.1
+        ani2x.model.aev_computer.neighborlist.cutoff = 7.1
     use_double = precision == "double"
     dtype = torch.float64 if use_double else torch.float32
-    calculator = ani2x.to(dtype).to(device).ase()
+    # calculator = ani2x.to(dtype).to(device).ase()
+    calculator = torchani.ase.Calculator(ani2x.to(dtype).to(device))
 
     # run ase
     aserunner = lammps_ani.utils.AseRunner("water-0.8nm.pdb", calculator=calculator, pbc=pbc)

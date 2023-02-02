@@ -3,16 +3,15 @@ import torchani
 import os
 import pytest
 import yaml
+from typing import Dict
 import subprocess
 import numpy as np
-from typing import Dict
 from ase.io import read
 from ase.md.verlet import VelocityVerlet
 from ase.io.trajectory import Trajectory
 from ase import units
-import save_ani
 
-LAMMPS_PATH = os.path.join(os.environ["LAMMPS_ROOT"], "build/lmp_mpi")
+lmp = os.path.join(os.environ["LAMMPS_ROOT"], "build/lmp_mpi")
 STEPS = 4
 
 
@@ -34,8 +33,28 @@ class LammpsRunner():
 
 
 class AseRunner():
-    def __init__(self, input_file: str, calculator, pbc: bool = False):
+    def __init__(self, pbc: bool = False, use_double: bool = True, use_cuaev: bool = False, half_nbr: bool = True):
+        input_file = "water-0.8nm.pdb"
         atoms = read(input_file)
+
+        # use cpu for reference result if not for cuaev
+        device = torch.device("cuda") if use_cuaev else torch.device("cpu")
+        ani2x = torchani.models.ANI2x(
+            periodic_table_index=True,
+            model_index=None,
+            cell_list=False,
+            use_cuaev_interface=use_cuaev,
+            use_cuda_extension=use_cuaev,
+        )
+        # When using half nbrlist, we have to set the cutoff as 7.1 to match lammps nbr cutoff.
+        # When using full nbrlist with nocuaev, it is actually still using half_nbr, we also need 7.1 cutoff.
+        # Full nbrlist still uses 5.1, which is fine.
+        if half_nbr or (not half_nbr and not use_cuaev):
+            ani2x.aev_computer.neighborlist.cutoff = 7.1
+        # double precision
+        if use_double:
+            ani2x = ani2x.double()
+        calculator = ani2x.to(device).ase()
 
         print(len(atoms), "atoms in the cell")
         atoms.set_calculator(calculator)
@@ -73,7 +92,7 @@ def compare_lmp_ase(lmp_dump, ase_traj, high_prec):
     #     lmp_dump = list(yaml.safe_load_all(stream))
     # ase_traj = list(Trajectory('tests/md.traj'))
     atol = 1e-9 if high_prec else 1e-3
-    rtol = 1e-5 if high_prec else 1e-3
+    rtol = 1e-6 if high_prec else 1e-3
     num_traj = len(ase_traj)
     for i in range(num_traj):
         lmp_data = lmp_dump[i]
@@ -88,7 +107,7 @@ def compare_lmp_ase(lmp_dump, ase_traj, high_prec):
         ase_pos = ase_atoms.positions
         ase_force = ase_atoms.get_forces() / units.Hartree * hartree2kcalmol
         ase_potEng = ase_atoms.get_potential_energy() / units.Hartree * hartree2kcalmol
-        print("force error: ", np.abs(ase_force - lmp_force).max())
+        print(np.abs(ase_force - lmp_force).max())
         assert np.allclose(ase_force, lmp_force, rtol, atol)
         assert np.allclose(ase_pos, lmp_pos, rtol, atol)
         if i > 0:
@@ -107,17 +126,13 @@ num_tasks_params = [
     pytest.param(1, id="num_tasks_1"),
     pytest.param(2, id="num_tasks_2")
 ]
-use_repulsion_params = [
-    pytest.param(False, id="repulsion-no"),
-    pytest.param(True, id="repulsion-yes"),
-]
 
 
 @pytest.mark.parametrize("pbc", pbc_params)
 @pytest.mark.parametrize("precision", precision_params)
 @pytest.mark.parametrize("num_tasks", num_tasks_params)
 @pytest.mark.parametrize(
-    "kokkos, use_cuaev, nbr, device",
+    "kokkos, cuaev, nbr, device",
     [
         # kokkos on, only support full nbr
         # kokkos works with cuaev (only cuda), nocuaev (cuda and cpu)
@@ -153,10 +168,8 @@ use_repulsion_params = [
         ),
     ],
 )
-@pytest.mark.parametrize("use_repulsion", use_repulsion_params)
 def test_lmp_with_ase(
-        kokkos: bool, use_cuaev: bool, precision: str, nbr: str, pbc: bool, device: str, num_tasks: int,
-        use_repulsion: bool):
+        kokkos: bool, cuaev: bool, precision: str, nbr: str, pbc: bool, device: str, num_tasks: int):
     # SKIP: compiled kokkos only work on Ampere GPUs
     SM = torch.cuda.get_device_capability(0)
     SM = int(f'{SM[0]}{SM[1]}')
@@ -169,14 +182,14 @@ def test_lmp_with_ase(
     if num_tasks > 1 and (not run_github_action_multi) and (not run_slurm_multi):
         pytest.skip("Skip running on 2 MPI Processes")
 
-    ani_model = "ani2x_repulsion.pt" if use_repulsion else "ani2x.pt"
     # prepare configurations
-    ani_aev_str = "cuaev" if use_cuaev else "pyaev"
+    cuaev_str = "cuaev" if cuaev else "nocuaev"
+    ani_aev_str = "cuaev" if cuaev else "pyaev"
     var_dict = {
         "newton_pair": "off",
         "data_file": "water-0.8nm.data",
         "change_box": "'all boundary p p p'",
-        "ani_model_file": ani_model,
+        "ani_model_file": "ani2x.pt",
         "ani_device": device,
         "ani_num_models": 8,
         "ani_aev": ani_aev_str,
@@ -189,34 +202,20 @@ def test_lmp_with_ase(
         var_dict["newton_pair"] = "on"
 
     # run lammps
-    lmprunner = LammpsRunner(LAMMPS_PATH, "in.lammps", var_dict, kokkos, num_tasks)
+    lmprunner = LammpsRunner(lmp, "in.lammps", var_dict, kokkos, num_tasks)
     lmp_dump = lmprunner.run()
 
-    # setup ase calculator
-    # use cpu for reference result if not for cuaev
-    # device = torch.device("cuda") if use_cuaev else torch.device("cpu")
-    # ani2x = torchani.models.ANI2x(
-    #     periodic_table_index=True,
-    #     model_index=None,
-    #     cell_list=False,
-    #     use_cuaev_interface=use_cuaev,
-    #     use_cuda_extension=use_cuaev,
-    # )
-    ani2x = save_ani.ANI2xRef(use_cuaev=use_cuaev, use_repulsion=use_repulsion)
-    # When using half nbrlist, we have to set the cutoff as 7.1 to match lammps nbr cutoff.
-    # When using full nbrlist with nocuaev, it is actually still using half_nbr, we also need 7.1 cutoff.
-    # Full nbrlist still uses 5.1, which is fine.
-    half_nbr = nbr == "half"
-    if half_nbr or (not half_nbr and not use_cuaev):
-        ani2x.model.aev_computer.neighborlist.cutoff = 7.1
-    use_double = precision == "double"
-    dtype = torch.float64 if use_double else torch.float32
-    # calculator = ani2x.to(dtype).to(device).ase()
-    calculator = torchani.ase.Calculator(ani2x.to(dtype).to(device))
+    # TODO cuaev work with double now
+    # SKIP: cuaev and double precision do not work with ASE
+    # if cuaev and precision == "double":
+    #     pytest.skip("cuaev and double precision do not work with ASE")
 
     # run ase
-    aserunner = AseRunner("water-0.8nm.pdb", calculator=calculator, pbc=pbc)
+    use_double = precision == "double"
+    half_nbr = nbr == "half"
+    aserunner = AseRunner(pbc=pbc, use_double=use_double, use_cuaev=cuaev, half_nbr=half_nbr)
     ase_traj = aserunner.run()
 
     # check result
-    compare_lmp_ase(lmp_dump, ase_traj, high_prec=use_double)
+    high_prec = not cuaev and use_double
+    compare_lmp_ase(lmp_dump, ase_traj, high_prec)

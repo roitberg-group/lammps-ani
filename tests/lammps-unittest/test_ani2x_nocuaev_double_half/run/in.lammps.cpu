@@ -1,0 +1,37 @@
+#LAMMPS Input file
+# mpirun -np 4 ${LAMMPS_ROOT}/build/lmp_mpi -in in.lammps
+
+# variables
+variable       lammps_ani_root getenv LAMMPS_ANI_ROOT
+
+# Intialization
+units          real
+atom_style     atomic
+
+neighbor       2.0 bin
+neigh_modify   every 10 delay 0 check yes
+newton         off off
+
+# Atom Definition
+read_data      ${lammps_ani_root}/tests/water-0.8nm.data
+change_box     all boundary p p p
+
+pair_style     ani 5.1 ${lammps_ani_root}/tests/ani2x.pt cpu -1 pyaev half double
+pair_coeff     * *
+
+# Settings: temperature at 300 K, timestep (0.5 fs)
+velocity       all create 300.0 12345 rot yes mom yes dist gaussian
+fix            1 all langevin 300.0 300.0 100.0 12345
+fix            2 all nve
+timestep       0.5
+
+# Output: dump atom positions every 0.5 ps and log info every 0.5 ps
+# dump           dumpXYZ all xyz 50 water.xyz
+thermo_style   custom step pe ke etotal temp press vol
+thermo         10
+
+# Run the simulation: first run (5 ps)
+run            20
+
+# write final state of simulation
+write_data    water.final

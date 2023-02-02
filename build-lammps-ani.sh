@@ -5,7 +5,7 @@ set -ex
 source build-env.sh
 
 # copy source files to ani_csrc
-cp external/torchani_sandbox/torchani/csrc/* ani_csrc/
+cp external/torchani_sandbox/torchani/csrc/* src/ani_csrc/
 
 # build lammps-ani
 rm -rf build; mkdir -p build; cd build

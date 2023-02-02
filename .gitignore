@@ -1,6 +1,12 @@
 **/build/
-ani_csrc/*
+src/ani_csrc/*
 *.pt
 examples/*
 .vscode/*
 **/__pycache__/*
+.eggs/
+*.qdrep
+*.sqlite
+*.sif
+._.DS_Store
+.DS_Store

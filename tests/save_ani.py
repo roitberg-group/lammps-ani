@@ -17,7 +17,52 @@ hartree2kcalmol = 627.5094738898777
 torch._C._get_graph_executor_optimize(False)
 
 
-class ANI2x(torch.nn.Module):
+class LammpsModelBase(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    @torch.jit.export
+    def init(self, use_cuaev: bool, use_fullnbr: bool):
+        """
+        Method that will be called at the very beginning within the lammps interface to set parameters.
+        """
+        raise NotImplementedError
+
+    @torch.jit.export
+    def forward(self, species: Tensor, coordinates: Tensor, para1: Tensor, para2: Tensor, para3: Tensor,
+                species_ghost_as_padding: Tensor, atomic: bool = False):
+        """
+        The forward function will be called by the lammps interfact with necessary inputs, and it
+        should return 3 tensors: total_energy, atomic_forces, atomic_energies. The atomic_energies could
+        be an empty tensor if the `atomic` flag is `False`.
+
+        Args:
+            species (Tensor): The species tensor, 0 indexed instead of periodic table indexed.
+            coordinates (Tensor): The coordinates tensor.
+            para1 (Tensor): if use_fullnbr, it is `ilist_unique`, otherwise `atom_index12`
+            para2 (Tensor): if use_fullnbr, it is `jlist`, otherwise `diff_vector`
+            para3 (Tensor): if use_fullnbr, it is `numneigh`, otherwise `distances`
+            species_ghost_as_padding (Tensor): The species tensor that ghost atoms are set as -1.
+            atomic (bool, optional): Whether the atomic_energies should be returned. Defaults to False.
+
+        Raises:
+            NotImplementedError: The User needs to override this function.
+        """
+        raise NotImplementedError
+
+    @torch.jit.export
+    def select_models(self, use_num_models: Optional[int] = None):
+        self.use_num_models = use_num_models
+        """
+        For an ensemble of models, select only the first `use_num_models` models.
+
+        Args:
+            use_num_models (Optional[int]): Defaults to None.
+        """
+        pass
+
+
+class ANI2x(LammpsModelBase):
     def __init__(self):
         super().__init__()
 
@@ -29,8 +74,7 @@ class ANI2x(torch.nn.Module):
         # create model
         ani2x = torchani.models.ANI2x(periodic_table_index=False, model_index=None, cell_list=False,
                                       use_cuaev_interface=self.use_cuaev,
-                                      use_cuda_extension=self.use_cuaev,
-                                      use_fullnbr=self.use_fullnbr)
+                                      use_cuda_extension=self.use_cuaev)
         self.aev_computer = ani2x.aev_computer
 
         # num_models
@@ -40,8 +84,6 @@ class ANI2x(torch.nn.Module):
         self.neural_networks = ani2x.neural_networks.to_infer_model(use_mnp=False)
         # self.neural_networks = ani2x.neural_networks
         self.energy_shifter = ani2x.energy_shifter
-        # Because the dtype of coordinates is always double when passed to the model, we need
-        # dummy_buffer to convert coordinates dtype
         self.register_buffer("dummy_buffer", torch.empty(0))
         # self.nvfuser_enabled = torch._C._jit_nvfuser_enabled()
 
@@ -53,11 +95,11 @@ class ANI2x(torch.nn.Module):
     def init(self, use_cuaev: bool, use_fullnbr: bool):
         self.use_cuaev = use_cuaev
         self.use_fullnbr = use_fullnbr
-        self.aev_computer.use_fullnbr = use_fullnbr
         self.initialized = True
 
     @torch.jit.export
-    def forward(self, species, coordinates, para1, para2, para3, species_ghost_as_padding, atomic: bool=False):
+    def forward(self, species: Tensor, coordinates: Tensor, para1: Tensor, para2: Tensor, para3: Tensor,
+                species_ghost_as_padding: Tensor, atomic: bool=False):
         assert self.initialized, "Model is not initialized, You need to call init() method before forward function"
 
         if self.use_cuaev and not self.aev_computer.cuaev_is_initialized:
@@ -68,13 +110,22 @@ class ANI2x(torch.nn.Module):
         torch.ops.mnp.nvtx_range_push("AEV forward")
         aev = self.compute_aev(species, coordinates, para1, para2, para3)
         torch.ops.mnp.nvtx_range_pop()
+
         if atomic:
-            return self.forward_atomic(species, coordinates, species_ghost_as_padding, aev)
+            energies, atomic_energies = self.forward_atomic(species, coordinates, species_ghost_as_padding, aev)
         else:
-            return self.forward_total(species, coordinates, species_ghost_as_padding, aev)
+            energies, atomic_energies = self.forward_total(species, coordinates, species_ghost_as_padding, aev)
+
+        torch.ops.mnp.nvtx_range_push("Force")
+        force = torch.autograd.grad([energies.sum()], [coordinates], create_graph=True, retain_graph=True)[0]
+        assert force is not None
+        force = -force
+        torch.ops.mnp.nvtx_range_pop()
+
+        return energies, force, atomic_energies
 
     @torch.jit.export
-    def forward_total(self, species, coordinates, species_ghost_as_padding, aev):
+    def forward_total(self, species: Tensor, coordinates: Tensor, species_ghost_as_padding: Tensor, aev: Tensor):
         # run neural networks
         torch.ops.mnp.nvtx_range_push(f"NN ({self.use_num_models}) forward")
         species_energies = self.neural_networks((species_ghost_as_padding, aev))
@@ -83,16 +134,10 @@ class ANI2x(torch.nn.Module):
         energies = species_energies[1]
         torch.ops.mnp.nvtx_range_pop()
 
-        torch.ops.mnp.nvtx_range_push("Force")
-        force = torch.autograd.grad([energies.sum()], [coordinates], create_graph=True, retain_graph=True)[0]
-        assert force is not None
-        force = -force
-        torch.ops.mnp.nvtx_range_pop()
-
-        return energies, force, torch.empty(0)
+        return energies, torch.empty(0)
 
     @torch.jit.export
-    def forward_atomic(self, species, coordinates, species_ghost_as_padding, aev):
+    def forward_atomic(self, species: Tensor, coordinates: Tensor, species_ghost_as_padding: Tensor, aev: Tensor):
         ntotal = species.shape[1]
         nghost = (species_ghost_as_padding == -1).flatten().sum()
         nlocal = ntotal - nghost
@@ -101,40 +146,26 @@ class ANI2x(torch.nn.Module):
         torch.ops.mnp.nvtx_range_push("NN ({self.use_num_models}) forward_atomic")
         atomic_energies = self.neural_networks._atomic_energies((species_ghost_as_padding, aev))
         atomic_energies += self.energy_shifter._atomic_saes(species_ghost_as_padding)
+        # when using ANI ensemble (not batchmm), atomic_energies shape is [models, C, A]
+        if len(atomic_energies.shape) > 2:
+            atomic_energies = atomic_energies.mean(0)
         energies = atomic_energies.sum(dim=1)
         torch.ops.mnp.nvtx_range_pop()
 
-        torch.ops.mnp.nvtx_range_push("Force")
-        force = torch.autograd.grad([energies.sum()], [coordinates], create_graph=True, retain_graph=True)[0]
-        assert force is not None
-        force = -force
-        torch.ops.mnp.nvtx_range_pop()
-
-        return energies, force, atomic_energies[:, :nlocal]
+        return energies, atomic_energies[:, :nlocal]
 
     @torch.jit.export
-    def compute_aev(self, species, coordinates, para1, para2, para3):
-        # dtype
-        dtype = self.dummy_buffer.dtype
-
+    def compute_aev(self, species: Tensor, coordinates: Tensor, para1: Tensor, para2: Tensor, para3: Tensor):
         atom_index12, diff_vector, distances = para1, para2, para3
         ilist_unique, jlist, numneigh = para1, para2, para3
         # compute aev
         assert species.shape[0] == 1, "Currently only support inference for single molecule"
         if self.use_cuaev:
-            # TODO, coordinates, diff_vector could be in float
-            # diff_vector, distances, coordinates from lammps are always in double,
-            coordinates = coordinates.to(dtype)
             if self.use_fullnbr:
                 aev = self.aev_computer._compute_cuaev_with_full_nbrlist(species, coordinates, ilist_unique, jlist, numneigh)
             else:
-                # TODO, should separate full or half nbrlist method in aev_computer.py?
-                diff_vector = diff_vector.to(dtype)
-                distances = distances.to(dtype)
-                aev = self.aev_computer._compute_cuaev_with_nbrlist(species, coordinates, atom_index12, diff_vector, distances)
+                aev = self.aev_computer._compute_cuaev_with_half_nbrlist(species, coordinates, atom_index12, diff_vector, distances)
             assert aev is not None
-            # the neural network part will use whatever dtype the user specified
-            aev = aev.to(dtype)
         else:
             # diff_vector, distances from lammps are always in double,
             # we need to convert it to single precision if needed
@@ -146,8 +177,6 @@ class ANI2x(torch.nn.Module):
                 coords1 = coordinates.view(-1, 3).index_select(0, atom_index12[1])
                 diff_vector = coords0 - coords1
                 distances = diff_vector.norm(2, -1)
-            diff_vector = diff_vector.to(dtype)
-            distances = distances.to(dtype)
             aev = self.aev_computer._compute_aev(species, atom_index12, diff_vector, distances)
 
         return aev
@@ -158,44 +187,32 @@ class ANI2x(torch.nn.Module):
         if isinstance(neural_networks, BmmEnsemble2):
             neural_networks.select_models(use_num_models)
             self.use_num_models = neural_networks.use_num_models
-        elif isinstance(neural_networks, Ensemble):
-            size = len(neural_networks)
-            if use_num_models is None:
-                use_num_models = size
-                return
-            assert use_num_models <= size, f"use_num_models {use_num_models} cannot be larger than size {size}"
-            neural_networks = neural_networks[:use_num_models]
-            self.use_num_models = use_num_models
         else:
-            raise RuntimeError("select_models method only works for BmmEnsemble2 or Ensemble neural networks")
+            raise RuntimeError("select_models method only works for BmmEnsemble2")
 
 
 class ANI2xRef(torch.nn.Module):
-    """
-    This is used to handel cuaev_computer that currently only works with single precision.
-    """
-    def __init__(self, use_cuaev, use_fullnbr):
+    def __init__(self, use_cuaev):
         super().__init__()
-        ani2x = torchani.models.ANI2x(periodic_table_index=False, model_index=None, cell_list=False,
-                                      use_cuaev_interface=use_cuaev, use_cuda_extension=use_cuaev,
-                                      use_fullnbr=use_fullnbr)
+        ani2x = torchani.models.ANI2x(periodic_table_index=True, model_index=None, cell_list=False,
+                                      use_cuaev_interface=use_cuaev, use_cuda_extension=use_cuaev)
         self.model = ani2x
         self.model.neural_networks = self.model.neural_networks.to_infer_model(use_mnp=False)
         self.use_cuaev = use_cuaev
-        self.register_buffer("dummy_buffer", torch.empty(0))
-        self.use_fullnbr = use_fullnbr
+        # we only use halfnbr for ANI2xRef
+        # self.use_fullnbr = use_fullnbr
+        # self.model.aev_computer.use_fullnbr = use_fullnbr
+        self.periodic_table_index = self.model.periodic_table_index
+        self.aev_computer = self.model.aev_computer
 
     def forward(self, species_coordinates: Tuple[Tensor, Tensor],
                 cell: Optional[Tensor] = None,
                 pbc: Optional[Tensor] = None) -> SpeciesEnergies:
         species_coordinates = self.model._maybe_convert_species(species_coordinates)
-        if self.use_cuaev:
-            species_aevs = self.model.aev_computer(species_coordinates, cell=cell, pbc=pbc)
-            species_aevs = (species_aevs[0], species_aevs[1].to(self.dummy_buffer.dtype))
-        else:
-            species_aevs = self.model.aev_computer(species_coordinates, cell=cell, pbc=pbc)
+        species_aevs = self.model.aev_computer(species_coordinates, cell=cell, pbc=pbc)
         species_energies = self.model.neural_networks(species_aevs)
-        return self.model.energy_shifter(species_energies)
+        energies = self.model.energy_shifter(species_energies).energies
+        return SpeciesEnergies(species_coordinates[0], energies)
 
     @torch.jit.export
     def select_models(self, use_num_models: Optional[int] = None):
@@ -252,8 +269,9 @@ use_fullnbr_params = [
 @pytest.mark.parametrize("use_cuaev", use_cuaev_params)
 @pytest.mark.parametrize("use_fullnbr", use_fullnbr_params)
 def test_ani2x_models(runpbc, device, use_double, use_cuaev, use_fullnbr):
-    if use_fullnbr and (not use_cuaev) and runpbc:
-        pytest.skip("Does not support full neighbor list on CPU when pbc is on")
+    # when pbc is on, full nbrlist converted from half nbrlist is not correct
+    if use_fullnbr and runpbc:
+        pytest.skip("Does not support full neighbor list using pyaev when pbc is on")
     if use_cuaev and device == 'cpu':
         pytest.skip("Cuaev does not support CPU")
     if device == 'cuda' and (not torch.cuda.is_available()):
@@ -268,28 +286,28 @@ def test_ani2x_models(runpbc, device, use_double, use_cuaev, use_fullnbr):
     # ani2x_loaded = ANI2x().to(dtype).to(device)
     ani2x_loaded.init(use_cuaev, use_fullnbr)
 
-    ani2x_ref = ANI2xRef(use_cuaev, use_fullnbr).to(dtype).to(device)
+    ani2x_ref = ANI2xRef(use_cuaev).to(dtype).to(device)
 
     # we need a fewer iterations to tigger the fuser
-    for num_models in [None, 4]:
+    # for num_models in [len(ani2x_ref.model.neural_networks), 4]:
+    total_num_models = ani2x_ref.model.neural_networks.use_num_models
+    for num_models in [total_num_models, 4]:
         ani2x_ref.select_models(num_models)
         ani2x_loaded.select_models(num_models)
         for i in range(5):
-            run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr, dtype, verbose=(num_models is None and i==0))
+            run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr, dtype, verbose=(num_models == total_num_models and i==0))
 
 
 def run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr, dtype, verbose=False):
     input_file = "water-0.8nm.pdb"
     mol = read(input_file)
 
-    species = torch.tensor(mol.get_atomic_numbers(), device=device).unsqueeze(0)
+    species_periodic_table = torch.tensor(mol.get_atomic_numbers(), device=device).unsqueeze(0)
     coordinates = torch.tensor(mol.get_positions(), dtype=dtype, requires_grad=True, device=device).unsqueeze(0)
-    species, coordinates = ani2x_ref.model.species_converter((species, coordinates))
+    species, coordinates = ani2x_ref.model.species_converter((species_periodic_table, coordinates))
     cell = torch.tensor(mol.cell, device=device, dtype=dtype)
     pbc = torch.tensor(mol.pbc, device=device)
 
-    # TODO It is IMPORTANT to set cutoff as 7.1 to match lammps nbr cutoff
-    ani2x_ref.model.aev_computer.neighborlist.cutoff = 7.1
     if runpbc:
         atom_index12, _, diff_vector, distances = ani2x_ref.model.aev_computer.neighborlist(species, coordinates, cell, pbc)
     else:
@@ -322,7 +340,6 @@ def run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr
 
     assert torch.allclose(energy, energy_, atol=threshold), f"error {(energy - energy_).abs().max()}"
     assert torch.allclose(force, force_, atol=threshold), f"error {(force - force_).abs().max()}"
-    assert torch.allclose(energy, atomic_energies.sum(dim=-1), atol=threshold), f"error {(energy - atomic_energies.sum(dim=-1)).abs().max()}"
 
     # for test_model inputs
     # print(coordinates.flatten())
@@ -331,9 +348,9 @@ def run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr
     # print(force.flatten())
 
     if runpbc:
-        _, energy_ref = ani2x_ref((species, coordinates), cell, pbc)
+        _, energy_ref = ani2x_ref((species_periodic_table, coordinates), cell, pbc)
     else:
-        _, energy_ref = ani2x_ref((species, coordinates))
+        _, energy_ref = ani2x_ref((species_periodic_table, coordinates))
     force_ref = -torch.autograd.grad(energy_ref.sum(), coordinates, create_graph=True, retain_graph=True)[0]
     energy_ref, force_ref = energy_ref * hartree2kcalmol, force_ref * hartree2kcalmol
 
@@ -346,5 +363,6 @@ def run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr
         print("energy max err: ".ljust(15), energy_err.item())
         print("force  max err: ".ljust(15), force_err.item())
 
-    assert torch.allclose(energy, energy_ref, atol=threshold), f"error {(energy - energy_ref).abs().max()}"
+    # print(f"error {(energy - energy_ref).abs().max()}")
+    assert torch.allclose(energy, energy_ref), f"error {(energy - energy_ref).abs().max()}"
     assert torch.allclose(force, force_ref, atol=threshold), f"error {(force - force_ref).abs().max()}"

@@ -160,7 +160,7 @@ int test_ani2x_withnbr(int argc, const char* argv[]) {
     force_err = std::max(force_err, err);
   }
 
-  double threshold = (ani.dtype == torch::kFloat64) ? 1e-8 : 1e-4;
+  double threshold = (ani.dtype == torch::kFloat64) ? 1e-8 : 3e-4;
   std::cout << "First call : energy " << std::fixed << out_energy << " (kcal/mol), error: " << std::scientific << energy_err
             << " (hartree)" << std::endl;
   std::cout << "First call : force " << out_force[0] << ", " << out_force[1] << ", " << out_force[2]

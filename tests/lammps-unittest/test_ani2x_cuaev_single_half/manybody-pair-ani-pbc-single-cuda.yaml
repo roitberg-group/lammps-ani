@@ -1,7 +1,8 @@
 ---
 lammps_version: 17 Feb 2022
 date_generated: Sat Jun 18 22:17:50 2022
-epsilon: 1e-3
+# larger error comes from the reference data here actually from full nbr list restult (half_nbr internally coverted to full_nbr) 
+epsilon: 5e-3
 skip_tests:
 prerequisites: ! |
   pair ani
@@ -17,7 +18,7 @@ pre_commands: ! |  # execute before the input template file is read
 post_commands: ! |  # execute right before the actual tests
   newton ${newton_pair} ${newton_bond}  # needs to be here so that restart test works
 input_file: in.ani
-pair_style: ani 5.1 ../ani2x.pt cuda -1 cuaev half single
+pair_style: ani 5.1 ../../ani2x.pt cuda -1 cuaev half single
 pair_coeff: ! |
   * *
 extract: ! ""

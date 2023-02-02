@@ -15,7 +15,7 @@ neigh_modify   every 10 delay 0 check yes
 newton         ${newton_pair} off
 
 # Atom Definition
-read_data      ../../water-0.8nm.data
+read_data      ${lammps_ani_root}/tests/water-0.8nm.data
 change_box     all boundary p p p
 
 pair_style     ani 5.1 ${lammps_ani_root}/tests/ani2x.pt cuda -1 cuaev full single

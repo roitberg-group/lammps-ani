@@ -1,6 +1,7 @@
+variable  lammps_ani_root getenv LAMMPS_ANI_ROOT
 variable  units           index  real
 variable  input_dir       index  .
-variable  data_file       index ${input_dir}/../water-0.8nm.data
+variable  data_file       index  ${lammps_ani_root}/tests/water-0.8nm.data
 variable  pair_style      index 'zero 8.0'
 variable  change_box      index 'all boundary p p p'
 

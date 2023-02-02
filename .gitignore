@@ -1,11 +1,10 @@
 **/build/
-lammps_ani/ani_csrc/*
+src/ani_csrc/*
 *.pt
 examples/*
 .vscode/*
 **/__pycache__/*
 .eggs/
-lammps_ani.egg-info/
 *.qdrep
 *.sqlite
 *.sif

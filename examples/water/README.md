@@ -8,8 +8,7 @@ Generate lammps data from pdb
 python ../pdb2lmp.py water-6nm.pdb water-6nm.data --center
 ```
 
-
-Benchmark Result
+## Benchmark Result
 
 
 20k system

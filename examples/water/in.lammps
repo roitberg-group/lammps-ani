@@ -1,23 +1,32 @@
-#LAMMPS Input file
-# mpirun -np 4 ${LAMMPS_ROOT}/build/lmp_mpi -in in.lammps
-
 # variables
 variable       lammps_ani_root getenv LAMMPS_ANI_ROOT
+# kokkos needs newton_pair on for reverse communication between gpus
+variable       newton_pair     index  off
+variable       num_models      index  1
+variable       datafile        index  20k/water.data
 
 # Intialization
 units          real
 atom_style     atomic
 
 neighbor       2.0 bin
+# check yes = only build if at least one atom has moved half the skin distance or more
 neigh_modify   every 10 delay 0 check yes
-newton         off off
+newton         ${newton_pair} off
 
 # Atom Definition
-read_data      water-5nm.data
+read_data      ${datafile} 
 # replicate      3 3 3
 change_box     all boundary p p p
 
-pair_style     ani 5.1 ${lammps_ani_root}/tests/ani2x_cuaev_single_full.pt cuda
+# pair_style ani 5.1 model_file device num_models ani_aev ani_neighbor
+# 0. model_file               = path to the model file
+# 1. device                   = cuda/cpu
+# 2. num_models (Optional)    = number of models to use, default as -1 to use all models
+# 3. ani_aev (Optional)       = cuaev/pyaev, default as cuaev
+# 4. ani_neighbor (Optional)  = full/half, default as full nbrlist
+# 5. ani_precision (Optional) = single/double, default as single
+pair_style     ani 5.1 ${lammps_ani_root}/tests/ani2x.pt cuda ${num_models} cuaev full single
 pair_coeff     * *
 
 # Settings: temperature at 300 K, timestep (0.5 fs)
@@ -27,12 +36,13 @@ fix            2 all nve
 timestep       0.5
 
 # Output: dump atom positions every 0.5 ps and log info every 0.5 ps
-dump           dumpXYZ all xyz 100 water.xyz
+dump           1 all xyz 100 water.xyz
+dump_modify    1 element H C N O F S Cl
 thermo_style   custom step pe ke etotal temp press vol
 thermo         100
 
 # Run the simulation: first run (5 ps)
-run            300
+run            1000
 
 # write final state of simulation
-write_data    water.final
+# write_data    water.final

@@ -1,7 +1,6 @@
 **/build/
 src/ani_csrc/*
 *.pt
-examples/*
 .vscode/*
 **/__pycache__/*
 .eggs/
@@ -10,3 +9,15 @@ examples/*
 *.sif
 ._.DS_Store
 .DS_Store
+*.final
+*.xyz
+*.log
+*.dump
+log.lammps
+myexamples/*
+md.log
+md.traj
+dump.yaml
+*.final
+TODOs*
+deadcode*

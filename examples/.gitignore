@@ -1,7 +1,0 @@
-log.lammps
-*.final
-*.xyz
-*.log
-*.dump
-*.qdrep
-*.sqlite

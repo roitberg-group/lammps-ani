@@ -1,0 +1,121 @@
+LAMMPS (3 Aug 2022)
+KOKKOS mode is enabled (src/KOKKOS/kokkos.cpp:106)
+  will use up to 8 GPU(s) per node
+  using 1 OpenMP thread(s) per MPI task
+Loaded 1 plugins from /blue/roitberg/apps/lammps-ani/build/
+package kokkos
+package kokkos gpu/aware on
+# variables
+variable       lammps_ani_root getenv LAMMPS_ANI_ROOT
+# kokkos needs newton_pair on for reverse communication between gpus
+variable       newton_pair     index  off
+variable       num_models      index  1
+variable       datafile        index  20k/water.data
+
+# Intialization
+units          real
+atom_style     atomic
+
+neighbor       2.0 bin
+# check yes = only build if at least one atom has moved half the skin distance or more
+neigh_modify   every 10 delay 0 check yes
+newton         ${newton_pair} off
+newton         on off
+
+# Atom Definition
+read_data      ${datafile}
+read_data      20k/water.data
+Reading data file ...
+  triclinic box = (-30 -30 -30) to (30 30 30) with tilt (0 0 0)
+  2 by 2 by 2 MPI processor grid
+  reading atoms ...
+  21384 atoms
+  read_data CPU = 0.118 seconds
+# replicate      3 3 3
+change_box     all boundary p p p
+Changing box ...
+
+# pair_style ani 5.1 model_file device num_models ani_aev ani_neighbor
+# 0. model_file               = path to the model file
+# 1. device                   = cuda/cpu
+# 2. num_models (Optional)    = number of models to use, default as -1 to use all models
+# 3. ani_aev (Optional)       = cuaev/pyaev, default as cuaev
+# 4. ani_neighbor (Optional)  = full/half, default as full nbrlist
+# 5. ani_precision (Optional) = single/double, default as single
+pair_style     ani 5.1 ${lammps_ani_root}/tests/ani2x.pt cuda ${num_models} cuaev full single
+pair_style     ani 5.1 /blue/roitberg/apps/lammps-ani/tests/ani2x.pt cuda ${num_models} cuaev full single
+pair_style     ani 5.1 /blue/roitberg/apps/lammps-ani/tests/ani2x.pt cuda 8 cuaev full single
+pair_coeff     * *
+
+# Settings: temperature at 300 K, timestep (0.5 fs)
+velocity       all create 300.0 12345 rot yes mom yes dist gaussian
+fix            1 all langevin 300.0 300.0 100.0 12345
+fix            2 all nve
+timestep       0.5
+
+# Output: dump atom positions every 0.5 ps and log info every 0.5 ps
+dump           1 all xyz 100 water.xyz
+dump_modify    1 element H C N O F S Cl
+thermo_style   custom step pe ke etotal temp press vol
+thermo         100
+
+# Run the simulation: first run (5 ps)
+run            1000
+Generated 0 of 21 mixed pair_coeff terms from geometric mixing rule
+Neighbor list info ...
+  update: every = 10 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 7.1
+  ghost atom cutoff = 7.1
+  binsize = 7.1, bins = 9 9 9
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair ani/kk, perpetual
+      attributes: full, newton on, kokkos_device
+      pair build: full/bin/kk/device
+      stencil: full/bin/3d
+      bin: kk/device
+Per MPI rank memory allocation (min/avg/max) = 3.37 | 3.37 | 3.37 Mbytes
+   Step         PotEng         KinEng         TotEng          Temp          Press          Volume    
+         0  -3.4177647e+08  19121.598     -3.4175735e+08  300            4046.7213      216000       
+       100  -3.4177899e+08  20502.918     -3.4175849e+08  321.67162      4339.0512      216000       
+       200  -3.4178095e+08  20865.894     -3.4176009e+08  327.36637      4415.8682      216000       
+       300  -3.417827e+08   20810.513     -3.4176189e+08  326.49749      4404.1479      216000       
+       400  -3.4178382e+08  20589.487     -3.4176323e+08  323.0298       4357.3719      216000       
+       500  -3.4178484e+08  20332.27      -3.4176451e+08  318.99431      4302.9368      216000       
+       600  -3.4178568e+08  20017.767     -3.4176566e+08  314.06005      4236.3783      216000       
+       700  -3.4178649e+08  19912.14      -3.4176658e+08  312.40285      4214.0243      216000       
+       800  -3.4178687e+08  19552.705     -3.4176732e+08  306.76365      4137.9567      216000       
+       900  -3.4178747e+08  19718.34      -3.4176775e+08  309.36231      4173.0102      216000       
+      1000  -3.4178773e+08  19387.937     -3.4176834e+08  304.17861      4103.0868      216000       
+Loop time of 5.20524 on 8 procs for 1000 steps with 21384 atoms
+
+Performance: 8.299 ns/day, 2.892 hours/ns, 192.114 timesteps/s
+83.7% CPU use with 8 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 4.2186     | 4.249      | 4.2729     |   0.8 | 81.63
+Neigh   | 0.013408   | 0.016377   | 0.020542   |   1.7 |  0.31
+Comm    | 0.77007    | 0.79501    | 0.82774    |   2.0 | 15.27
+Output  | 0.039797   | 0.043694   | 0.047736   |   1.3 |  0.84
+Modify  | 0.070201   | 0.073873   | 0.077492   |   0.8 |  1.42
+Other   |            | 0.02725    |            |       |  0.52
+
+Nlocal:           2673 ave        2697 max        2658 min
+Histogram: 2 2 0 1 1 0 0 0 1 1
+Nghost:        5889.75 ave        5924 max        5857 min
+Histogram: 2 0 1 0 2 0 0 0 2 1
+Neighs:              0 ave           0 max           0 min
+Histogram: 8 0 0 0 0 0 0 0 0 0
+FullNghs:       393992 ave      399096 max      391061 min
+Histogram: 4 0 0 0 0 1 2 0 0 1
+
+Total # of neighbors = 3151940
+Ave neighs/atom = 147.39712
+Neighbor list builds = 24
+Dangerous builds = 0
+
+# write final state of simulation
+# write_data    water.final
+Total wall time: 0:00:09

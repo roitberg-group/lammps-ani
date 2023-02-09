@@ -94,6 +94,8 @@ class ANI2x(LammpsModelBase):
         for name, param in self.neural_networks.named_parameters():
             param.requires_grad_(False)
 
+        self.using_bmmensemble = isinstance(self.neural_networks, BmmEnsemble2)
+
     @torch.jit.export
     def init(self, use_cuaev: bool, use_fullnbr: bool):
         self.use_cuaev = use_cuaev
@@ -207,10 +209,12 @@ class ANI2x(LammpsModelBase):
 
     @torch.jit.export
     def select_models(self, use_num_models: Optional[int] = None):
-        neural_networks = self.neural_networks
-        if isinstance(neural_networks, BmmEnsemble2):
-            neural_networks.select_models(use_num_models)
-            self.use_num_models = neural_networks.use_num_models
+        if self.using_bmmensemble:
+            self.neural_networks.select_models(use_num_models)
+            self.use_num_models = self.neural_networks.use_num_models
+        elif use_num_models is None or use_num_models == self.num_models:
+            # We don't need to do anything in this case, even if it is not using BmmEnsemble2.
+            pass
         else:
             raise RuntimeError("select_models method only works for BmmEnsemble2")
 

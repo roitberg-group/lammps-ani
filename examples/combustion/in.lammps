@@ -18,7 +18,9 @@ read_data      combustion-very-small-point-7-density.solvated.cell.data
 # replicate      3 3 3
 change_box     all boundary p p p
 
-pair_style     ani 5.1 ${lammps_ani_root}/tests/ani2x.pt cuda ${num_models} cuaev full single 
+# pair_style     ani 5.1 ${lammps_ani_root}/tests/ani2x.pt cuda ${num_models} cuaev full single 
+# pair_style     ani 5.1 ${lammps_ani_root}/tests/ani2x_ext0_repulsion.pt cuda ${num_models} cuaev full single
+pair_style     ani 5.1 ${lammps_ani_root}/tests/ani2x_repulsion.pt cuda ${num_models} cuaev full single
 pair_coeff     * *
 
 # Settings: temperature at 300 K, timestep (0.5 fs)
@@ -36,7 +38,7 @@ thermo_style   custom step pe ke etotal temp press vol
 thermo         100
 
 # Run the simulation: first run (1 ps)
-run            5000
+run            50000
 
 # write final state of simulation
 write_data    logs/${prefix}-${timestamp}.final

@@ -1,3 +1,4 @@
+import copy
 import torch
 import pytest
 import torchani
@@ -8,6 +9,7 @@ from torchani.nn import SpeciesEnergies
 from torchani.infer import BmmEnsemble2
 from torchani.models import Ensemble
 from torchani.repulsion import RepulsionCalculator
+from ani2x_ext.custom_emsemble_ani2x_ext import CustomEnsemble
 
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
@@ -63,8 +65,72 @@ class LammpsModelBase(torch.nn.Module):
         pass
 
 
-class ANI2x(LammpsModelBase):
-    def __init__(self, use_repulsion):
+########################################################################################
+
+def ANI2x_Model():
+    model = torchani.models.ANI2x(periodic_table_index=True, model_index=None, cell_list=False,
+                                  use_cuaev_interface=True, use_cuda_extension=True)
+    return model
+
+
+def ANI2x_Repulsion_Model():
+    elements = ('H', 'C', 'N', 'O', 'S', 'F', 'Cl')
+    def dispersion_atomics(atom: str = 'H'):
+        dims_for_atoms = {'H': (1008, 256, 192, 160),
+                          'C': (1008, 256, 192, 160),
+                          'N': (1008, 192, 160, 128),
+                          'O': (1008, 192, 160, 128),
+                          'S': (1008, 160, 128, 96),
+                          'F': (1008, 160, 128, 96),
+                          'Cl': (1008, 160, 128, 96)}
+        return torchani.atomics.standard(dims_for_atoms[atom], activation=torch.nn.GELU(), bias=False)
+    model = torchani.models.ANI2x(pretrained=False,
+                  cutoff_fn='smooth',
+                  atomic_maker=dispersion_atomics,
+                  ensemble_size=7,
+                  repulsion=True,
+                  repulsion_kwargs={'elements': elements,
+                                    'cutoff': 5.1,
+                                    'cutoff_fn': torchani.aev.cutoffs.CutoffSmooth(order=2)},
+                                    periodic_table_index=True, model_index=None, cell_list=False,
+                                    use_cuaev_interface=True, use_cuda_extension=True
+                  )
+    state_dict = torchani.models._fetch_state_dict('anid_state_dict_mod.pt', private=True)
+    for key in state_dict.copy().keys():
+        if key.startswith("potentials.0"):
+            state_dict.pop(key)
+    for key in state_dict.copy().keys():
+        if key.startswith("potentials.1"):
+            new_key = key.replace("potentials.1", "potentials.0")
+            state_dict[new_key] = state_dict[key]
+            state_dict.pop(key)
+    for key in state_dict.copy().keys():
+        if key.startswith("potentials.2"):
+            new_key = key.replace("potentials.2", "potentials.1")
+            state_dict[new_key] = state_dict[key]
+            state_dict.pop(key)
+
+    model.load_state_dict(state_dict)
+    return model
+
+
+# class ANI2xExt_Model(CustomEnsemble):
+#     """
+#     ani_ext model with repulsion, smooth cutoff, GELU, No Bias, GSAE
+#     """
+#     def __init__(self, *args, **kwargs):
+#         super().__init__(*args, **kwargs)
+#         self.aev_computer = torchani.AEVComputer.like_2x(cutoff_fn="smooth", use_cuda_extension=True, use_cuaev_interface=True)
+#         self.neural_networks = self.models
+
+#     def forward(self):
+#         pass
+
+########################################################################################
+
+
+class LammpsANI(LammpsModelBase):
+    def __init__(self, model, use_repulsion):
         super().__init__()
 
         # setup model
@@ -73,20 +139,24 @@ class ANI2x(LammpsModelBase):
         self.initialized = False
         self.use_repulsion = use_repulsion
 
-        # create model
-        ani2x = torchani.models.ANI2x(periodic_table_index=False, model_index=None, cell_list=False,
-                                      use_cuaev_interface=self.use_cuaev,
-                                      use_cuda_extension=self.use_cuaev)
-        self.aev_computer = ani2x.aev_computer
-        self.rep_calc = RepulsionCalculator()
+        assert hasattr(model, 'aev_computer'), "No aev_computer found in the model"
+        assert hasattr(model, 'neural_networks'), "No neural_networks found in the model"
+        assert isinstance(model.neural_networks, Ensemble) or isinstance(model.neural_networks, torch.nn.ModuleList)
+        assert hasattr(model, 'energy_shifter'), "No energy_shifter found in the model"
+
+        self.aev_computer = model.aev_computer
+        # TODO how to set repulsion cutoff
+        self.rep_calc = RepulsionCalculator(cutoff=5.1)
 
         # num_models
-        self.num_models = len(ani2x.neural_networks)
+        self.num_models = len(model.neural_networks)
         self.use_num_models = self.num_models
-        # batched neural networks
-        self.neural_networks = ani2x.neural_networks.to_infer_model(use_mnp=False)
-        # self.neural_networks = ani2x.neural_networks
-        self.energy_shifter = ani2x.energy_shifter
+        # Batched neural networks is required for selecting number of models at Runtime.
+        # TODO if the normal Ensemble needs to be supported to select_models in the future,
+        # A ModuleList of Ensemble with different number of models could be prepared in advance
+        # within the __init__ function.
+        self.neural_networks = BmmEnsemble2(model.neural_networks)
+        self.energy_shifter = model.energy_shifter
         self.register_buffer("dummy_buffer", torch.empty(0))
         # self.nvfuser_enabled = torch._C._jit_nvfuser_enabled()
 
@@ -219,6 +289,7 @@ class ANI2x(LammpsModelBase):
             raise RuntimeError("select_models method only works for BmmEnsemble2")
 
 
+# TODO delete this
 class ANI2xRef(torch.nn.Module):
     def __init__(self, use_cuaev, use_repulsion):
         super().__init__()
@@ -268,16 +339,17 @@ class ANI2xRef(torch.nn.Module):
             raise RuntimeError("select_models method only works for BmmEnsemble2 or Ensemble neural networks")
 
 
-def save_ani2x_model():
-    ani2x = ANI2x(use_repulsion=False)
-    output_file = "ani2x.pt"
-    script_module = torch.jit.script(ani2x)
-    script_module.save(output_file)
+all_models = {"ani2x.pt": {"model": ANI2x_Model, "use_repulsion": False},
+              "ani2x_repulsion.pt": {"model": ANI2x_Repulsion_Model, "use_repulsion": True}}
+# TODO Ping's model
+# "ani2x_ext0_repulsion": {"model": ANI2xExt_Model, "use_repulsion": True}
 
-    ani2x = ANI2x(use_repulsion=True)
-    output_file = "ani2x_repulsion.pt"
-    script_module = torch.jit.script(ani2x)
-    script_module.save(output_file)
+def save_ani2x_model():
+    for output_file, info in all_models.items():
+        ani2x = LammpsANI(info["model"](), use_repulsion=info["use_repulsion"])
+        script_module = torch.jit.script(ani2x)
+        script_module.save(output_file)
+
 
 # Save all ani2x models by using session-scoped "autouse" fixture, this will run ahead of all tests.
 @pytest.fixture(scope='session', autouse=True)
@@ -305,18 +377,15 @@ use_fullnbr_params = [
     pytest.param(True, id="full"),
     pytest.param(False, id="half"),
 ]
-use_repulsion_params = [
-    pytest.param(False, id="repulsion-no"),
-    pytest.param(True, id="repulsion-yes"),
-]
+modelfile_params = all_models.keys()
 
 @pytest.mark.parametrize("runpbc", runpbc_params)
 @pytest.mark.parametrize("device", device_params)
 @pytest.mark.parametrize("use_double", use_double_params)
 @pytest.mark.parametrize("use_cuaev", use_cuaev_params)
 @pytest.mark.parametrize("use_fullnbr", use_fullnbr_params)
-@pytest.mark.parametrize("use_repulsion", use_repulsion_params)
-def test_ani2x_models(runpbc, device, use_double, use_cuaev, use_fullnbr, use_repulsion):
+@pytest.mark.parametrize("modelfile", modelfile_params)
+def test_ani2x_models(runpbc, device, use_double, use_cuaev, use_fullnbr, modelfile):
     # when pbc is on, full nbrlist converted from half nbrlist is not correct
     if use_fullnbr and runpbc:
         pytest.skip("Does not support full neighbor list using pyaev when pbc is on")
@@ -327,6 +396,7 @@ def test_ani2x_models(runpbc, device, use_double, use_cuaev, use_fullnbr, use_re
 
     # dtype
     dtype = torch.float64 if use_double else torch.float32
+    use_repulsion = all_models[modelfile]["use_repulsion"]
     if use_repulsion:
         output_file = "ani2x_repulsion.pt"
     else:
@@ -337,13 +407,39 @@ def test_ani2x_models(runpbc, device, use_double, use_cuaev, use_fullnbr, use_re
     # ani2x_loaded = ANI2x().to(dtype).to(device)
     ani2x_loaded.init(use_cuaev, use_fullnbr)
 
-    ani2x_ref = ANI2xRef(use_cuaev, use_repulsion).to(dtype).to(device)
+    def set_cuda_aev(model, use_cuaev):
+        model.aev_computer.use_cuaev_interface = use_cuaev
+        model.aev_computer.use_cuda_extension = use_cuaev
+        return model
+
+    def select_num_models(model, use_num_models):
+        newmodel = copy.deepcopy(model)
+        # BuiltinModelPairInteractions needs to change AEVPotential.neural_networks
+        if isinstance(model, torchani.models.BuiltinModelPairInteractions):
+            assert isinstance(model.neural_networks, torch.nn.ModuleList)
+            assert use_num_models <= len(model.neural_networks)
+            newmodel.neural_networks = Ensemble(newmodel.neural_networks[:use_num_models])
+            for i, pot in enumerate(model.potentials):
+                if isinstance(pot, torchani.models.AEVPotential):
+                    nn = newmodel.potentials[i].neural_networks
+                    assert isinstance(nn, torch.nn.ModuleList)
+                    assert use_num_models <= len(nn)
+                    newmodel.potentials[i].neural_networks = Ensemble(nn[:use_num_models])
+        elif isinstance(model, torchani.models.BuiltinModel):
+            assert isinstance(model.neural_networks, torch.nn.ModuleList)
+            assert use_num_models <= len(model.neural_networks)
+            newmodel.neural_networks = Ensemble(newmodel.neural_networks[:use_num_models])
+        return newmodel
+
+    ani2x_ref_all_models = all_models[modelfile]["model"]().to(dtype).to(device)
+    ani2x_ref_all_models = set_cuda_aev(ani2x_ref_all_models, use_cuaev)
+
+    # ani2x_ref = ANI2xRef(use_cuaev, use_repulsion).to(dtype).to(device)
 
     # we need a fewer iterations to tigger the fuser
-    # for num_models in [len(ani2x_ref.model.neural_networks), 4]:
-    total_num_models = ani2x_ref.model.neural_networks.use_num_models
+    total_num_models = len(ani2x_ref_all_models.neural_networks)
     for num_models in [total_num_models, 4]:
-        ani2x_ref.select_models(num_models)
+        ani2x_ref = select_num_models(ani2x_ref_all_models, num_models)
         ani2x_loaded.select_models(num_models)
         for i in range(5):
             run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr, use_repulsion, dtype, verbose=(num_models == total_num_models and i==0))
@@ -355,16 +451,16 @@ def run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr
 
     species_periodic_table = torch.tensor(mol.get_atomic_numbers(), device=device).unsqueeze(0)
     coordinates = torch.tensor(mol.get_positions(), dtype=dtype, requires_grad=True, device=device).unsqueeze(0)
-    species, coordinates = ani2x_ref.model.species_converter((species_periodic_table, coordinates))
+    species, coordinates = ani2x_ref.species_converter((species_periodic_table, coordinates))
     cell = torch.tensor(mol.cell, device=device, dtype=dtype)
     pbc = torch.tensor(mol.pbc, device=device)
 
     if runpbc:
-        atom_index12, _, diff_vector, distances = ani2x_ref.model.aev_computer.neighborlist(species, coordinates, cell, pbc)
+        atom_index12, _, diff_vector, distances = ani2x_ref.aev_computer.neighborlist(species, coordinates, cell, pbc)
     else:
-        atom_index12, _, diff_vector, distances = ani2x_ref.model.aev_computer.neighborlist(species, coordinates)
+        atom_index12, _, diff_vector, distances = ani2x_ref.aev_computer.neighborlist(species, coordinates)
     if use_fullnbr:
-        ilist_unique, jlist, numneigh = ani2x_ref.model.aev_computer._half_to_full_nbrlist(atom_index12)
+        ilist_unique, jlist, numneigh = ani2x_ref.aev_computer._half_to_full_nbrlist(atom_index12)
         para1, para2, para3 = ilist_unique, jlist, numneigh
     else:
         para1, para2, para3 = atom_index12, diff_vector, distances
@@ -407,8 +503,8 @@ def run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr
     force_ref = -torch.autograd.grad(energy_ref.sum(), coordinates, create_graph=True, retain_graph=True)[0]
     energy_ref, force_ref = energy_ref * hartree2kcalmol, force_ref * hartree2kcalmol
 
-    energy_err = torch.abs(torch.max(energy_ref.cpu() - energy.cpu()))
-    force_err = torch.abs(torch.max(force_ref.cpu() - force.cpu()))
+    energy_err = (energy_ref.cpu() - energy.cpu()).abs().max()
+    force_err = (force_ref.cpu() - force.cpu()).abs().max()
 
     if verbose:
         print(f"{'energy_ref:'.ljust(15)} shape: {energy_ref.shape}, value: {energy_ref.item()}, dtype: {energy_ref.dtype}, unit: (kcal/mol)")

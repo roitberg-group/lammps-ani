@@ -6,8 +6,13 @@ source build-env.sh
 
 # build torchani
 cd external/torchani_sandbox
-rm -rf build && python setup.py install --ext
+rm -rf build && python setup.py develop --ext
 pip install h5py ase pytest pyyaml --upgrade
+cd ../../
+
+# install ani_ext
+cd external/ani_ext
+python setup.py develop
 cd ../../
 
 # save model

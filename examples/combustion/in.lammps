@@ -1,6 +1,3 @@
-#LAMMPS Input file
-# mpirun -np 4 ${LAMMPS_ROOT}/build/lmp_mpi -in in.lammps
-
 # variables
 variable       lammps_ani_root getenv LAMMPS_ANI_ROOT
 variable       newton_pair     index  off

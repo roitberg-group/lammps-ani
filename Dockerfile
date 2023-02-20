@@ -33,6 +33,11 @@ ENV MAKE_J_THREADS=${MAKE_J_THREADS}
 
 # Set default shell to /bin/bash
 SHELL ["/bin/bash", "-cu"]
+
+# install some packages
+RUN apt-get update && \
+    apt-get install -y netcdf-bin
+
 # Copy files into container
 COPY . $LAMMPS_ANI_ROOT
 # Build base dependencies: lammps, kokkos, and torchani

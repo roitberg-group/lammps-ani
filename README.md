@@ -5,7 +5,7 @@ A plugin to run torchani on LAMMPS.
 Run an interactive session on hipergator
 ```
 srun --qos=roitberg --account=roitberg --nodes=1 --ntasks=2 --cpus-per-task=2 --mem=20gb --gres=gpu:2 --partition=hpg-ai -t 10:00:00 --pty /bin/bash -i
-module load cuda/11.4.3 gcc/9.3.0 openmpi/4.0.5 cmake/3.21.3 git/2.30.1 singularity
+module load cuda/11.4.3 gcc/9.3.0 openmpi/4.0.5 cmake/3.21.3 git/2.30.1 netcdf/4.7.2 singularity
 ```
 
 pytorch and cudnn

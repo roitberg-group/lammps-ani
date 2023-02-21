@@ -36,7 +36,7 @@ SHELL ["/bin/bash", "-cu"]
 
 # install some packages
 RUN apt-get update && \
-    apt-get install -y netcdf-bin
+    apt-get install -y libnetcdf-dev
 
 # Copy files into container
 COPY . $LAMMPS_ANI_ROOT

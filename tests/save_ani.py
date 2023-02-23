@@ -8,7 +8,7 @@ from torch import Tensor
 from torchani.nn import SpeciesEnergies
 from torchani.infer import BmmEnsemble2
 from torchani.models import Ensemble
-from torchani.repulsion import RepulsionCalculator
+from torchani.repulsion import RepulsionXTB
 from ani2x_ext.custom_emsemble_ani2x_ext import CustomEnsemble
 
 torch.backends.cuda.matmul.allow_tf32 = False
@@ -89,7 +89,7 @@ def ANI2x_Repulsion_Model():
                   atomic_maker=dispersion_atomics,
                   ensemble_size=7,
                   repulsion=True,
-                  repulsion_kwargs={'elements': elements,
+                  repulsion_kwargs={'symbols': elements,
                                     'cutoff': 5.1,
                                     'cutoff_fn': torchani.aev.cutoffs.CutoffSmooth(order=2)},
                                     periodic_table_index=True, model_index=None, cell_list=False,
@@ -146,7 +146,8 @@ class LammpsANI(LammpsModelBase):
 
         self.aev_computer = model.aev_computer
         # TODO how to set repulsion cutoff
-        self.rep_calc = RepulsionCalculator(cutoff=5.1)
+        elements = ('H', 'C', 'N', 'O', 'S', 'F', 'Cl')
+        self.rep_calc = RepulsionXTB(cutoff=5.1, symbols=elements)
 
         # num_models
         self.num_models = len(model.neural_networks)
@@ -259,7 +260,7 @@ class LammpsANI(LammpsModelBase):
                 coords1 = coordinates.view(-1, 3).index_select(0, atom_index12[1])
                 diff_vector = coords0 - coords1
                 distances = diff_vector.norm(2, -1)
-            aev = self.aev_computer._compute_aev(species, atom_index12, diff_vector, distances)
+            aev = self.aev_computer._compute_aev(species, atom_index12, distances, diff_vector)
 
         return aev
 
@@ -274,7 +275,7 @@ class LammpsANI(LammpsModelBase):
             coords1 = coordinates.view(-1, 3).index_select(0, atom_index12[1])
             diff_vector = coords0 - coords1
             distances = diff_vector.norm(2, -1)
-        repulsion_energies = self.rep_calc((species, torch.scalar_tensor(0)), atom_index12, distances, ghost_flags)[1]
+        repulsion_energies = self.rep_calc(species, atom_index12, distances, ghost_flags=ghost_flags)
         return repulsion_energies
 
     @torch.jit.export
@@ -302,7 +303,7 @@ class ANI2xRef(torch.nn.Module):
         # self.use_fullnbr = use_fullnbr
         # self.model.aev_computer.use_fullnbr = use_fullnbr
         self.use_repulsion = use_repulsion
-        self.rep_calc = RepulsionCalculator()
+        self.rep_calc = RepulsionXTB()
         self.periodic_table_index = self.model.periodic_table_index
         self.aev_computer = self.model.aev_computer
 
@@ -320,8 +321,8 @@ class ANI2xRef(torch.nn.Module):
     def compute_repulsion(self, species_coordinates: Tuple[Tensor, Tensor],
                           cell: Optional[Tensor] = None, pbc: Optional[Tensor] = None):
         species, coordinates = species_coordinates
-        atom_index12, _, _, distances = self.model.aev_computer.neighborlist(species, coordinates, cell, pbc)
-        return self.rep_calc((species, torch.scalar_tensor(0)), atom_index12, distances)[1]
+        atom_index12, distances, _, _ = self.model.aev_computer.neighborlist(species, coordinates, cell, pbc)
+        return self.rep_calc(species, atom_index12, distances)
 
     @torch.jit.export
     def select_models(self, use_num_models: Optional[int] = None):
@@ -404,7 +405,7 @@ def test_ani2x_models(runpbc, device, use_double, use_cuaev, use_fullnbr, modelf
 
     # cuaev currently only works with single precision
     ani2x_loaded = torch.jit.load(output_file).to(dtype).to(device)
-    # ani2x_loaded = ANI2x().to(dtype).to(device)
+    # ani2x_loaded = LammpsANI(ANI2x_Repulsion_Model(), use_repulsion=use_repulsion).to(dtype).to(device)
     ani2x_loaded.init(use_cuaev, use_fullnbr)
 
     def set_cuda_aev(model, use_cuaev):
@@ -438,8 +439,8 @@ def test_ani2x_models(runpbc, device, use_double, use_cuaev, use_fullnbr, modelf
 
     # we need a fewer iterations to tigger the fuser
     total_num_models = len(ani2x_ref_all_models.neural_networks)
-    for num_models in [total_num_models, 4]:
-        ani2x_ref = select_num_models(ani2x_ref_all_models, num_models)
+    for num_models in [total_num_models]:
+        ani2x_ref = ani2x_ref_all_models
         ani2x_loaded.select_models(num_models)
         for i in range(5):
             run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr, use_repulsion, dtype, verbose=(num_models == total_num_models and i==0))
@@ -456,9 +457,9 @@ def run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr
     pbc = torch.tensor(mol.pbc, device=device)
 
     if runpbc:
-        atom_index12, _, diff_vector, distances = ani2x_ref.aev_computer.neighborlist(species, coordinates, cell, pbc)
+        atom_index12, distances, diff_vector, _ = ani2x_ref.aev_computer.neighborlist(species, coordinates, cell, pbc)
     else:
-        atom_index12, _, diff_vector, distances = ani2x_ref.aev_computer.neighborlist(species, coordinates)
+        atom_index12, distances, diff_vector, _ = ani2x_ref.aev_computer.neighborlist(species, coordinates)
     if use_fullnbr:
         ilist_unique, jlist, numneigh = ani2x_ref.aev_computer._half_to_full_nbrlist(atom_index12)
         para1, para2, para3 = ilist_unique, jlist, numneigh

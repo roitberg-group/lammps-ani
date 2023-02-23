@@ -1,7 +1,10 @@
 import torch
 import ase
+import time
+import pkbar
 import cudf
 import cupy
+import warnings
 import argparse
 import cugraph as cnx
 from ase.io import read
@@ -11,19 +14,21 @@ from torchani.aev.neighbors import _parse_neighborlist
 import matplotlib.pyplot as plt
 
 PERIODIC_TABLE_LENGTH = 118
-
+# TODO pbc
 
 def plot(df, save_to_file=None):
     fig, ax = plt.subplots(figsize=(8, 4), dpi=150)
 
-    df[df["formula"] == "O2"].plot.line(x="frame", y="counts", ax=ax, label="O2")
-    df[df["formula"] == "CH4"].plot.line(x="frame", y="counts", ax=ax, label="CH4")
-    df[df["formula"] == "CO2"].plot.line(x="frame", y="counts", ax=ax, label="CO2")
-    df[df["formula"] == "H2O"].plot.line(x="frame", y="counts", ax=ax, label="H2O")
-    df[df["formula"] == "CO"].plot.line(x="frame", y="counts", ax=ax, label="CO")
-    # df[df["formula"] == "O"].plot.line(x="frame", y="counts", ax=ax, label="O")
+    df[df["formula"] == "O2"].plot.line(x="time", y="counts", ax=ax, label="O2")
+    df[df["formula"] == "CH4"].plot.line(x="time", y="counts", ax=ax, label="CH4")
+    df[df["formula"] == "CO2"].plot.line(x="time", y="counts", ax=ax, label="CO2")
+    df[df["formula"] == "H2O"].plot.line(x="time", y="counts", ax=ax, label="H2O")
+    df[df["formula"] == "CO"].plot.line(x="time", y="counts", ax=ax, label="CO")
+    df[df["formula"] == "H"].plot.line(x="time", y="counts", ax=ax, label="H")
+    df[df["formula"] == "O"].plot.line(x="time", y="counts", ax=ax, label="O")
     plt.legend(loc='best')
     plt.ylabel("molecule counts")
+    plt.xlabel("time (ns)")
     if save_to_file is not None:
         plt.savefig(fname=save_to_file)
     else:
@@ -59,8 +64,11 @@ def atomicpair_to_bond_label(pairs):
     bond_label = pairs[0] * PERIODIC_TABLE_LENGTH + pairs[1]
     return bond_label
 
-def fragment(xyz_file, batch_size):
-    molecules = read(xyz_file, index=":")
+def fragment(traj_file, batch_size, timestep, dump_interval):
+    start = time.time()
+    molecules = read(traj_file, index=":")
+    print(f"finish reading '{traj_file}', total loading time: {time.time() - start:.2f} s")
+
     assert torch.cuda.is_available(), "CUDA is required to run analysis"
     device = "cuda"
 
@@ -74,12 +82,23 @@ def fragment(xyz_file, batch_size):
     cell = torch.tensor(molecules[0].cell, device=device)
     pbc = torch.tensor(molecules[0].pbc, device=device)
 
+    file_type = Path(traj_file).suffix
+    lmpindex_element_dict = {1: 1, 2: 6, 3: 7, 4: 8, 5: 16, 6: 9, 7: 17}
+    if file_type != ".xyz":
+        # We need to convert lammps internal element index into correct species.
+        # Reverse is important, otherwise 2 -> 6 (C), 6 -> 9 (F), which is not what we want.
+        print(f"pbc box is {pbc.tolist()}")
+        for lmpindex, element in reversed(lmpindex_element_dict.items()):
+            mask = (species == lmpindex)
+            species[mask] = element
+
     total_frames = species.shape[0]
     atoms_per_molecule = species.shape[1]
     coordinates = coordinates.split(batch_size)
     species = species.split(batch_size)
     total_batches = len(species)
     print(f"finish reading, total_frames: {total_frames}, total_batches: {total_batches}")
+    pbar = pkbar.Pbar(name='processing fragments', target=total_frames)
 
     all_formula_counts = []
     for i in range(total_batches):
@@ -91,7 +110,7 @@ def fragment(xyz_file, batch_size):
             neighborlist = _parse_neighborlist("full_pairwise", cutoff=2).to(device)
         else:
             neighborlist = _parse_neighborlist("cell_list", cutoff=2).to(device)
-        atom_index12, _, diff_vector, distances = neighborlist(spe, coord)
+        atom_index12, distances, diff_vector, _ = neighborlist(spe, coord, cell=cell, pbc=pbc)
 
         # filter based on bond length
         bond_length_table = get_bond_data_table().to(device)
@@ -137,24 +156,32 @@ def fragment(xyz_file, batch_size):
         formula_counts = df_frame_formula.to_pandas().groupby("frame")["formula"].value_counts().to_frame("counts").reset_index()
         # format formula
         formula_counts["formula"] = formula_counts["formula"].apply(lambda x: ase.formula.Formula(x).format("hill"))
-        print(formula_counts)
+        # print(formula_counts)
+        # print("done")
         all_formula_counts.append(formula_counts)
+        pbar.update(i * batch_size + coord.shape[0] - 1)
+        torch.cuda.synchronize()
 
     all_formula_counts = pd.concat(all_formula_counts)
-    all_formula_counts.to_csv(f"analyze/{Path(xyz_file).stem}.csv")
-    plot(all_formula_counts, f"analyze/{Path(xyz_file).stem}.png")
+    all_formula_counts["time"] = all_formula_counts["frame"] * timestep * dump_interval * 1e-6  # ns
+    all_formula_counts.to_csv(f"analyze/{Path(traj_file).stem}.csv")
+    plot(all_formula_counts, f"analyze/{Path(traj_file).stem}.png")
 
     # breakpoint()
 
 
 if __name__ == "__main__":
-    # xyz_file = "/blue/roitberg/apps/lammps-ani/myexamples/combustion/logs/2023-02-09-231903.xyz"
-    # xyz_file = "/blue/roitberg/apps/lammps-ani/myexamples/combustion/logs/0-old-combustin/combustion-2023-02-09-1239.xyz"
-    # xyz_file = "/blue/roitberg/apps/lammps-ani/myexamples/combustion/logs/methane.xyz"
+    # traj_file = "/blue/roitberg/apps/lammps-ani/myexamples/combustion/logs/2023-02-09-231903.xyz"
+    # traj_file = "/blue/roitberg/apps/lammps-ani/myexamples/combustion/logs/0-old-combustin/combustion-2023-02-09-1239.xyz"
+    # traj_file = "/blue/roitberg/apps/lammps-ani/myexamples/combustion/logs/methane.xyz"
     parser = argparse.ArgumentParser()
-    parser.add_argument('xyz_file', type=str, help="xyz file to be analyzed")
-    parser.add_argument('-b', "--batch_size", type=int, default=100, help="xyz file to be analyzed")
+    parser.add_argument('traj_file', type=str, help="trajectory file to be analyzed")
+    parser.add_argument('-t', '--timestep', type=float, help="timestep used in the simulation (fs)", default=0.5)
+    parser.add_argument('-i', '--dump_interval', type=int, help="how many timesteps it dump once", default=100)
+    parser.add_argument('-b', "--batch_size", type=int, default=100, help="batch size")
     args = parser.parse_args()
 
     print("start")
-    fragment(args.xyz_file, batch_size=args.batch_size)
+    if Path(args.traj_file).suffix == "xyz":
+        warnings.warn("xyz file does not have pbc information, please use nc file instead")
+    fragment(args.traj_file, batch_size=args.batch_size, timestep=args.timestep, dump_interval=args.dump_interval)

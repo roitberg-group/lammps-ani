@@ -2,12 +2,14 @@ import copy
 import torch
 import pytest
 import torchani
+# import ani_engine.utils
 from ase.io import read
 from typing import Tuple, Optional
 from torch import Tensor
 from torchani.nn import SpeciesEnergies
 from torchani.infer import BmmEnsemble2
 from torchani.models import Ensemble
+from torchani.nn import ANIModel
 from torchani.repulsion import RepulsionXTB
 from ani2x_ext.custom_emsemble_ani2x_ext import CustomEnsemble
 
@@ -71,6 +73,14 @@ def ANI2x_Model():
     model = torchani.models.ANI2x(periodic_table_index=True, model_index=None, cell_list=False,
                                   use_cuaev_interface=True, use_cuda_extension=True)
     return model
+
+
+def ANI1x_Zeng():
+    eng = ani_engine.utils.load_engine("/blue/roitberg/apps/lammps-ani/myexamples/combustion/retrain_with_zeng/ani_run/logs/debug/20230301_152446-88lx93lb-robust-darkness-5")
+    neural_networks = eng.model.networks
+    ani1x = torchani.models.ANI1x(periodic_table_index=True, use_cuaev_interface=True, use_cuda_extension=True)
+    ani1x.neural_networks = Ensemble([ANIModel(neural_networks)])
+    return ani1x
 
 
 def ANI2x_Repulsion_Model():
@@ -146,7 +156,10 @@ class LammpsANI(LammpsModelBase):
 
         self.aev_computer = model.aev_computer
         # TODO how to set repulsion cutoff
+        # TODO how to set repulsion elements
+        # TODO how to support general model
         elements = ('H', 'C', 'N', 'O', 'S', 'F', 'Cl')
+        # elements = ('H', 'C', 'N', 'O')
         self.rep_calc = RepulsionXTB(cutoff=5.1, symbols=elements)
 
         # num_models
@@ -341,9 +354,10 @@ class ANI2xRef(torch.nn.Module):
 
 
 all_models = {"ani2x.pt": {"model": ANI2x_Model, "use_repulsion": False},
-              "ani2x_repulsion.pt": {"model": ANI2x_Repulsion_Model, "use_repulsion": True}}
-# TODO Ping's model
-# "ani2x_ext0_repulsion": {"model": ANI2xExt_Model, "use_repulsion": True}
+              "ani2x_repulsion.pt": {"model": ANI2x_Repulsion_Model, "use_repulsion": True},
+            #   "ani1x_zeng.pt": {"model": ANI1x_Zeng, "use_repulsion": True},
+            #   "ani2x_ext0_repulsion": {"model": ANI2xExt_Model, "use_repulsion": True},
+              }
 
 def save_ani2x_model():
     for output_file, info in all_models.items():
@@ -398,13 +412,9 @@ def test_ani2x_models(runpbc, device, use_double, use_cuaev, use_fullnbr, modelf
     # dtype
     dtype = torch.float64 if use_double else torch.float32
     use_repulsion = all_models[modelfile]["use_repulsion"]
-    if use_repulsion:
-        output_file = "ani2x_repulsion.pt"
-    else:
-        output_file = "ani2x.pt"
 
     # cuaev currently only works with single precision
-    ani2x_loaded = torch.jit.load(output_file).to(dtype).to(device)
+    ani2x_loaded = torch.jit.load(modelfile).to(dtype).to(device)
     # ani2x_loaded = LammpsANI(ANI2x_Repulsion_Model(), use_repulsion=use_repulsion).to(dtype).to(device)
     ani2x_loaded.init(use_cuaev, use_fullnbr)
 

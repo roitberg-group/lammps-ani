@@ -24,8 +24,8 @@ def plot(df, save_to_file=None):
     df[df["formula"] == "CO2"].plot.line(x="time", y="counts", ax=ax, label="CO2")
     df[df["formula"] == "H2O"].plot.line(x="time", y="counts", ax=ax, label="H2O")
     df[df["formula"] == "CO"].plot.line(x="time", y="counts", ax=ax, label="CO")
-    df[df["formula"] == "H"].plot.line(x="time", y="counts", ax=ax, label="H")
-    df[df["formula"] == "O"].plot.line(x="time", y="counts", ax=ax, label="O")
+    # df[df["formula"] == "H"].plot.line(x="time", y="counts", ax=ax, label="H")
+    # df[df["formula"] == "O"].plot.line(x="time", y="counts", ax=ax, label="O")
     plt.legend(loc='best')
     plt.ylabel("molecule counts")
     plt.xlabel("time (ns)")
@@ -91,6 +91,9 @@ def fragment(traj_file, batch_size, timestep, dump_interval):
         for lmpindex, element in reversed(lmpindex_element_dict.items()):
             mask = (species == lmpindex)
             species[mask] = element
+    else:
+        cell = None
+        pbc = None
 
     total_frames = species.shape[0]
     atoms_per_molecule = species.shape[1]

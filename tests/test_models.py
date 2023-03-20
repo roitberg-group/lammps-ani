@@ -30,6 +30,8 @@ use_fullnbr_params = [
     pytest.param(False, id="half"),
 ]
 modelfile_params = all_models.keys()
+# remove modelfiles that have unittest as False
+modelfile_params = [modelfile for modelfile in modelfile_params if all_models[modelfile]["unittest"]]
 
 
 # Save all ani2x models by using session-scoped "autouse" fixture, this will run ahead of all tests.

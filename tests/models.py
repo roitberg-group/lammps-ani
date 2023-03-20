@@ -61,23 +61,25 @@ def ANI2x_Repulsion_Model():
     return model
 
 
-# class ANI2xExt_Model(CustomEnsemble):
-#     """
-#     ani_ext model with repulsion, smooth cutoff, GELU, No Bias, GSAE
-#     """
-#     def __init__(self, *args, **kwargs):
-#         super().__init__(*args, **kwargs)
-#         self.aev_computer = torchani.AEVComputer.like_2x(cutoff_fn="smooth", use_cuda_extension=True, use_cuaev_interface=True)
-#         self.neural_networks = self.models
+class ANI2xExt_Model(CustomEnsemble):
+    """
+    ani_ext model with repulsion, smooth cutoff, GELU, No Bias, GSAE
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.aev_computer = torchani.AEVComputer.like_2x(cutoff_fn="smooth", use_cuda_extension=True, use_cuaev_interface=True)
+        self.neural_networks = self.models
+        self.species_converter = self.number2tensor
 
-#     def forward(self):
-#         pass
+    def forward(self):
+        raise RuntimeError("forward is not suppported")
 
 
-all_models = {"ani2x.pt": {"model": ANI2x_Model, "use_repulsion": False},
-              "ani2x_repulsion.pt": {"model": ANI2x_Repulsion_Model, "use_repulsion": True},
-            #   "ani1x_zeng.pt": {"model": ANI1x_Zeng, "use_repulsion": True},
-            #   "ani2x_ext0_repulsion": {"model": ANI2xExt_Model, "use_repulsion": True},
+all_models = {"ani2x.pt": {"model": ANI2x_Model, "use_repulsion": False, "unittest": True},
+              "ani2x_repulsion.pt": {"model": ANI2x_Repulsion_Model, "use_repulsion": True, "unittest": True},
+              # Because ani2x_ext uses public torchani that has legacy aev code, we cannot run unittest for it.
+              "ani2x_ext0_repulsion.pt": {"model": ANI2xExt_Model, "use_repulsion": True, "unittest": False},
+              # "ani1x_zeng.pt": {"model": ANI1x_Zeng, "use_repulsion": True},
               }
 
 

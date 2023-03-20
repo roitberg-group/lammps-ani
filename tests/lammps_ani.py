@@ -1,24 +1,18 @@
-import copy
 import torch
-import pytest
 import torchani
-# import ani_engine.utils
-from ase.io import read
 from typing import Tuple, Optional
 from torch import Tensor
 from torchani.nn import SpeciesEnergies
 from torchani.infer import BmmEnsemble2
 from torchani.models import Ensemble
-from torchani.nn import ANIModel
 from torchani.repulsion import RepulsionXTB
-from ani2x_ext.custom_emsemble_ani2x_ext import CustomEnsemble
 
+# disable tensorfloat32
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
-hartree2kcalmol = 627.5094738898777
 
-# NVFuser has bug
-# torch._C._jit_set_nvfuser_enabled(False)
+# nvfuser and graph optimization are disabled
+torch._C._jit_set_nvfuser_enabled(False)
 torch._C._get_graph_executor_optimize(False)
 
 
@@ -65,78 +59,6 @@ class LammpsModelBase(torch.nn.Module):
             use_num_models (Optional[int]): Defaults to None.
         """
         pass
-
-
-########################################################################################
-
-def ANI2x_Model():
-    model = torchani.models.ANI2x(periodic_table_index=True, model_index=None, cell_list=False,
-                                  use_cuaev_interface=True, use_cuda_extension=True)
-    return model
-
-
-def ANI1x_Zeng():
-    eng = ani_engine.utils.load_engine("/blue/roitberg/apps/lammps-ani/myexamples/combustion/retrain_with_zeng/ani_run/logs/debug/20230301_152446-88lx93lb-robust-darkness-5")
-    neural_networks = eng.model.networks
-    ani1x = torchani.models.ANI1x(periodic_table_index=True, use_cuaev_interface=True, use_cuda_extension=True)
-    ani1x.neural_networks = Ensemble([ANIModel(neural_networks)])
-    return ani1x
-
-
-def ANI2x_Repulsion_Model():
-    elements = ('H', 'C', 'N', 'O', 'S', 'F', 'Cl')
-    def dispersion_atomics(atom: str = 'H'):
-        dims_for_atoms = {'H': (1008, 256, 192, 160),
-                          'C': (1008, 256, 192, 160),
-                          'N': (1008, 192, 160, 128),
-                          'O': (1008, 192, 160, 128),
-                          'S': (1008, 160, 128, 96),
-                          'F': (1008, 160, 128, 96),
-                          'Cl': (1008, 160, 128, 96)}
-        return torchani.atomics.standard(dims_for_atoms[atom], activation=torch.nn.GELU(), bias=False)
-    model = torchani.models.ANI2x(pretrained=False,
-                  cutoff_fn='smooth',
-                  atomic_maker=dispersion_atomics,
-                  ensemble_size=7,
-                  repulsion=True,
-                  repulsion_kwargs={'symbols': elements,
-                                    'cutoff': 5.1,
-                                    'cutoff_fn': torchani.aev.cutoffs.CutoffSmooth(order=2)},
-                                    periodic_table_index=True, model_index=None, cell_list=False,
-                                    use_cuaev_interface=True, use_cuda_extension=True
-                  )
-    state_dict = torchani.models._fetch_state_dict('anid_state_dict_mod.pt', private=True)
-    for key in state_dict.copy().keys():
-        if key.startswith("potentials.0"):
-            state_dict.pop(key)
-    for key in state_dict.copy().keys():
-        if key.startswith("potentials.1"):
-            new_key = key.replace("potentials.1", "potentials.0")
-            state_dict[new_key] = state_dict[key]
-            state_dict.pop(key)
-    for key in state_dict.copy().keys():
-        if key.startswith("potentials.2"):
-            new_key = key.replace("potentials.2", "potentials.1")
-            state_dict[new_key] = state_dict[key]
-            state_dict.pop(key)
-
-    model.load_state_dict(state_dict)
-    return model
-
-
-# class ANI2xExt_Model(CustomEnsemble):
-#     """
-#     ani_ext model with repulsion, smooth cutoff, GELU, No Bias, GSAE
-#     """
-#     def __init__(self, *args, **kwargs):
-#         super().__init__(*args, **kwargs)
-#         self.aev_computer = torchani.AEVComputer.like_2x(cutoff_fn="smooth", use_cuda_extension=True, use_cuaev_interface=True)
-#         self.neural_networks = self.models
-
-#     def forward(self):
-#         pass
-
-########################################################################################
 
 
 class LammpsANI(LammpsModelBase):
@@ -352,177 +274,3 @@ class ANI2xRef(torch.nn.Module):
         else:
             raise RuntimeError("select_models method only works for BmmEnsemble2 or Ensemble neural networks")
 
-
-all_models = {"ani2x.pt": {"model": ANI2x_Model, "use_repulsion": False},
-              "ani2x_repulsion.pt": {"model": ANI2x_Repulsion_Model, "use_repulsion": True},
-            #   "ani1x_zeng.pt": {"model": ANI1x_Zeng, "use_repulsion": True},
-            #   "ani2x_ext0_repulsion": {"model": ANI2xExt_Model, "use_repulsion": True},
-              }
-
-def save_ani2x_model():
-    for output_file, info in all_models.items():
-        ani2x = LammpsANI(info["model"](), use_repulsion=info["use_repulsion"])
-        script_module = torch.jit.script(ani2x)
-        script_module.save(output_file)
-
-
-# Save all ani2x models by using session-scoped "autouse" fixture, this will run ahead of all tests.
-@pytest.fixture(scope='session', autouse=True)
-def session_start():
-    print('Pytest session started, saving all models')
-    save_ani2x_model()
-
-runpbc_params = [
-    pytest.param(True, id="pbc_true"),
-    pytest.param(False, id="pbc_false"),
-]
-device_params = [
-    pytest.param("cuda", id="cuda"),
-    pytest.param("cpu", id="cpu"),
-]
-use_double_params = [
-    pytest.param(True, id="double"),
-    pytest.param(False, id="single"),
-]
-use_cuaev_params = [
-    pytest.param(True, id="cuaev"),
-    pytest.param(False, id="nocuaev"),
-]
-use_fullnbr_params = [
-    pytest.param(True, id="full"),
-    pytest.param(False, id="half"),
-]
-modelfile_params = all_models.keys()
-
-@pytest.mark.parametrize("runpbc", runpbc_params)
-@pytest.mark.parametrize("device", device_params)
-@pytest.mark.parametrize("use_double", use_double_params)
-@pytest.mark.parametrize("use_cuaev", use_cuaev_params)
-@pytest.mark.parametrize("use_fullnbr", use_fullnbr_params)
-@pytest.mark.parametrize("modelfile", modelfile_params)
-def test_ani2x_models(runpbc, device, use_double, use_cuaev, use_fullnbr, modelfile):
-    # when pbc is on, full nbrlist converted from half nbrlist is not correct
-    if use_fullnbr and runpbc:
-        pytest.skip("Does not support full neighbor list using pyaev when pbc is on")
-    if use_cuaev and device == 'cpu':
-        pytest.skip("Cuaev does not support CPU")
-    if device == 'cuda' and (not torch.cuda.is_available()):
-        pytest.skip("GPU is not available")
-
-    # dtype
-    dtype = torch.float64 if use_double else torch.float32
-    use_repulsion = all_models[modelfile]["use_repulsion"]
-
-    # cuaev currently only works with single precision
-    ani2x_loaded = torch.jit.load(modelfile).to(dtype).to(device)
-    # ani2x_loaded = LammpsANI(ANI2x_Repulsion_Model(), use_repulsion=use_repulsion).to(dtype).to(device)
-    ani2x_loaded.init(use_cuaev, use_fullnbr)
-
-    def set_cuda_aev(model, use_cuaev):
-        model.aev_computer.use_cuaev_interface = use_cuaev
-        model.aev_computer.use_cuda_extension = use_cuaev
-        return model
-
-    def select_num_models(model, use_num_models):
-        newmodel = copy.deepcopy(model)
-        # BuiltinModelPairInteractions needs to change AEVPotential.neural_networks
-        if isinstance(model, torchani.models.BuiltinModelPairInteractions):
-            assert isinstance(model.neural_networks, torch.nn.ModuleList)
-            assert use_num_models <= len(model.neural_networks)
-            newmodel.neural_networks = Ensemble(newmodel.neural_networks[:use_num_models])
-            for i, pot in enumerate(model.potentials):
-                if isinstance(pot, torchani.models.AEVPotential):
-                    nn = newmodel.potentials[i].neural_networks
-                    assert isinstance(nn, torch.nn.ModuleList)
-                    assert use_num_models <= len(nn)
-                    newmodel.potentials[i].neural_networks = Ensemble(nn[:use_num_models])
-        elif isinstance(model, torchani.models.BuiltinModel):
-            assert isinstance(model.neural_networks, torch.nn.ModuleList)
-            assert use_num_models <= len(model.neural_networks)
-            newmodel.neural_networks = Ensemble(newmodel.neural_networks[:use_num_models])
-        return newmodel
-
-    ani2x_ref_all_models = all_models[modelfile]["model"]().to(dtype).to(device)
-    ani2x_ref_all_models = set_cuda_aev(ani2x_ref_all_models, use_cuaev)
-
-    # ani2x_ref = ANI2xRef(use_cuaev, use_repulsion).to(dtype).to(device)
-
-    # we need a fewer iterations to tigger the fuser
-    total_num_models = len(ani2x_ref_all_models.neural_networks)
-    for num_models in [total_num_models]:
-        ani2x_ref = ani2x_ref_all_models
-        ani2x_loaded.select_models(num_models)
-        for i in range(5):
-            run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr, use_repulsion, dtype, verbose=(num_models == total_num_models and i==0))
-
-
-def run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr, use_repulsion, dtype, verbose=False):
-    input_file = "water-0.8nm.pdb"
-    mol = read(input_file)
-
-    species_periodic_table = torch.tensor(mol.get_atomic_numbers(), device=device).unsqueeze(0)
-    coordinates = torch.tensor(mol.get_positions(), dtype=dtype, requires_grad=True, device=device).unsqueeze(0)
-    species, coordinates = ani2x_ref.species_converter((species_periodic_table, coordinates))
-    cell = torch.tensor(mol.cell.array, device=device, dtype=dtype)
-    pbc = torch.tensor(mol.pbc, device=device)
-
-    if runpbc:
-        atom_index12, distances, diff_vector, _ = ani2x_ref.aev_computer.neighborlist(species, coordinates, cell, pbc)
-    else:
-        atom_index12, distances, diff_vector, _ = ani2x_ref.aev_computer.neighborlist(species, coordinates)
-    if use_fullnbr:
-        ilist_unique, jlist, numneigh = ani2x_ref.aev_computer._half_to_full_nbrlist(atom_index12)
-        para1, para2, para3 = ilist_unique, jlist, numneigh
-    else:
-        para1, para2, para3 = atom_index12, diff_vector, distances
-    species_ghost_as_padding = species.detach().clone()
-    torch.set_printoptions(profile="full")
-
-    torch.set_printoptions(precision=13)
-    energy, force, _ = ani2x_loaded(species, coordinates, para1, para2, para3, species_ghost_as_padding, atomic=False)
-
-    # test forward_atomic API
-    energy_, force_, atomic_energies = ani2x_loaded(species, coordinates, para1, para2, para3, species_ghost_as_padding, atomic=True)
-
-    energy, force = energy * hartree2kcalmol, force * hartree2kcalmol
-    energy_, atomic_energies, force_ = energy_ * hartree2kcalmol, atomic_energies * hartree2kcalmol, force_ * hartree2kcalmol
-
-    if verbose:
-        print(distances.shape)
-        print("atomic force max err: ".ljust(15), (force - force_).abs().max().item())
-        print(f"{'energy:'.ljust(15)} shape: {energy.shape}, value: {energy.item()}, dtype: {energy.dtype}, unit: (kcal/mol)")
-        print(f"{'force:'.ljust(15)} shape: {force.shape}, dtype: {force.dtype}, unit: (kcal/mol/A)")
-
-    use_double = dtype == torch.float64
-    threshold = 1e-13 if use_double else 1e-4
-
-    assert torch.allclose(energy, energy_, atol=threshold), f"error {(energy - energy_).abs().max()}"
-    assert torch.allclose(force, force_, atol=threshold), f"error {(force - force_).abs().max()}"
-    if not use_repulsion:
-        assert torch.allclose(energy, atomic_energies.sum(dim=-1), atol=threshold), f"error {(energy - atomic_energies.sum(dim=-1)).abs().max()}"
-
-    # for test_model inputs
-    # print(coordinates.flatten())
-    # print(species.flatten())
-    # print(atom_index12.flatten())
-    # print(force.flatten())
-
-    if runpbc:
-        _, energy_ref = ani2x_ref((species_periodic_table, coordinates), cell, pbc)
-    else:
-        _, energy_ref = ani2x_ref((species_periodic_table, coordinates))
-    force_ref = -torch.autograd.grad(energy_ref.sum(), coordinates, create_graph=True, retain_graph=True)[0]
-    energy_ref, force_ref = energy_ref * hartree2kcalmol, force_ref * hartree2kcalmol
-
-    energy_err = (energy_ref.cpu() - energy.cpu()).abs().max()
-    force_err = (force_ref.cpu() - force.cpu()).abs().max()
-
-    if verbose:
-        print(f"{'energy_ref:'.ljust(15)} shape: {energy_ref.shape}, value: {energy_ref.item()}, dtype: {energy_ref.dtype}, unit: (kcal/mol)")
-        print(f"{'force_ref:'.ljust(15)} shape: {force_ref.shape}, dtype: {force_ref.dtype}, unit: (kcal/mol/A)")
-        print("energy max err: ".ljust(15), energy_err.item())
-        print("force  max err: ".ljust(15), force_err.item())
-
-    # print(f"error {(energy - energy_ref).abs().max()}")
-    assert torch.allclose(energy, energy_ref), f"error {(energy - energy_ref).abs().max()}"
-    assert torch.allclose(force, force_ref, atol=threshold), f"error {(force - force_ref).abs().max()}"

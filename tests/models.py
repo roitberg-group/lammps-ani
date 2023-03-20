@@ -82,7 +82,7 @@ all_models = {"ani2x.pt": {"model": ANI2x_Model, "use_repulsion": False},
 
 
 # TODO rename this function name
-def save_ani2x_model():
+def save_models():
     for output_file, info in all_models.items():
         ani2x = LammpsANI(info["model"](), use_repulsion=info["use_repulsion"])
         script_module = torch.jit.script(ani2x)

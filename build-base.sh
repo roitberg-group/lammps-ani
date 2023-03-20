@@ -17,7 +17,7 @@ cd ../../
 
 # save model
 cd tests/
-pytest save_ani.py -s -v
+pytest test_models.py -s -v
 cd ../
 
 # build kokkos

@@ -4,7 +4,7 @@ import pytest
 import torchani
 from ase.io import read
 from torchani.models import Ensemble
-from .models import all_models, save_ani2x_model
+from .models import all_models, save_models
 
 hartree2kcalmol = torchani.units.hartree2kcalmol(1)
 
@@ -36,7 +36,7 @@ modelfile_params = all_models.keys()
 @pytest.fixture(scope='session', autouse=True)
 def session_start():
     print('Pytest session started, saving all models')
-    save_ani2x_model()
+    save_models()
 
 # test all models
 @pytest.mark.parametrize("runpbc", runpbc_params)

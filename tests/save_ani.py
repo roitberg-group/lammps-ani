@@ -463,7 +463,7 @@ def run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr
     species_periodic_table = torch.tensor(mol.get_atomic_numbers(), device=device).unsqueeze(0)
     coordinates = torch.tensor(mol.get_positions(), dtype=dtype, requires_grad=True, device=device).unsqueeze(0)
     species, coordinates = ani2x_ref.species_converter((species_periodic_table, coordinates))
-    cell = torch.tensor(mol.cell, device=device, dtype=dtype)
+    cell = torch.tensor(mol.cell.array, device=device, dtype=dtype)
     pbc = torch.tensor(mol.pbc, device=device)
 
     if runpbc:

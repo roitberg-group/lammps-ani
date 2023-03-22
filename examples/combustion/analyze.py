@@ -174,9 +174,6 @@ def fragment(traj_file, batch_size, timestep, dump_interval):
 
 
 if __name__ == "__main__":
-    # traj_file = "/blue/roitberg/apps/lammps-ani/myexamples/combustion/logs/2023-02-09-231903.xyz"
-    # traj_file = "/blue/roitberg/apps/lammps-ani/myexamples/combustion/logs/0-old-combustin/combustion-2023-02-09-1239.xyz"
-    # traj_file = "/blue/roitberg/apps/lammps-ani/myexamples/combustion/logs/methane.xyz"
     parser = argparse.ArgumentParser()
     parser.add_argument('traj_file', type=str, help="trajectory file to be analyzed")
     parser.add_argument('-t', '--timestep', type=float, help="timestep used in the simulation (fs)", default=0.5)

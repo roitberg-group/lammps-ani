@@ -65,12 +65,12 @@ def test_models(runpbc, device, use_double, use_cuaev, use_fullnbr, modelfile):
     # model_loaded = LammpsANI(model_Repulsion_Model(), use_repulsion=use_repulsion).to(dtype).to(device)
     model_loaded.init(use_cuaev, use_fullnbr)
 
-    def set_cuda_aev(model, use_cuaev):
+    def set_ref_cuda_aev(model, use_cuaev):
         model.aev_computer.use_cuaev_interface = use_cuaev
         model.aev_computer.use_cuda_extension = use_cuaev
         return model
 
-    def select_num_models(model, use_num_models):
+    def select_ref_num_models(model, use_num_models):
         newmodel = copy.deepcopy(model)
         # BuiltinModelPairInteractions needs to change AEVPotential.neural_networks
         if isinstance(model, torchani.models.BuiltinModelPairInteractions):
@@ -90,15 +90,16 @@ def test_models(runpbc, device, use_double, use_cuaev, use_fullnbr, modelfile):
         return newmodel
 
     model_ref_all_models = all_models[modelfile]["model"]().to(dtype).to(device)
-    model_ref_all_models = set_cuda_aev(model_ref_all_models, use_cuaev)
+    model_ref_all_models = set_ref_cuda_aev(model_ref_all_models, use_cuaev)
 
     # we need a fewer iterations to tigger the fuser
     total_num_models = len(model_ref_all_models.neural_networks)
-    for num_models in [total_num_models]:
-        model_ref = model_ref_all_models
+    for num_models in [4, total_num_models]:
+        print(f"test num_models == {num_models}")
+        model_ref = select_ref_num_models(model_ref_all_models, num_models)
         model_loaded.select_models(num_models)
         for i in range(5):
-            run_one_test(model_ref, model_loaded, device, runpbc, use_cuaev, use_fullnbr, use_repulsion, dtype, verbose=(num_models == total_num_models and i==0))
+            run_one_test(model_ref, model_loaded, device, runpbc, use_cuaev, use_fullnbr, use_repulsion, dtype, verbose=(i==0))
 
 
 def run_one_test(model_ref, model_loaded, device, runpbc, use_cuaev, use_fullnbr, use_repulsion, dtype, verbose=False):

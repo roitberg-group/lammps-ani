@@ -1,6 +1,7 @@
 import torch
 import torchani
 import os
+import ase
 import pytest
 import yaml
 import subprocess
@@ -35,7 +36,7 @@ class LammpsRunner():
 
 
 class AseRunner():
-    def __init__(self, input_file: str, calculator, pbc: bool = False):
+    def __init__(self, input_file: str, calculator: ase.calculators.calculator.Calculator, pbc: bool = False):
         atoms = read(input_file)
 
         print(len(atoms), "atoms in the cell")
@@ -191,15 +192,15 @@ def test_lmp_with_ase(
     lmprunner = LammpsRunner(LAMMPS_PATH, "in.lammps", var_dict, kokkos, num_tasks)
     lmp_dump = lmprunner.run()
 
-    # setup ase calculator
-    def set_cuda_aev(model, use_cuaev):
+    def set_ref_cuda_aev(model, use_cuaev):
         model.aev_computer.use_cuaev_interface = use_cuaev
         model.aev_computer.use_cuda_extension = use_cuaev
         return model
 
+    # setup ase calculator
     # use_repulsion = all_models[modelfile]["use_repulsion"]
     ref_model = all_models[modelfile]["model"]()
-    ref_model = set_cuda_aev(ref_model, use_cuaev)
+    ref_model = set_ref_cuda_aev(ref_model, use_cuaev)
     # When using half nbrlist, we have to set the cutoff as 7.1 to match lammps nbr cutoff.
     # When using full nbrlist with nocuaev, it is actually still using half_nbr, we also need 7.1 cutoff.
     # Full nbrlist still uses 5.1, which is fine.

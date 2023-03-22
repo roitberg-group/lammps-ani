@@ -65,7 +65,7 @@ jobs:
       - name: Test
         env:
           TEST_WITH_MULTI_PROCS: true
-        run: docker run --gpus all ${{ steps.meta.outputs.tags }} bash -c "nvidia-smi && cd /lammps-ani/tests/ && pytest save_ani.py -s -v && ./test_all.sh && TEST_WITH_MULTI_PROCS=true pytest test_lmp_with_ase.py -s -v"
+        run: docker run --gpus all ${{ steps.meta.outputs.tags }} bash -c "nvidia-smi && cd /lammps-ani/tests/ && pytest test_models.py -s -v && ./test_all.sh && TEST_WITH_MULTI_PROCS=true pytest test_lmp_with_ase.py -s -v"
 
       - name: Remove image
         if: ${{ always() }}

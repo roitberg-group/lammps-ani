@@ -69,11 +69,8 @@ ANI::ANI(const std::string& model_file, int local_rank, int use_num_models, bool
     // select models
     model.get_method("select_models")(select_models_inputs);
 
-    // TODO we need to disable nvfuser
-    // TORCH_CHECK(model.hasattr("nvfuser_enabled"), "nvfuser_enabled (bool) is not found in your model");
-    // bool nvfuser_enabled = model.attr("nvfuser_enabled").toBool();
-    // std::cout << "nvfuser_enabled: " << nvfuser_enabled << std::endl;
-    // torch::jit::fuser::cuda::setEnabled(nvfuser_enabled);
+    // nvfuser and graph optimization are disabled
+    // torch::jit::fuser::cuda::setEnabled(false);
     torch::jit::setGraphExecutorOptimize(false);
 
     std::cout << "Successfully loaded the model \nfile: '" << model_file << "' \ndevice: " << device << " \ndtype: " << dtype

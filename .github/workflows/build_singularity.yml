@@ -20,7 +20,7 @@ jobs:
     - name: Build Singularity Image
       run: rm -rf ../lammps-ani.sif && singularity build --nv --fakeroot -B $PWD:/tmp/host_pwd ../lammps-ani.sif Singularity.def
     - name: Test
-      run: singularity exec --cleanenv -H $PWD:/home --pwd /home --nv ../lammps-ani.sif /bin/bash -c "nvidia-smi && cd external/torchani_sandbox && python setup.py install --ext --user && cd ../../ && cd tests/ && pytest save_ani.py -s -v && ./test_all.sh"
+      run: singularity exec --cleanenv -H $PWD:/home --pwd /home --nv ../lammps-ani.sif /bin/bash -c "nvidia-smi && cd external/torchani_sandbox && python setup.py install --ext --user && cd ../../ && cd tests/ && pytest test_models.py -s -v && ./test_all.sh"
 
 concurrency:
   group: build_singularity-${{ github.event.pull_request.number || github.sha }}

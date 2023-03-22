@@ -28,8 +28,16 @@ class LammpsModelBase(torch.nn.Module):
         raise NotImplementedError
 
     @torch.jit.export
-    def forward(self, species: Tensor, coordinates: Tensor, para1: Tensor, para2: Tensor, para3: Tensor,
-                species_ghost_as_padding: Tensor, atomic: bool = False):
+    def forward(
+        self,
+        species: Tensor,
+        coordinates: Tensor,
+        para1: Tensor,
+        para2: Tensor,
+        para3: Tensor,
+        species_ghost_as_padding: Tensor,
+        atomic: bool = False,
+    ):
         """
         The forward function will be called by the lammps interfact with necessary inputs, and it
         should return 3 tensors: total_energy, atomic_forces, atomic_energies. The atomic_energies could
@@ -66,11 +74,17 @@ class LammpsANI(LammpsModelBase):
         super().__init__()
 
         # make sure the model has correct attributes
-        assert hasattr(model, 'aev_computer'), "No aev_computer found in the model."
-        assert hasattr(model, 'neural_networks'), "No neural_networks found in the model."
-        assert isinstance(model.neural_networks, Ensemble) or isinstance(model.neural_networks, torch.nn.ModuleList)
-        assert hasattr(model, 'energy_shifter'), "No energy_shifter found in the model."
-        assert hasattr(model, 'rep_calc'), "No rep_calc is found in your model. Please set model.rep_calc = None if you don't need to calculate repulsion energy."
+        assert hasattr(model, "aev_computer"), "No aev_computer found in the model."
+        assert hasattr(
+            model, "neural_networks"
+        ), "No neural_networks found in the model."
+        assert isinstance(model.neural_networks, Ensemble) or isinstance(
+            model.neural_networks, torch.nn.ModuleList
+        )
+        assert hasattr(model, "energy_shifter"), "No energy_shifter found in the model."
+        assert hasattr(
+            model, "rep_calc"
+        ), "No rep_calc is found in your model. Please set model.rep_calc = None if you don't need to calculate repulsion energy."
         assert isinstance(model.rep_calc, RepulsionXTB) or model.rep_calc is None
 
         # setup model
@@ -111,9 +125,19 @@ class LammpsANI(LammpsModelBase):
         self.initialized = True
 
     @torch.jit.export
-    def forward(self, species: Tensor, coordinates: Tensor, para1: Tensor, para2: Tensor, para3: Tensor,
-                species_ghost_as_padding: Tensor, atomic: bool=False):
-        assert self.initialized, "Model is not initialized, You need to call init() method before forward function"
+    def forward(
+        self,
+        species: Tensor,
+        coordinates: Tensor,
+        para1: Tensor,
+        para2: Tensor,
+        para3: Tensor,
+        species_ghost_as_padding: Tensor,
+        atomic: bool = False,
+    ):
+        assert (
+            self.initialized
+        ), "Model is not initialized, You need to call init() method before forward function"
 
         if self.use_cuaev and not self.aev_computer.cuaev_is_initialized:
             self.aev_computer._init_cuaev_computer()
@@ -125,19 +149,27 @@ class LammpsANI(LammpsModelBase):
         torch.ops.mnp.nvtx_range_pop()
 
         if atomic:
-            energies, atomic_energies = self.forward_atomic(species, coordinates, species_ghost_as_padding, aev)
+            energies, atomic_energies = self.forward_atomic(
+                species, coordinates, species_ghost_as_padding, aev
+            )
         else:
-            energies, atomic_energies = self.forward_total(species, coordinates, species_ghost_as_padding, aev)
+            energies, atomic_energies = self.forward_total(
+                species, coordinates, species_ghost_as_padding, aev
+            )
 
         if self.use_repulsion:
             torch.ops.mnp.nvtx_range_push("Repulsion forward")
-            ghost_flags = (species_ghost_as_padding == -1)
-            rep_energies = self.compute_repulsion(species, coordinates, para1, para2, para3, ghost_flags)
+            ghost_flags = species_ghost_as_padding == -1
+            rep_energies = self.compute_repulsion(
+                species, coordinates, para1, para2, para3, ghost_flags
+            )
             energies += rep_energies
             torch.ops.mnp.nvtx_range_pop()
 
         torch.ops.mnp.nvtx_range_push("Force")
-        force = torch.autograd.grad([energies.sum()], [coordinates], create_graph=True, retain_graph=True)[0]
+        force = torch.autograd.grad(
+            [energies.sum()], [coordinates], create_graph=True, retain_graph=True
+        )[0]
         assert force is not None
         force = -force
         torch.ops.mnp.nvtx_range_pop()
@@ -145,7 +177,13 @@ class LammpsANI(LammpsModelBase):
         return energies, force, atomic_energies
 
     @torch.jit.export
-    def forward_total(self, species: Tensor, coordinates: Tensor, species_ghost_as_padding: Tensor, aev: Tensor):
+    def forward_total(
+        self,
+        species: Tensor,
+        coordinates: Tensor,
+        species_ghost_as_padding: Tensor,
+        aev: Tensor,
+    ):
         # run neural networks
         torch.ops.mnp.nvtx_range_push(f"NN ({self.use_num_models}) forward")
         species_energies = self.neural_networks((species_ghost_as_padding, aev))
@@ -157,14 +195,22 @@ class LammpsANI(LammpsModelBase):
         return energies, torch.empty(0)
 
     @torch.jit.export
-    def forward_atomic(self, species: Tensor, coordinates: Tensor, species_ghost_as_padding: Tensor, aev: Tensor):
+    def forward_atomic(
+        self,
+        species: Tensor,
+        coordinates: Tensor,
+        species_ghost_as_padding: Tensor,
+        aev: Tensor,
+    ):
         ntotal = species.shape[1]
         nghost = (species_ghost_as_padding == -1).flatten().sum()
         nlocal = ntotal - nghost
 
         # run neural networks
         torch.ops.mnp.nvtx_range_push("NN ({self.use_num_models}) forward_atomic")
-        atomic_energies = self.neural_networks._atomic_energies((species_ghost_as_padding, aev))
+        atomic_energies = self.neural_networks._atomic_energies(
+            (species_ghost_as_padding, aev)
+        )
         atomic_energies += self.energy_shifter._atomic_saes(species_ghost_as_padding)
         # when using ANI ensemble (not batchmm), atomic_energies shape is [models, C, A]
         if len(atomic_energies.shape) > 2:
@@ -175,44 +221,77 @@ class LammpsANI(LammpsModelBase):
         return energies, atomic_energies[:, :nlocal]
 
     @torch.jit.export
-    def compute_aev(self, species: Tensor, coordinates: Tensor, para1: Tensor, para2: Tensor, para3: Tensor):
+    def compute_aev(
+        self,
+        species: Tensor,
+        coordinates: Tensor,
+        para1: Tensor,
+        para2: Tensor,
+        para3: Tensor,
+    ):
         atom_index12, diff_vector, distances = para1, para2, para3
         ilist_unique, jlist, numneigh = para1, para2, para3
         # compute aev
-        assert species.shape[0] == 1, "Currently only support inference for single molecule"
+        assert (
+            species.shape[0] == 1
+        ), "Currently only support inference for single molecule"
         if self.use_cuaev:
             if self.use_fullnbr:
-                aev = self.aev_computer._compute_cuaev_with_full_nbrlist(species, coordinates, ilist_unique, jlist, numneigh)
+                aev = self.aev_computer._compute_cuaev_with_full_nbrlist(
+                    species, coordinates, ilist_unique, jlist, numneigh
+                )
             else:
-                aev = self.aev_computer._compute_cuaev_with_half_nbrlist(species, coordinates, atom_index12, diff_vector, distances)
+                aev = self.aev_computer._compute_cuaev_with_half_nbrlist(
+                    species, coordinates, atom_index12, diff_vector, distances
+                )
             assert aev is not None
         else:
             # diff_vector, distances from lammps are always in double,
             # we need to convert it to single precision if needed
             if self.use_fullnbr:
-                atom_index12 = self.aev_computer._full_to_half_nbrlist(ilist_unique, jlist, numneigh, species)
+                atom_index12 = self.aev_computer._full_to_half_nbrlist(
+                    ilist_unique, jlist, numneigh, species
+                )
                 # print(f"{atom_index12.device}, max_neighbor_index {atom_index12.max().item()}, num_atoms {coordinates.shape[1]}")
-                assert atom_index12.max() < coordinates.shape[1], f"neighbor {atom_index12.max().item()} larger than num_atoms {coordinates.shape[1]}"
+                assert (
+                    atom_index12.max() < coordinates.shape[1]
+                ), f"neighbor {atom_index12.max().item()} larger than num_atoms {coordinates.shape[1]}"
                 coords0 = coordinates.view(-1, 3).index_select(0, atom_index12[0])
                 coords1 = coordinates.view(-1, 3).index_select(0, atom_index12[1])
                 diff_vector = coords0 - coords1
                 distances = diff_vector.norm(2, -1)
-            aev = self.aev_computer._compute_aev(species, atom_index12, distances, diff_vector)
+            aev = self.aev_computer._compute_aev(
+                species, atom_index12, distances, diff_vector
+            )
 
         return aev
 
     @torch.jit.export
-    def compute_repulsion(self, species: Tensor, coordinates: Tensor, para1: Tensor, para2: Tensor, para3: Tensor, ghost_flags: Tensor):
+    def compute_repulsion(
+        self,
+        species: Tensor,
+        coordinates: Tensor,
+        para1: Tensor,
+        para2: Tensor,
+        para3: Tensor,
+        ghost_flags: Tensor,
+    ):
         atom_index12, diff_vector, distances = para1, para2, para3
         ilist_unique, jlist, numneigh = para1, para2, para3
         if self.use_fullnbr:
-            atom_index12 = self.aev_computer._full_to_half_nbrlist(ilist_unique, jlist, numneigh, species)
-            assert atom_index12.max() < coordinates.shape[1], f"neighbor {atom_index12.max().item()} larger than num_atoms {coordinates.shape[1]}"
+            atom_index12 = self.aev_computer._full_to_half_nbrlist(
+                ilist_unique, jlist, numneigh, species
+            )
+            assert (
+                atom_index12.max() < coordinates.shape[1]
+            ), f"neighbor {atom_index12.max().item()} larger than num_atoms {coordinates.shape[1]}"
             coords0 = coordinates.view(-1, 3).index_select(0, atom_index12[0])
             coords1 = coordinates.view(-1, 3).index_select(0, atom_index12[1])
             diff_vector = coords0 - coords1
             distances = diff_vector.norm(2, -1)
-        repulsion_energies = self.rep_calc(species, atom_index12, distances, ghost_flags=ghost_flags)
+        repulsion_energies = self.rep_calc(
+            species, atom_index12, distances, ghost_flags=ghost_flags
+        )
         return repulsion_energies
 
     @torch.jit.export

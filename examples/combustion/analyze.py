@@ -14,7 +14,7 @@ from torchani.aev.neighbors import _parse_neighborlist
 import matplotlib.pyplot as plt
 
 PERIODIC_TABLE_LENGTH = 118
-# TODO pbc
+
 
 def plot(df, save_to_file=None):
     fig, ax = plt.subplots(figsize=(8, 4), dpi=150)
@@ -26,7 +26,7 @@ def plot(df, save_to_file=None):
     df[df["formula"] == "CO"].plot.line(x="time", y="counts", ax=ax, label="CO")
     # df[df["formula"] == "H"].plot.line(x="time", y="counts", ax=ax, label="H")
     # df[df["formula"] == "O"].plot.line(x="time", y="counts", ax=ax, label="O")
-    plt.legend(loc='best')
+    plt.legend(loc="best")
     plt.ylabel("molecule counts")
     plt.xlabel("time (ns)")
     if save_to_file is not None:
@@ -37,7 +37,7 @@ def plot(df, save_to_file=None):
 
 def get_bond_data_table():
     # TODO assert error if bond is not here
-    bond_data = {"HH": 0.75, "HC": 1.09, "HO": 0.96, "CC": 1.54,  "CO": 1.43, "OO": 1.48}
+    bond_data = {"HH": 0.75, "HC": 1.09, "HO": 0.96, "CC": 1.54, "CO": 1.43, "OO": 1.48}
     # make bond length longer in case it is stretched
     bond_data = {k: v + 0.2 for k, v in bond_data.items()}
     bond_data_atomic_pairs = [[], []]
@@ -51,7 +51,9 @@ def get_bond_data_table():
     bond_data_length = torch.tensor(list(bond_data.values()))
 
     # very simple way for pytorch to index
-    bond_length_table = -1.0 * torch.ones(PERIODIC_TABLE_LENGTH * (PERIODIC_TABLE_LENGTH + 1))
+    bond_length_table = -1.0 * torch.ones(
+        PERIODIC_TABLE_LENGTH * (PERIODIC_TABLE_LENGTH + 1)
+    )
     bond_length_table[bond_data_label] = bond_data_length
     assert bond_length_table[119] == bond_data["HH"]
     assert bond_length_table[124] == bond_data["HC"]
@@ -64,10 +66,13 @@ def atomicpair_to_bond_label(pairs):
     bond_label = pairs[0] * PERIODIC_TABLE_LENGTH + pairs[1]
     return bond_label
 
+
 def fragment(traj_file, batch_size, timestep, dump_interval):
     start = time.time()
     molecules = read(traj_file, index=":")
-    print(f"finish reading '{traj_file}', total loading time: {time.time() - start:.2f} s")
+    print(
+        f"finish reading '{traj_file}', total loading time: {time.time() - start:.2f} s"
+    )
 
     assert torch.cuda.is_available(), "CUDA is required to run analysis"
     device = "cuda"
@@ -89,7 +94,7 @@ def fragment(traj_file, batch_size, timestep, dump_interval):
         # Reverse is important, otherwise 2 -> 6 (C), 6 -> 9 (F), which is not what we want.
         print(f"pbc box is {pbc.tolist()}")
         for lmpindex, element in reversed(lmpindex_element_dict.items()):
-            mask = (species == lmpindex)
+            mask = species == lmpindex
             species[mask] = element
     else:
         cell = None
@@ -100,8 +105,10 @@ def fragment(traj_file, batch_size, timestep, dump_interval):
     coordinates = coordinates.split(batch_size)
     species = species.split(batch_size)
     total_batches = len(species)
-    print(f"finish reading, total_frames: {total_frames}, total_batches: {total_batches}")
-    pbar = pkbar.Pbar(name='processing fragments', target=total_frames)
+    print(
+        f"finish reading, total_frames: {total_frames}, total_batches: {total_batches}"
+    )
+    pbar = pkbar.Pbar(name="processing fragments", target=total_frames)
 
     all_formula_counts = []
     for i in range(total_batches):
@@ -113,7 +120,9 @@ def fragment(traj_file, batch_size, timestep, dump_interval):
             neighborlist = _parse_neighborlist("full_pairwise", cutoff=2).to(device)
         else:
             neighborlist = _parse_neighborlist("cell_list", cutoff=2).to(device)
-        atom_index12, distances, diff_vector, _ = neighborlist(spe, coord, cell=cell, pbc=pbc)
+        atom_index12, distances, diff_vector, _ = neighborlist(
+            spe, coord, cell=cell, pbc=pbc
+        )
 
         # filter based on bond length
         bond_length_table = get_bond_data_table().to(device)
@@ -156,9 +165,17 @@ def fragment(traj_file, batch_size, timestep, dump_interval):
         # TODO cudf currently does not support GroupBy.value_counts
         df_frame_formula.to_pandas()
         # unique = df_frame_formula.groupby("frame")["formula"].unique()
-        formula_counts = df_frame_formula.to_pandas().groupby("frame")["formula"].value_counts().to_frame("counts").reset_index()
+        formula_counts = (
+            df_frame_formula.to_pandas()
+            .groupby("frame")["formula"]
+            .value_counts()
+            .to_frame("counts")
+            .reset_index()
+        )
         # format formula
-        formula_counts["formula"] = formula_counts["formula"].apply(lambda x: ase.formula.Formula(x).format("hill"))
+        formula_counts["formula"] = formula_counts["formula"].apply(
+            lambda x: ase.formula.Formula(x).format("hill")
+        )
         # print(formula_counts)
         # print("done")
         all_formula_counts.append(formula_counts)
@@ -166,7 +183,9 @@ def fragment(traj_file, batch_size, timestep, dump_interval):
         torch.cuda.synchronize()
 
     all_formula_counts = pd.concat(all_formula_counts)
-    all_formula_counts["time"] = all_formula_counts["frame"] * timestep * dump_interval * 1e-6  # ns
+    all_formula_counts["time"] = (
+        all_formula_counts["frame"] * timestep * dump_interval * 1e-6
+    )  # ns
     all_formula_counts.to_csv(f"analyze/{Path(traj_file).stem}.csv")
     plot(all_formula_counts, f"analyze/{Path(traj_file).stem}.png")
 
@@ -175,13 +194,32 @@ def fragment(traj_file, batch_size, timestep, dump_interval):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('traj_file', type=str, help="trajectory file to be analyzed")
-    parser.add_argument('-t', '--timestep', type=float, help="timestep used in the simulation (fs)", default=0.5)
-    parser.add_argument('-i', '--dump_interval', type=int, help="how many timesteps it dump once", default=100)
-    parser.add_argument('-b', "--batch_size", type=int, default=100, help="batch size")
+    parser.add_argument("traj_file", type=str, help="trajectory file to be analyzed")
+    parser.add_argument(
+        "-t",
+        "--timestep",
+        type=float,
+        help="timestep used in the simulation (fs)",
+        default=0.5,
+    )
+    parser.add_argument(
+        "-i",
+        "--dump_interval",
+        type=int,
+        help="how many timesteps it dump once",
+        default=100,
+    )
+    parser.add_argument("-b", "--batch_size", type=int, default=100, help="batch size")
     args = parser.parse_args()
 
     print("start")
     if Path(args.traj_file).suffix == "xyz":
-        warnings.warn("xyz file does not have pbc information, please use nc file instead")
-    fragment(args.traj_file, batch_size=args.batch_size, timestep=args.timestep, dump_interval=args.dump_interval)
+        warnings.warn(
+            "xyz file does not have pbc information, please use nc file instead"
+        )
+    fragment(
+        args.traj_file,
+        batch_size=args.batch_size,
+        timestep=args.timestep,
+        dump_interval=args.dump_interval,
+    )

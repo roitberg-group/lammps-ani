@@ -89,7 +89,6 @@ def test_models(runpbc, device, use_double, use_cuaev, use_fullnbr, modelfile):
             newmodel.neural_networks = Ensemble(newmodel.neural_networks[:use_num_models])
         return newmodel
 
-    # TODO remove model from name
     model_ref_all_models = all_models[modelfile]["model"]().to(dtype).to(device)
     model_ref_all_models = set_cuda_aev(model_ref_all_models, use_cuaev)
 

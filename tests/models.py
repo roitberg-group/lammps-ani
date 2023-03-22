@@ -83,7 +83,6 @@ all_models = {"ani2x.pt": {"model": ANI2x_Model, "use_repulsion": False, "unitte
               }
 
 
-# TODO rename this function name
 def save_models():
     for output_file, info in all_models.items():
         ani2x = LammpsANI(info["model"](), use_repulsion=info["use_repulsion"])

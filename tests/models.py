@@ -12,14 +12,6 @@ def ANI2x_Model():
     return model
 
 
-def ANI1x_Zeng():
-    eng = ani_engine.utils.load_engine("/blue/roitberg/apps/lammps-ani/myexamples/combustion/retrain_with_zeng/ani_run/logs/debug/20230301_152446-88lx93lb-robust-darkness-5")
-    neural_networks = eng.model.networks
-    ani1x = torchani.models.ANI1x(periodic_table_index=True, use_cuaev_interface=True, use_cuda_extension=True)
-    ani1x.neural_networks = Ensemble([ANIModel(neural_networks)])
-    return ani1x
-
-
 def ANI2x_Repulsion_Model():
     elements = ('H', 'C', 'N', 'O', 'S', 'F', 'Cl')
     def dispersion_atomics(atom: str = 'H'):
@@ -79,7 +71,6 @@ all_models = {"ani2x.pt": {"model": ANI2x_Model, "use_repulsion": False, "unitte
               "ani2x_repulsion.pt": {"model": ANI2x_Repulsion_Model, "use_repulsion": True, "unittest": True},
               # Because ani2x_ext uses public torchani that has legacy aev code, we cannot run unittest for it.
               "ani2x_ext0_repulsion.pt": {"model": ANI2xExt_Model, "use_repulsion": True, "unittest": False},
-              # "ani1x_zeng.pt": {"model": ANI1x_Zeng, "use_repulsion": True},
               }
 
 
@@ -88,4 +79,3 @@ def save_models():
         ani2x = LammpsANI(info["model"](), use_repulsion=info["use_repulsion"])
         script_module = torch.jit.script(ani2x)
         script_module.save(output_file)
-

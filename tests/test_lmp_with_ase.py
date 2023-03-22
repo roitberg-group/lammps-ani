@@ -10,7 +10,8 @@ from ase.io import read
 from ase.md.verlet import VelocityVerlet
 from ase.io.trajectory import Trajectory
 from ase import units
-import save_ani
+from .models import all_models
+
 
 LAMMPS_PATH = os.path.join(os.environ["LAMMPS_ROOT"], "build/lmp_mpi")
 STEPS = 4
@@ -27,7 +28,7 @@ class LammpsRunner():
         self.var_dict = var_dict
 
     def run(self):
-        stdout = subprocess.run(self.run_commands, shell=True, check=True)
+        stdout = subprocess.run(self.run_commands, shell=True, check=True, stdout=subprocess.DEVNULL)
         with open(self.var_dict["dump_file"], "r") as stream:
             documents = list(yaml.safe_load_all(stream))
         return documents
@@ -107,11 +108,10 @@ num_tasks_params = [
     pytest.param(1, id="num_tasks_1"),
     pytest.param(2, id="num_tasks_2")
 ]
-use_repulsion_params = [
-    pytest.param(False, id="repulsion-no"),
-    pytest.param(True, id="repulsion-yes"),
-]
 
+modelfile_params = all_models.keys()
+# remove modelfiles that have unittest as False
+modelfile_params = [modelfile for modelfile in modelfile_params if all_models[modelfile]["unittest"]]
 
 @pytest.mark.parametrize("pbc", pbc_params)
 @pytest.mark.parametrize("precision", precision_params)
@@ -153,10 +153,10 @@ use_repulsion_params = [
         ),
     ],
 )
-@pytest.mark.parametrize("use_repulsion", use_repulsion_params)
+@pytest.mark.parametrize("modelfile", modelfile_params)
 def test_lmp_with_ase(
         kokkos: bool, use_cuaev: bool, precision: str, nbr: str, pbc: bool, device: str, num_tasks: int,
-        use_repulsion: bool):
+        modelfile: str):
     # SKIP: compiled kokkos only work on Ampere GPUs
     SM = torch.cuda.get_device_capability(0)
     SM = int(f'{SM[0]}{SM[1]}')
@@ -169,16 +169,15 @@ def test_lmp_with_ase(
     if num_tasks > 1 and (not run_github_action_multi) and (not run_slurm_multi):
         pytest.skip("Skip running on 2 MPI Processes")
 
-    ani_model = "ani2x_repulsion.pt" if use_repulsion else "ani2x.pt"
     # prepare configurations
     ani_aev_str = "cuaev" if use_cuaev else "pyaev"
     var_dict = {
         "newton_pair": "off",
         "data_file": "water-0.8nm.data",
         "change_box": "'all boundary p p p'",
-        "ani_model_file": ani_model,
+        "ani_model_file": modelfile,
         "ani_device": device,
-        "ani_num_models": 8,
+        "ani_num_models": -1,
         "ani_aev": ani_aev_str,
         "ani_neighbor": nbr,
         "ani_precision": precision
@@ -193,26 +192,24 @@ def test_lmp_with_ase(
     lmp_dump = lmprunner.run()
 
     # setup ase calculator
-    # use cpu for reference result if not for cuaev
-    # device = torch.device("cuda") if use_cuaev else torch.device("cpu")
-    # ani2x = torchani.models.ANI2x(
-    #     periodic_table_index=True,
-    #     model_index=None,
-    #     cell_list=False,
-    #     use_cuaev_interface=use_cuaev,
-    #     use_cuda_extension=use_cuaev,
-    # )
-    ani2x = save_ani.ANI2xRef(use_cuaev=use_cuaev, use_repulsion=use_repulsion)
+    def set_cuda_aev(model, use_cuaev):
+        model.aev_computer.use_cuaev_interface = use_cuaev
+        model.aev_computer.use_cuda_extension = use_cuaev
+        return model
+
+    # use_repulsion = all_models[modelfile]["use_repulsion"]
+    ref_model = all_models[modelfile]["model"]()
+    ref_model = set_cuda_aev(ref_model, use_cuaev)
     # When using half nbrlist, we have to set the cutoff as 7.1 to match lammps nbr cutoff.
     # When using full nbrlist with nocuaev, it is actually still using half_nbr, we also need 7.1 cutoff.
     # Full nbrlist still uses 5.1, which is fine.
     half_nbr = nbr == "half"
     if half_nbr or (not half_nbr and not use_cuaev):
-        ani2x.model.aev_computer.neighborlist.cutoff = 7.1
+        ref_model.aev_computer.neighborlist.cutoff = 7.1
     use_double = precision == "double"
     dtype = torch.float64 if use_double else torch.float32
-    # calculator = ani2x.to(dtype).to(device).ase()
-    calculator = torchani.ase.Calculator(ani2x.to(dtype).to(device))
+    # calculator = ref_model.to(dtype).to(device).ase()
+    calculator = torchani.ase.Calculator(ref_model.to(dtype).to(device))
 
     # run ase
     aserunner = AseRunner("water-0.8nm.pdb", calculator=calculator, pbc=pbc)

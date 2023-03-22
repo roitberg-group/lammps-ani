@@ -34,7 +34,7 @@ modelfile_params = all_models.keys()
 modelfile_params = [modelfile for modelfile in modelfile_params if all_models[modelfile]["unittest"]]
 
 
-# Save all ani2x models by using session-scoped "autouse" fixture, this will run ahead of all tests.
+# Save all models by using session-scoped "autouse" fixture, this will run ahead of all tests.
 @pytest.fixture(scope='session', autouse=True)
 def session_start():
     print('Pytest session started, saving all models')
@@ -47,7 +47,7 @@ def session_start():
 @pytest.mark.parametrize("use_cuaev", use_cuaev_params)
 @pytest.mark.parametrize("use_fullnbr", use_fullnbr_params)
 @pytest.mark.parametrize("modelfile", modelfile_params)
-def test_ani2x_models(runpbc, device, use_double, use_cuaev, use_fullnbr, modelfile):
+def test_models(runpbc, device, use_double, use_cuaev, use_fullnbr, modelfile):
     # when pbc is on, full nbrlist converted from half nbrlist is not correct
     if use_fullnbr and runpbc:
         pytest.skip("Does not support full neighbor list using pyaev when pbc is on")
@@ -61,9 +61,9 @@ def test_ani2x_models(runpbc, device, use_double, use_cuaev, use_fullnbr, modelf
     use_repulsion = all_models[modelfile]["use_repulsion"]
 
     # cuaev currently only works with single precision
-    ani2x_loaded = torch.jit.load(modelfile).to(dtype).to(device)
-    # ani2x_loaded = LammpsANI(ANI2x_Repulsion_Model(), use_repulsion=use_repulsion).to(dtype).to(device)
-    ani2x_loaded.init(use_cuaev, use_fullnbr)
+    model_loaded = torch.jit.load(modelfile).to(dtype).to(device)
+    # model_loaded = LammpsANI(model_Repulsion_Model(), use_repulsion=use_repulsion).to(dtype).to(device)
+    model_loaded.init(use_cuaev, use_fullnbr)
 
     def set_cuda_aev(model, use_cuaev):
         model.aev_computer.use_cuaev_interface = use_cuaev
@@ -89,36 +89,35 @@ def test_ani2x_models(runpbc, device, use_double, use_cuaev, use_fullnbr, modelf
             newmodel.neural_networks = Ensemble(newmodel.neural_networks[:use_num_models])
         return newmodel
 
-    ani2x_ref_all_models = all_models[modelfile]["model"]().to(dtype).to(device)
-    ani2x_ref_all_models = set_cuda_aev(ani2x_ref_all_models, use_cuaev)
-
-    # ani2x_ref = ANI2xRef(use_cuaev, use_repulsion).to(dtype).to(device)
+    # TODO remove model from name
+    model_ref_all_models = all_models[modelfile]["model"]().to(dtype).to(device)
+    model_ref_all_models = set_cuda_aev(model_ref_all_models, use_cuaev)
 
     # we need a fewer iterations to tigger the fuser
-    total_num_models = len(ani2x_ref_all_models.neural_networks)
+    total_num_models = len(model_ref_all_models.neural_networks)
     for num_models in [total_num_models]:
-        ani2x_ref = ani2x_ref_all_models
-        ani2x_loaded.select_models(num_models)
+        model_ref = model_ref_all_models
+        model_loaded.select_models(num_models)
         for i in range(5):
-            run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr, use_repulsion, dtype, verbose=(num_models == total_num_models and i==0))
+            run_one_test(model_ref, model_loaded, device, runpbc, use_cuaev, use_fullnbr, use_repulsion, dtype, verbose=(num_models == total_num_models and i==0))
 
 
-def run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr, use_repulsion, dtype, verbose=False):
+def run_one_test(model_ref, model_loaded, device, runpbc, use_cuaev, use_fullnbr, use_repulsion, dtype, verbose=False):
     input_file = "water-0.8nm.pdb"
     mol = read(input_file)
 
     species_periodic_table = torch.tensor(mol.get_atomic_numbers(), device=device).unsqueeze(0)
     coordinates = torch.tensor(mol.get_positions(), dtype=dtype, requires_grad=True, device=device).unsqueeze(0)
-    species, coordinates = ani2x_ref.species_converter((species_periodic_table, coordinates))
+    species, coordinates = model_ref.species_converter((species_periodic_table, coordinates))
     cell = torch.tensor(mol.cell.array, device=device, dtype=dtype)
     pbc = torch.tensor(mol.pbc, device=device)
 
     if runpbc:
-        atom_index12, distances, diff_vector, _ = ani2x_ref.aev_computer.neighborlist(species, coordinates, cell, pbc)
+        atom_index12, distances, diff_vector, _ = model_ref.aev_computer.neighborlist(species, coordinates, cell, pbc)
     else:
-        atom_index12, distances, diff_vector, _ = ani2x_ref.aev_computer.neighborlist(species, coordinates)
+        atom_index12, distances, diff_vector, _ = model_ref.aev_computer.neighborlist(species, coordinates)
     if use_fullnbr:
-        ilist_unique, jlist, numneigh = ani2x_ref.aev_computer._half_to_full_nbrlist(atom_index12)
+        ilist_unique, jlist, numneigh = model_ref.aev_computer._half_to_full_nbrlist(atom_index12)
         para1, para2, para3 = ilist_unique, jlist, numneigh
     else:
         para1, para2, para3 = atom_index12, diff_vector, distances
@@ -126,10 +125,10 @@ def run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr
     torch.set_printoptions(profile="full")
 
     torch.set_printoptions(precision=13)
-    energy, force, _ = ani2x_loaded(species, coordinates, para1, para2, para3, species_ghost_as_padding, atomic=False)
+    energy, force, _ = model_loaded(species, coordinates, para1, para2, para3, species_ghost_as_padding, atomic=False)
 
     # test forward_atomic API
-    energy_, force_, atomic_energies = ani2x_loaded(species, coordinates, para1, para2, para3, species_ghost_as_padding, atomic=True)
+    energy_, force_, atomic_energies = model_loaded(species, coordinates, para1, para2, para3, species_ghost_as_padding, atomic=True)
 
     energy, force = energy * hartree2kcalmol, force * hartree2kcalmol
     energy_, atomic_energies, force_ = energy_ * hartree2kcalmol, atomic_energies * hartree2kcalmol, force_ * hartree2kcalmol
@@ -155,9 +154,9 @@ def run_one_test(ani2x_ref, ani2x_loaded, device, runpbc, use_cuaev, use_fullnbr
     # print(force.flatten())
 
     if runpbc:
-        _, energy_ref = ani2x_ref((species_periodic_table, coordinates), cell, pbc)
+        _, energy_ref = model_ref((species_periodic_table, coordinates), cell, pbc)
     else:
-        _, energy_ref = ani2x_ref((species_periodic_table, coordinates))
+        _, energy_ref = model_ref((species_periodic_table, coordinates))
     force_ref = -torch.autograd.grad(energy_ref.sum(), coordinates, create_graph=True, retain_graph=True)[0]
     energy_ref, force_ref = energy_ref * hartree2kcalmol, force_ref * hartree2kcalmol
 

@@ -100,8 +100,10 @@ void ANI::compute(
   // output tensor
   auto out_force_t = torch::from_blob(out_force.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat64));
   // input tensor
-  auto coordinates_t =
-      torch::from_blob(coordinates.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat64)).to(dtype).to(device).requires_grad_(true);
+  auto coordinates_t = torch::from_blob(coordinates.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat64))
+                           .to(dtype)
+                           .to(device)
+                           .requires_grad_(true);
 
   // species_t and atom_index12_t are cloned/cached on devices and only needs to be updated when neigh_list rebuild
   if (ago == 0) {
@@ -171,8 +173,10 @@ void ANI::compute(
   // output tensor
   auto out_force_t = torch::from_blob(out_force.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat64));
   // input tensor
-  auto coordinates_t =
-      torch::from_blob(coordinates.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat64)).to(dtype).to(device).requires_grad_(true);
+  auto coordinates_t = torch::from_blob(coordinates.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat64))
+                           .to(dtype)
+                           .to(device)
+                           .requires_grad_(true);
 
   // species_t, ilist_unique_t, jlist_t and numneigh_t are cloned/cached on devices and only needs to be updated when neigh_list
   // rebuild

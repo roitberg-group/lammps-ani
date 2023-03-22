@@ -62,27 +62,29 @@ class LammpsModelBase(torch.nn.Module):
 
 
 class LammpsANI(LammpsModelBase):
-    def __init__(self, model, use_repulsion):
+    def __init__(self, model):
         super().__init__()
+
+        # make sure the model has correct attributes
+        assert hasattr(model, 'aev_computer'), "No aev_computer found in the model."
+        assert hasattr(model, 'neural_networks'), "No neural_networks found in the model."
+        assert isinstance(model.neural_networks, Ensemble) or isinstance(model.neural_networks, torch.nn.ModuleList)
+        assert hasattr(model, 'energy_shifter'), "No energy_shifter found in the model."
+        assert hasattr(model, 'rep_calc'), "No rep_calc is found in your model. Please set model.rep_calc = None if you don't need to calculate repulsion energy."
+        assert isinstance(model.rep_calc, RepulsionXTB) or model.rep_calc is None
 
         # setup model
         self.use_cuaev = True
         self.use_fullnbr = True
         self.initialized = False
-        self.use_repulsion = use_repulsion
-
-        assert hasattr(model, 'aev_computer'), "No aev_computer found in the model"
-        assert hasattr(model, 'neural_networks'), "No neural_networks found in the model"
-        assert isinstance(model.neural_networks, Ensemble) or isinstance(model.neural_networks, torch.nn.ModuleList)
-        assert hasattr(model, 'energy_shifter'), "No energy_shifter found in the model"
-
         self.aev_computer = model.aev_computer
-        # TODO how to set repulsion cutoff
-        # TODO how to set repulsion elements
-        # TODO how to support general model
-        elements = ('H', 'C', 'N', 'O', 'S', 'F', 'Cl')
-        # elements = ('H', 'C', 'N', 'O')
-        self.rep_calc = RepulsionXTB(cutoff=5.1, symbols=elements)
+        self.use_repulsion = model.rep_calc is not None
+        if self.use_repulsion:
+            self.rep_calc = model.rep_calc
+        else:
+            # We need to create a useless repulsion model because the `compute_repulsion()`
+            # method needs the repulsion forward functions are exposed.
+            self.rep_calc = RepulsionXTB()
 
         # num_models
         self.num_models = len(model.neural_networks)
@@ -223,54 +225,3 @@ class LammpsANI(LammpsModelBase):
             pass
         else:
             raise RuntimeError("select_models method only works for BmmEnsemble2")
-
-
-# TODO delete this
-class ANI2xRef(torch.nn.Module):
-    def __init__(self, use_cuaev, use_repulsion):
-        super().__init__()
-        ani2x = torchani.models.ANI2x(periodic_table_index=True, model_index=None, cell_list=False,
-                                      use_cuaev_interface=use_cuaev, use_cuda_extension=use_cuaev)
-        self.model = ani2x
-        self.model.neural_networks = self.model.neural_networks.to_infer_model(use_mnp=False)
-        self.use_cuaev = use_cuaev
-        # we only use halfnbr for ANI2xRef
-        # self.use_fullnbr = use_fullnbr
-        # self.model.aev_computer.use_fullnbr = use_fullnbr
-        self.use_repulsion = use_repulsion
-        self.rep_calc = RepulsionXTB()
-        self.periodic_table_index = self.model.periodic_table_index
-        self.aev_computer = self.model.aev_computer
-
-    def forward(self, species_coordinates: Tuple[Tensor, Tensor],
-                cell: Optional[Tensor] = None,
-                pbc: Optional[Tensor] = None) -> SpeciesEnergies:
-        species_coordinates = self.model._maybe_convert_species(species_coordinates)
-        species_aevs = self.model.aev_computer(species_coordinates, cell=cell, pbc=pbc)
-        species_energies = self.model.neural_networks(species_aevs)
-        energies = self.model.energy_shifter(species_energies).energies
-        if self.use_repulsion:
-            energies += self.compute_repulsion(species_coordinates, cell, pbc)
-        return SpeciesEnergies(species_coordinates[0], energies)
-
-    def compute_repulsion(self, species_coordinates: Tuple[Tensor, Tensor],
-                          cell: Optional[Tensor] = None, pbc: Optional[Tensor] = None):
-        species, coordinates = species_coordinates
-        atom_index12, distances, _, _ = self.model.aev_computer.neighborlist(species, coordinates, cell, pbc)
-        return self.rep_calc(species, atom_index12, distances)
-
-    @torch.jit.export
-    def select_models(self, use_num_models: Optional[int] = None):
-        neural_networks = self.model.neural_networks
-        if isinstance(neural_networks, BmmEnsemble2):
-            neural_networks.select_models(use_num_models)
-        elif isinstance(neural_networks, Ensemble):
-            size = len(neural_networks)
-            if use_num_models is None:
-                use_num_models = size
-                return
-            assert use_num_models <= size, f"use_num_models {use_num_models} cannot be larger than size {size}"
-            neural_networks = neural_networks[:use_num_models]
-        else:
-            raise RuntimeError("select_models method only works for BmmEnsemble2 or Ensemble neural networks")
-

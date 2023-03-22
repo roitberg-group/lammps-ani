@@ -3,12 +3,14 @@ import torchani
 from torchani.nn import ANIModel
 from torchani.models import Ensemble
 from .lammps_ani import LammpsANI
+from torchani.repulsion import RepulsionXTB
 from ani2x_ext.custom_emsemble_ani2x_ext import CustomEnsemble
 
 
 def ANI2x_Model():
     model = torchani.models.ANI2x(periodic_table_index=True, model_index=None, cell_list=False,
                                   use_cuaev_interface=True, use_cuda_extension=True)
+    model.rep_calc = None
     return model
 
 
@@ -50,6 +52,9 @@ def ANI2x_Repulsion_Model():
             state_dict.pop(key)
 
     model.load_state_dict(state_dict)
+    # setup repulsion calculator
+    model.rep_calc = model.potentials[0]
+
     return model
 
 
@@ -62,20 +67,22 @@ class ANI2xExt_Model(CustomEnsemble):
         self.aev_computer = torchani.AEVComputer.like_2x(cutoff_fn="smooth", use_cuda_extension=True, use_cuaev_interface=True)
         self.neural_networks = self.models
         self.species_converter = self.number2tensor
+        self.rep_calc = RepulsionXTB(cutoff=5.1, symbols=('H', 'C', 'N', 'O', 'S', 'F', 'Cl'))
 
     def forward(self):
         raise RuntimeError("forward is not suppported")
 
 
-all_models = {"ani2x.pt": {"model": ANI2x_Model, "use_repulsion": False, "unittest": True},
-              "ani2x_repulsion.pt": {"model": ANI2x_Repulsion_Model, "use_repulsion": True, "unittest": True},
+all_models = {"ani2x.pt": {"model": ANI2x_Model, "unittest": True},
+              "ani2x_repulsion.pt": {"model": ANI2x_Repulsion_Model, "unittest": True},
               # Because ani2x_ext uses public torchani that has legacy aev code, we cannot run unittest for it.
-              "ani2x_ext0_repulsion.pt": {"model": ANI2xExt_Model, "use_repulsion": True, "unittest": False},
+              "ani2x_ext0_repulsion.pt": {"model": ANI2xExt_Model, "unittest": False},
               }
 
 
 def save_models():
     for output_file, info in all_models.items():
-        ani2x = LammpsANI(info["model"](), use_repulsion=info["use_repulsion"])
+        print(f"saving model: {output_file}")
+        ani2x = LammpsANI(info["model"]())
         script_module = torch.jit.script(ani2x)
         script_module.save(output_file)

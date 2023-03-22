@@ -198,7 +198,6 @@ def test_lmp_with_ase(
         return model
 
     # setup ase calculator
-    # use_repulsion = all_models[modelfile]["use_repulsion"]
     ref_model = all_models[modelfile]["model"]()
     ref_model = set_ref_cuda_aev(ref_model, use_cuaev)
     # When using half nbrlist, we have to set the cutoff as 7.1 to match lammps nbr cutoff.

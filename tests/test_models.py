@@ -58,12 +58,10 @@ def test_models(runpbc, device, use_double, use_cuaev, use_fullnbr, modelfile):
 
     # dtype
     dtype = torch.float64 if use_double else torch.float32
-    use_repulsion = all_models[modelfile]["use_repulsion"]
 
-    # cuaev currently only works with single precision
     model_loaded = torch.jit.load(modelfile).to(dtype).to(device)
-    # model_loaded = LammpsANI(model_Repulsion_Model(), use_repulsion=use_repulsion).to(dtype).to(device)
     model_loaded.init(use_cuaev, use_fullnbr)
+    use_repulsion = model_loaded.use_repulsion
 
     def set_ref_cuda_aev(model, use_cuaev):
         model.aev_computer.use_cuaev_interface = use_cuaev
@@ -147,12 +145,6 @@ def run_one_test(model_ref, model_loaded, device, runpbc, use_cuaev, use_fullnbr
     if not use_repulsion:
         assert torch.allclose(energy, atomic_energies.sum(dim=-1), atol=threshold), f"error {(energy - atomic_energies.sum(dim=-1)).abs().max()}"
 
-    # for test_model inputs
-    # print(coordinates.flatten())
-    # print(species.flatten())
-    # print(atom_index12.flatten())
-    # print(force.flatten())
-
     if runpbc:
         _, energy_ref = model_ref((species_periodic_table, coordinates), cell, pbc)
     else:
@@ -169,6 +161,5 @@ def run_one_test(model_ref, model_loaded, device, runpbc, use_cuaev, use_fullnbr
         print("energy max err: ".ljust(15), energy_err.item())
         print("force  max err: ".ljust(15), force_err.item())
 
-    # print(f"error {(energy - energy_ref).abs().max()}")
     assert torch.allclose(energy, energy_ref), f"error {(energy - energy_ref).abs().max()}"
     assert torch.allclose(force, force_ref, atol=threshold), f"error {(force - force_ref).abs().max()}"

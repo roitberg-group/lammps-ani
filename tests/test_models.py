@@ -101,7 +101,12 @@ def test_models(runpbc, device, use_double, use_cuaev, use_fullnbr, modelfile):
 
     # we need a fewer iterations to tigger the fuser
     total_num_models = len(model_ref_all_models.neural_networks)
-    for num_models in [4, total_num_models]:
+    test_num_models_list = []
+    if total_num_models <= 4:
+        test_num_models_list = [total_num_models]
+    else:
+        test_num_models_list = [4, total_num_models]
+    for num_models in test_num_models_list:
         print(f"test num_models == {num_models}")
         model_ref = select_ref_num_models(model_ref_all_models, num_models)
         model_loaded.select_models(num_models)

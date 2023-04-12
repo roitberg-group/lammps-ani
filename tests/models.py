@@ -1,5 +1,6 @@
 import torch
 import torchani
+import warnings
 from torchani.nn import ANIModel
 from torchani.models import Ensemble
 from .lammps_ani import LammpsANI
@@ -97,13 +98,21 @@ class ANI2xExt_Model(CustomEnsemble):
         raise RuntimeError("forward is not suppported")
 
 
-all_models = {
+all_models_ = {
     "ani2x.pt": {"model": ANI2x_Model, "unittest": True},
     "ani2x_repulsion.pt": {"model": ANI2x_Repulsion_Model, "unittest": True},
     # Because ani2x_ext uses public torchani that has legacy aev code, we cannot run unittest for it.
     "ani2x_ext0_repulsion.pt": {"model": ANI2xExt_Model, "unittest": False},
 }
+all_models = {}
 
+# Remove model that cannot be instantiated, e.g. ani2x_repulsion could only be downloaded within UF network
+for output_file, info in all_models_.items():
+    try:
+        model = info["model"]()
+        all_models[output_file] = info
+    except Exception as e:
+        warnings.warn(f"Failed to export {output_file}: {str(e)}")
 
 def save_models():
     for output_file, info in all_models.items():

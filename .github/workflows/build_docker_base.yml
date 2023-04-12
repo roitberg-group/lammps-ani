@@ -67,6 +67,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             MAKE_J_THREADS=5
+            OVERRIDE_KOKKOS_ARCH=Kokkos_ARCH_AMPERE80
           target: base
 
       - name: Remove image

@@ -24,3 +24,4 @@ fi
 
 # Build Options
 export MAKE_J_THREADS=${MAKE_J_THREADS:=""}  # default as all threads
+export OVERRIDE_KOKKOS_ARCH=${OVERRIDE_KOKKOS_ARCH:=""}  # default as null

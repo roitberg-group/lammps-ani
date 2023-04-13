@@ -14,10 +14,20 @@ conda install pytorch==1.12.1 torchvision==0.13.1 torchaudio==0.12.1 cudatoolkit
 conda install -c conda-forge cudnn=8.3.2
 ```
 
+Netcdf should be avialable in most HPC systems, and could be loaded using `module load` command. Otherwise, if you are running Ubuntu, you could install it by
+```
+apt install libnetcdf-dev
+```
+
 # Benchmark
 Pre-built docker container (kokkos only works for A100 GPUs).
 ```
-
+docker pull ghcr.io/roitberg-group/lammps-ani-pre:0.0.1
+docker run --gpus all -it ghcr.io/roitberg-group/lammps-ani-pre:0.0.1
+cd /lammps-ani/examples/water/
+# run benchmark script
+# Note that for this container, Kokkos is only available for A100 GPUs
+bash benchmark.sh
 ```
 
 ## Singularity & Docker Container

@@ -35,7 +35,9 @@ The SHAKE algorithm allows for a larger timestep (e.g., 2 fs) without compromisi
 After the simulation is complete, you can analyze the results. Key aspects to examine include:
 
 Temperature: Monitor the temperature of the system over time to assess its stability and equilibration.
+
 Ramachandran Plot: Generate a Ramachandran plot to visualize the distribution of the backbone dihedral angles (phi and psi) and assess the conformational states visited by the alanine dipeptide.
+
 For the Ramachandran plot, you can use computational tools such as MDTraj or PyMOL to calculate the phi and psi angles from the trajectory and create the plot.
 
 ### 5. Conclusion

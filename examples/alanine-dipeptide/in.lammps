@@ -10,8 +10,7 @@ variable       timestep        index  timestep
 
 # Intialization
 units          real
-atom_style     atomic  # could we use bond?
-# bond_style     none
+atom_style     atomic
 
 neighbor       2.0 bin
 # check yes = only build if at least one atom has moved half the skin distance or more
@@ -32,22 +31,21 @@ change_box     all boundary p p p
 # 5. ani_precision (Optional) = single/double, default as single
 pair_style     ani 5.1 ${modelfile} cuda ${num_models} cuaev full single
 pair_coeff     * *
-# bond_coeff     1 1.0
 
-# Output: dump atom positions every 0.5 ps and log info every 0.5 ps
+# dump and thermo
 dump           1 all xyz 100 logs/${timestamp}.xyz
 dump_modify    1 element H C N O F S Cl
+dump           2 all netcdf 100 logs/${timestamp}.nc type x y z
 thermo_style   custom step pe ke etotal temp press vol
 thermo         100
 
-# Settings: temperature at 300 K, timestep (0.5 fs)
+# Settings: temperature at 300 K
 velocity       all create 300.0 12345 rot yes mom yes dist gaussian
 timestep       ${timestep}
 
 # run nvt
 fix            1 all langevin 300.0 300.0 100.0 12345
 fix            2 all nve
-# fix            3 all shake 0.0001 10 100 b 1
-run            20000
+run            50000000 
 
 # write_data    system.final

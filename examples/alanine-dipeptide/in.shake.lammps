@@ -35,15 +35,14 @@ pair_coeff     * *
 # include 1-2, 1-3, 1-4 bonded pairs into pairwise non-bonded potential neighbor lists
 special_bonds lj/coul 1.0 1.0 1.0
 
-
-# Output: dump atom positions every 0.5 ps and log info every 0.5 ps
+# dump and thermo
 dump           1 all xyz 100 logs/${timestamp}.xyz
 dump_modify    1 element H C N O F S Cl
 dump           2 all netcdf 100 logs/${timestamp}.nc type x y z
 thermo_style   custom step pe ke etotal temp press vol
 thermo         100
 
-# Settings: temperature at 300 K, timestep (0.5 fs)
+# Settings: temperature at 300 K
 velocity       all create 300.0 12345 rot yes mom yes dist gaussian
 timestep       ${timestep}
 

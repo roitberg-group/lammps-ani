@@ -3,10 +3,18 @@ import os
 import numpy as np
 import argparse
 import warnings
+import textwrap
+from ase.geometry.analysis import Analysis
+# from ase.data.chemical_symbols import chemical_symbols
+
 
 header = """# LAMMPS data
 {num_atoms} atoms
 7 atom types
+
+{num_bonds} bonds
+{num_bond_types} bond types  # defined bond types: {all_bond_types}, detected bond types: {detected_bond_types}
+
 {xlo} {xhi}  xlo xhi
 {ylo} {yhi}  ylo yhi
 {zlo} {zhi}  zlo zhi
@@ -22,16 +30,36 @@ Masses
 6 18.998403163  # F
 7 35.45         # Cl
 
-Atoms
-
 """
-
 
 numbers_to_species = {1: 0, 6: 1, 7: 2, 8: 3, 16: 4, 9: 5, 17: 6}
 numbers_to_lmp_types = {1: 1, 6: 2, 7: 3, 8: 4, 16: 5, 9: 6, 17: 7}
+bond_lengths_data = {"HC": 1.09, "HO": 0.96, "HN": 1.01}
+bond_lengths = {}
+# sort each bond_type
+for bond_type in bond_lengths_data:
+    bond_type_sorted = "".join(sorted(bond_type))
+    bond_lengths[bond_type_sorted] = bond_lengths_data[bond_type]
+print(bond_lengths)
 
 
-def generate_data(input_file, output_file, system_size=None, center=False):
+def get_bonds_by_type(atoms, bond_types):
+    if not bond_types:
+        return {}, 0
+
+    analysis = Analysis(atoms)
+
+    bonds_by_type = {}
+
+    for bond_type in bond_types:
+        bonds = analysis.get_bonds(bond_type[0], bond_type[1])[0]
+        bonds_by_type[bond_type] = bonds
+
+    num_bonds = sum([len(bonds) for bonds in bonds_by_type.values()])
+    return bonds_by_type, num_bonds
+
+
+def generate_data(input_file, output_file, system_size=None, bond_types=[]):
 
     mol = read(input_file)
     cell = mol.cell
@@ -39,6 +67,19 @@ def generate_data(input_file, output_file, system_size=None, center=False):
         num_atoms = len(mol)
     else:
         num_atoms = system_size
+
+    bonds_by_type, num_bonds = get_bonds_by_type(mol, bond_types=bond_types)
+    all_bond_types = ",".join(["-".join(bond_type) for bond_type in bond_types])
+    detected_bond_types = ",".join(["-".join(bond_type) for bond_type in bonds_by_type.keys() if bonds_by_type[bond_type]])
+
+    # determine whether we need to center the cell\
+    positions = mol.get_positions()
+    positions_x_min = positions[:, 0].min()
+    xlen_quarter = (cell.lengths() / 4)[0]
+    # center is True if it is negative and it is less tha xlen_quarter
+    center = True if positions_x_min < (- xlen_quarter) else False
+    print(f"Center is {center}, x_min is {positions_x_min}")
+
     data = ""
     if center:
         xlen_half, ylen_half, zlen_half = cell.lengths() / 2
@@ -50,11 +91,18 @@ def generate_data(input_file, output_file, system_size=None, center=False):
             yhi=ylen_half,
             zlo=-zlen_half,
             zhi=zlen_half,
+            num_bonds=num_bonds,
+            num_bond_types=len(bond_types),
+            all_bond_types=all_bond_types,
+            detected_bond_types=detected_bond_types,
         )
     else:
         xlen, ylen, zlen = cell.lengths()
         data += header.format(
-            num_atoms=num_atoms, xlo=0.0, xhi=xlen, ylo=0.0, yhi=ylen, zlo=0.0, zhi=zlen
+            num_atoms=num_atoms, xlo=0.0, xhi=xlen, ylo=0.0, yhi=ylen, zlo=0.0, zhi=zlen,
+            num_bonds=num_bonds, num_bond_types=len(bond_types),
+            all_bond_types=all_bond_types,
+            detected_bond_types=detected_bond_types,
         )
 
     # header
@@ -69,26 +117,91 @@ def generate_data(input_file, output_file, system_size=None, center=False):
     print(f"Generated header is the following:\n{data}")
 
     # atoms data
+    data += "Atoms\n\n"
+    # if bond_types:
+    #     data += "# atom-ID\tmolecule-ID\tatom-type\tx\ty\tz\n"
+    # else:
+    #     data += "# atom-ID\tatom-type\tx\ty\tz\n"
+
     symbols = mol.get_chemical_symbols()
-    positions = mol.get_positions()
     numbers = mol.get_atomic_numbers()
+    residuenumbers = mol.get_array("residuenumbers")
     types = [numbers_to_lmp_types[i] for i in numbers]
     for i in range(num_atoms):
         position = positions[i]
-        line = f"{i+1}\t{types[i]}\t{position[0]}\t{position[1]}\t{position[2]}\t# {symbols[i]}\n"
+        if bond_types:
+            line = f"{i+1}\t{residuenumbers[i]}\t{types[i]}\t{position[0]}\t{position[1]}\t{position[2]}\t# {symbols[i]}\n"
+        else:
+            line = f"{i+1}\t{types[i]}\t{position[0]}\t{position[1]}\t{position[2]}\t# {symbols[i]}\n"
         data += line
+
+
+    # add bonds into data
+    if bond_types:
+        data += "\nBonds\n\n"
+        # data += "# ID\ttype\tatom1\tatom2\n"
+        index = 1
+        bond_type_index = 1
+        for bond_type, bonds in bonds_by_type.items():
+            # atom1 = chemical_symbols.index(bond_type[0])
+            # atom2 = chemical_symbols.index(bond_type[1])
+            # type1 = numbers_to_lmp_types[atom1]
+            # type2 = numbers_to_lmp_types[atom2]
+            for bond in bonds:
+                line = f"{index}\t{bond_type_index}\t{bond[0]+1}\t{bond[1]+1}\t# {bond_type[0]}-{bond_type[1]}\n"
+                data += line
+                index += 1
+            bond_type_index += 1
+
+        data += "\nBond Coeffs\n\n"
+        index = 1
+        for bond_type, bonds in bonds_by_type.items():
+            key = "".join(sorted(f"{bond_type[0]}{bond_type[1]}"))
+            bond_length = bond_lengths[key]
+            line = f"{index}\t{bond_length}\t# {bond_type[0]}-{bond_type[1]}\n"
+            data += line
+            index += 1
+
 
     # write out data
     with open(output_file, "w") as file:
         file.write(data)
 
 
+def convert_bond_string_to_list(input_string):
+    if len(input_string) == 0:
+        return {}
+
+    # Split the input string using the semicolon delimiter
+    substrings = input_string.split(',')
+
+    # Split each substring using the empty string delimiter and create pairs of elements
+    result = []
+    for substring in substrings:
+        assert len(substring) == 2, print(f"wrong format: {input_string}")
+        result.append((substring[0], substring[1]))
+
+    return result
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description=textwrap.dedent('''\
+        Convert pdb to lammps data format
+        Example usage:
+        1. only atomic data
+            python pdb2lmp.py abc.pdb abc.data
+        2. with also bonds data
+            python pdb2lmp.py abc.pdb abc.data --bonds OH,CH,NH
+        '''),
+        formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("in_file", type=str)
     parser.add_argument("out_file", type=str)
     parser.add_argument("--system_size", type=int, default=None)
-    parser.add_argument("--center", default=False, action="store_true")
+    parser.add_argument("--bonds", type=str, default="")
     args = parser.parse_args()
 
-    generate_data(args.in_file, args.out_file, args.system_size, args.center)
+    bond_types = convert_bond_string_to_list(args.bonds)
+    if bond_types:
+        print(f"generating bonds for {bond_types}")
+
+    generate_data(args.in_file, args.out_file, args.system_size, bond_types)

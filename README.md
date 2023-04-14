@@ -2,11 +2,20 @@
 A plugin to run torchani on LAMMPS.
 
 ## Requirement
-Run an interactive session on hipergator
-```
-srun --qos=roitberg --account=roitberg --nodes=1 --ntasks=2 --cpus-per-task=2 --mem=20gb --gres=gpu:2 --partition=hpg-ai -t 10:00:00 --pty /bin/bash -i
+Hipergator
+```bash
+# run an interactive session
+srun --qos=roitberg --account=roitberg --nodes=1 --ntasks=2 --cpus-per-task=2 --mem=80gb --gres=gpu:2 --partition=hpg-ai -t 3:00:00 --pty /bin/bash -i
+# load modules
 module load cuda/11.4.3 gcc/9.3.0 openmpi/4.0.5 cmake/3.21.3 git/2.30.1 netcdf/4.7.2 singularity
 ```
+
+<summary>Expanse</summary>
+```bash
+srun -p gpu-shared --nodes=1 --ntasks=1 --account=cwr109 --cpus-per-task=20 --gpus=1 --time=03:00:00 --mem=80gb  --pty -u bash -i
+module load gpu/0.15.4 openmpi/4.0.4 cuda/11.0.2 cmake/3.19.8 netcdf-c/4.7.4
+```
+</details>
 
 pytorch and cudnn
 ```
@@ -47,6 +56,7 @@ nvidia-smi && cd external/torchani_sandbox && python setup.py install --ext --us
 
 ## Build
 ```bash
+git clone --recursive git@github.com:roitberg-group/lammps-ani.git
 ./build.sh
 ```
 

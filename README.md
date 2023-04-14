@@ -10,6 +10,7 @@ srun --qos=roitberg --account=roitberg --nodes=1 --ntasks=2 --cpus-per-task=2 --
 module load cuda/11.4.3 gcc/9.3.0 openmpi/4.0.5 cmake/3.21.3 git/2.30.1 netcdf/4.7.2 singularity
 ```
 
+<details>
 <summary>Expanse</summary>
 ```bash
 srun -p gpu-shared --nodes=1 --ntasks=1 --account=cwr109 --cpus-per-task=20 --gpus=1 --time=03:00:00 --mem=80gb  --pty -u bash -i

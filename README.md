@@ -87,7 +87,7 @@ mpirun -np 1 lmp_mpi -k on g 1 -sf kk -pk kokkos gpu/aware on ... -in in.lammps
 ```
 
 ## Run examples
-There are 3 environment variables needed to run LAMMPS-ANI.
+There are 3 environment variables needed to run LAMMPS-ANI with absolute path.
 - For docker and singularity contianer, these variables are already set.
 - For local build users, they need to set them correctly and put them into `~/.bashrc` file and also the script file before submit slurm jobs. You could also run `source ./build-env.sh` to load them automatically.
 ```bash

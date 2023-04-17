@@ -2,9 +2,6 @@
 #!/bin/bash
 set -ex
 
-export LAMMPS_ANI_ROOT="/blue/roitberg/apps/lammps-ani"
-export LAMMPS_ROOT=${LAMMPS_ANI_ROOT}/external/lammps/
-export LAMMPS_PLUGIN_PATH=${LAMMPS_ANI_ROOT}/build/
 TIMESTAMP=`date +%F-%H%M%S`
 
 

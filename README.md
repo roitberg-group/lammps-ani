@@ -65,6 +65,9 @@ nvidia-smi && cd external/torchani_sandbox && python setup.py install --ext --us
 ```bash
 git clone --recursive git@github.com:roitberg-group/lammps-ani.git
 ./build.sh
+# by default this will build CUAEV for all GPU architectures, you could speed up this process by specifying
+# the CMAKE_CUDA_ARCHITECTURES for specific architectures, for example:
+# CMAKE_CUDA_ARCHITECTURES="7.5;8.0" ./build.sh
 ```
 
 Users need to set environment variables, please check [run examples](#run-examples) section.

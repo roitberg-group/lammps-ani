@@ -70,7 +70,21 @@ git clone --recursive git@github.com:roitberg-group/lammps-ani.git
 # CMAKE_CUDA_ARCHITECTURES="7.5;8.0" ./build.sh
 ```
 
-Users need to set environment variables, please check [run examples](#run-examples) section.
+User could use the absolute path to run lammps (please check [run examples](#run-examples) section), or install lammps binaries and libraries into `${HOME}/.local`. For the later case, you need to set `PATH` and `LD_LIBRARY_PATH` environment variables to be able to use `lmp_mpi` directly.
+```bash
+export PATH=${HOME}/.local/bin:$PATH
+export LD_LIBRARY_PATH=${HOME}/.local/lib:$LD_LIBRARY_PATH
+export LAMMPS_PLUGIN_PATH=${HOME}/.local/lib
+```
+
+test
+```bash
+lmp_mpi -help
+# run without kokkos
+mpirun -np 1 lmp_mpi ... -in in.lammps
+# run with kokkos
+mpirun -np 1 lmp_mpi -k on g 1 -sf kk -pk kokkos gpu/aware on ... -in in.lammps
+```
 
 ## Run examples
 There are 3 environment variables needed to run LAMMPS-ANI.

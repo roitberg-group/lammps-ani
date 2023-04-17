@@ -22,6 +22,11 @@ cd ../
 
 # build kokkos
 cd external/lammps
+# remove old building files
+if [ -f "build-kokkos/install_manifest.txt" ]; then
+    echo "Found install_manifest.txt. Removing installed files..."
+    xargs rm -vf < build-kokkos/install_manifest.txt
+fi
 rm -rf build-kokkos; mkdir -p build-kokkos; cd build-kokkos
 KOKKOS_ARCH=${OVERRIDE_KOKKOS_ARCH:=$(python -c "import torch; gpu_sm = ''.join(map(str, torch.cuda.get_device_capability(0))); gpu_name = torch.cuda.get_device_name(0); kokkos_dict = {'70': 'Kokkos_ARCH_VOLTA70', '75': 'Kokkos_ARCH_TURING75', '80': 'Kokkos_ARCH_AMPERE80', '86': 'Kokkos_ARCH_AMPERE86', '89': 'Kokkos_ARCH_ADA89', '90': 'Kokkos_ARCH_HOPPER90'}; kokkos_arch = kokkos_dict[gpu_sm]; print(kokkos_arch)")}
 echo Building KOKKOS for ${KOKKOS_ARCH}
@@ -52,6 +57,11 @@ cd ..
 # build lammps
 # kokkos flag
 KOKKOS_FLAGS="-DPKG_KOKKOS=yes -DEXTERNAL_KOKKOS=yes"
+# remove old building files
+if [ -f "build/install_manifest.txt" ]; then
+    echo "Found install_manifest.txt. Removing installed files..."
+    xargs rm -vf < build/install_manifest.txt
+fi
 rm -rf build; mkdir -p build; cd build
 # D_GLIBCXX_USE_CXX11_ABI: https://stackoverflow.com/a/50873329/9581569
 cmake -DCMAKE_C_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DLAMMPS_INSTALL_RPATH=yes \

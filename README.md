@@ -42,7 +42,7 @@ bash benchmark.sh
 ```
 
 ## Docker container
-You could use the pre-built [docker container](https://github.com/roitberg-group/lammps-ani/pkgs/container/lammps-ani) to avoid compiling the program by yourself.
+You could use the pre-built [docker container](https://github.com/roitberg-group/lammps-ani/pkgs/container/lammps-ani) to avoid compiling the program by yourself. The pre-built container only supports Kokkos for A100 GPUs.
 ```bash
 docker pull ghcr.io/roitberg-group/lammps-ani:master
 docker run --gpus all -it ghcr.io/roitberg-group/lammps-ani:master

@@ -154,3 +154,5 @@ cd /lammps-ani/examples/water/
 # Run benchmark script. Note that for this container, Kokkos is only available for A100 GPUs
 bash benchmark.sh
 ```
+
+There are several simulation examples under [examples](examples/) folder.

@@ -1,158 +1,202 @@
 # LAMMPS-ANI
-A plugin to run torchani on LAMMPS.
+A plugin that enables LAMMPS to run molecular dynamics simulations using the TorchANI neural network potential.
 
 ## Requirement
-### For Hipergator users
+This section describes the steps required to set up the environment for running LAMMPS-ANI.
+
+### For HiPerGator Users
+To run an interactive session on HiPerGator and load the necessary modules, use the following commands:
 ```bash
-# run an interactive session
+# Run an interactive session
 srun --qos=roitberg --account=roitberg --nodes=1 --ntasks=2 --cpus-per-task=2 --mem=80gb --gres=gpu:2 --partition=hpg-ai -t 3:00:00 --pty /bin/bash -i
-# load modules
+
+# Load modules
 module load cuda/11.4.3 gcc/9.3.0 openmpi/4.0.5 cmake/3.21.3 git/2.30.1 netcdf/4.7.2 singularity
 ```
 
-PyTorch and cuDNN
+You could skip the following if you use docker or singularity container.
+
+Next, install PyTorch and cuDNN using Conda.
 ```bash
 conda install pytorch==1.12.1 torchvision==0.13.1 torchaudio==0.12.1 cudatoolkit=11.6 -c pytorch -c conda-forge
 conda install -c conda-forge cudnn=8.3.2
 ```
 
-Netcdf should be avialable in most HPC systems, and could be loaded using `module load` command. Otherwise, if you are running Ubuntu, you could install it by
-```
+NetCDF should be available in most HPC systems and can be loaded using the module load command. If you are running Ubuntu and need to install NetCDF, use the following command:
+```bash
 apt install libnetcdf-dev
 ```
 
 
-### For Expanse users
+### For Expanse Users
 
-Expanse does not have the latest CUDA libraries to compile Lammps-ANI, please use the [singularity](#singularity-container) container instead
+Expanse does not have the latest CUDA libraries required to compile LAMMPS-ANI. Please use the Singularity container instead. The instructions for using Singularity on Expanse are as follows:
 
 ```bash
+# Request an interactive session on Expanse
 srun -p gpu-shared --nodes=1 --ntasks=2 --account=[YOUR_ACCOUNT_NAME] --cpus-per-task=2 --gpus=2 --time=03:00:00 --mem=80gb --pty -u bash -i
+
+# Load the Singularity module
 module load singularitypro
 ```
 
-Please check [Singularity container](#singularity-container) section on how to use it.
+For detailed instructions on how to use the Singularity container, please refer to the [Singularity container](#singularity-container) section.
 
-## Docker container
-You could use the pre-built [docker container](https://github.com/roitberg-group/lammps-ani/pkgs/container/lammps-ani) to avoid compiling the program by yourself. The pre-built container only supports Kokkos for A100 GPUs.
+## Docker Container
+You can use the pre-built [docker container](https://github.com/roitberg-group/lammps-ani/pkgs/container/lammps-ani) to avoid manually compiling the program. Note that the pre-built container only supports Kokkos for A100 GPUs.
+
 ```bash
+# Pull the Docker container
 docker pull ghcr.io/roitberg-group/lammps-ani:master
+# Run the Docker container
 docker run --gpus all -it ghcr.io/roitberg-group/lammps-ani:master
 ```
 
-## Singularity container
-Some HPCs provide Singularity instead of Docker. The following shows the instruction for Singularity usage:
-
+## Singularity Container
+Some HPC systems provide Singularity instead of Docker. The following instructions demonstrate how to use Singularity for running LAMMPS-ANI:
 ``` bash
-# First load singularity module
+# First, load the Singularity module
 module load singularity  # or `module load singularitypro` for Expanse
-# Setup Cache and TMP directory for singularity, this step is needed for Expanse Users
+
+# Set up cache and temporary directories for Singularity (required for Expanse users)
 export SINGULARITY_CACHEDIR=/scratch/$USER/job_$SLURM_JOB_ID
 export SINGULARITY_TMPDIR=/scratch/$USER/job_$SLURM_JOB_ID
+
 # Create and enter a new folder
 mkdir ani; cd ani
-# Pull the container
+
+# Pull the Singularity container
 singularity pull -F docker://ghcr.io/roitberg-group/lammps-ani:master
-# Clone the repo
+
+# Clone the LAMMPS-ANI repository
 git clone --recursive git@github.com:roitberg-group/lammps-ani.git
-# The folder structure now should be like:
-# .
-# ├── lammps-ani
-# └── lammps-ani_master.sif
-# Exec into the container
+```
+
+The folder structure should now be as follows:
+```bash
+.
+├── lammps-ani
+└── lammps-ani_master.sif
+```
+
+Execute into the Singularity container:
+
+```bash
 # [TODO] slurm environment might also be needed
 SINGULARITYENV_CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES singularity exec --cleanenv -H ./:/home --nv lammps-ani_master.sif /bin/bash
+```
 
-# Then run the water example
+You can then run the water example:
+```bash
 cd lammps-ani/examples/water
 # If you don't have A100 GPUs, you need to change the `RUN_KOKKOS` variable to `no` in the `run.sh` script.
-# Run it
+
+# Run the example
 ./run.sh
 ```
 
-You could also build kokkos for the GPUs you have, which moves all the LAMMPS internal computations such as neighbor list calculation, position update, etc to GPUs. It also eliminates the need for CPU-GPU data transfer and significantly improves the performance. Please check section [build within container](#build-within-container) for more detail.
+You can also build Kokkos for the GPUs you have, which moves all the LAMMPS internal computations, such as neighbor list calculation and position update, to GPUs. It also eliminates the need for CPU-GPU data transfer and significantly improves performance. Please refer to the [Build Within Container](#build-within-container) section for more details.
 
-Please also check the [alanine dipeptide](examples/alanine-dipeptide) example.
+The [Alanine Dipeptide](examples/alanine-dipeptide) example is also available for reference.
 
 ## Usage
+To use the LAMMPS-ANI plugin, you need to specify the `pair_style` and `pair_coeff` commands in your LAMMPS input script as follows:
+
 ```bash
 pair_style     ani 5.1 model_file device num_models ani_aev ani_neighbor
 pair_coeff     * *
 ```
-0. `model_file`               = path to the model file
-1. `device`                   = `cuda`/`cpu`
-2. `num_models` (Optional)    = number of models to use, default as `-1` to use all models within the ensemble
-3. `ani_aev` (Optional)       = `cuaev`/`pyaev`, default as `cuaev`
-4. `ani_neighbor` (Optional)  = `full`/`half`, default as full nbrlist. Note that full nbrlist is prefered for performance benefit.
-5. `ani_precision` (Optional) = `single`/`double`, default as single
+
+1. `model_file` - Path to the TorchANI model file
+2. `device` - Specifies the device to use: `cuda` for GPU or `cpu` for CPU.
+3. `num_models` (Optional) - Number of models to use in the ensemble. Default is `-1` to use all models.
+4. `ani_aev` (Optional) - AEV computation method: `cuaev` (CUDA AEV) or `pyaev` (PyTorch AEV). Default is `cuaev`.
+5. `ani_neighbor` (Optional) - Neighbor list type: `full` or `half`. Default is `full` and is prefered for performance benefit.
+6. `ani_precision` (Optional) - Precision mode: `single` or `double`. Default is `single`.
 
 
 ## Models
 
-Currently there are 3 models available, `ani2x.pt`, `ani2x_repulsion.pt`, `ani2x_ext0_repulsion.pt`. They are defined at [models.py](tests/models.py) and tested by [test_models.py](tests/test_models.py). To use custom models, the models need to follow a strict format, user could check the models defined at the [models.py](tests/models.py) for more detail.
+Three models are currently available: `ani2x.pt`, `ani2x_repulsion.pt`, `and ani2x_ext0_repulsion.pt`. These models are defined in the [models.py](tests/models.py) file and can be tested using [test_models.py](tests/test_models.py). To use custom models, ensure that they follow the specified format, as shown in [models.py](tests/models.py).
 
+The `ani2x_repulsion.pt` could only be exported within UF network. But all three models could be found in the container directory `/lammps-ani/tests/*.pt`.
 
+To export the models:
 ```bash
 cd lammps-ani
 # When using singularity container, you may encounter write permission error, you could solve it by install torchani_sandbox to your home directory by:
 # cd external/torchani_sandbox && python setup.py install --ext --user && cd ../../
+
+# Save models and tests
 cd tests/
-# save models and tests
 pytest test_models.py -s -v
 
-# a longer tests if you want to run
+# (Optional) Simulation tests against to ASE
 pytest test_lmp_with_ase.py -s -v
 ```
 
-## Build from source
+## Build from Source
+
+You can build LAMMPS-ANI from source using the following commands:
 ```bash
 git clone --recursive git@github.com:roitberg-group/lammps-ani.git
 ./build.sh
-# by default this will build CUAEV for all GPU architectures, you could speed up this process by specifying
-# the CMAKE_CUDA_ARCHITECTURES for specific architectures, for example:
+# By default, this builds CUAEV for all GPU architectures. To speed up the process, specify CMAKE_CUDA_ARCHITECTURES for specific architectures. For example:
 # CMAKE_CUDA_ARCHITECTURES="7.5;8.0" ./build.sh
 ```
 
-User could use the absolute path to run lammps (please check [run examples](#run-examples) section), or install lammps binaries and libraries into `${HOME}/.local`. For the later case, you need to set `PATH` and `LD_LIBRARY_PATH` environment variables to be able to use `lmp_mpi` directly.
+To use the LAMMPS-ANI plugin, you need to set environment variables for the paths. You can add these variables to your `~/.bashrc` file or use the provided source ./build-env.sh script to load them automatically:
+
+```bash
+export LAMMPS_ANI_ROOT=<PATH_TO_LAMMPS_ANI_ROOT>
+export LAMMPS_ROOT=${LAMMPS_ANI_ROOT}/external/lammps/
+export LAMMPS_PLUGIN_PATH=${LAMMPS_ANI_ROOT}/build/
+```
+Then lammps could be envoked by
+```
+mpirun -np 1 ${LAMMPS_ROOT}/lmp_mpi -help
+```
+
+(Optional) User could also install lammps binaries and libraries into `${HOME}/.local`. In this case, you need to set `PATH` and `LD_LIBRARY_PATH` environment variables to be able to use `lmp_mpi` directly.
 ```bash
 export PATH=${HOME}/.local/bin:$PATH
 export LD_LIBRARY_PATH=${HOME}/.local/lib:$LD_LIBRARY_PATH
 export LAMMPS_PLUGIN_PATH=${HOME}/.local/lib
 ```
 
-test
+## Build within Container
+Detailed instructions for building LAMMPS-ANI within a Docker or Singularity container will be provided here.
+
+
+## Run Examples
+
+The LAMMPS-ANI plugin provides several simulation [examples](examples/) that can be found in the examples folder. To successfully run these examples, you need to properly set the `LAMMPS_ANI_ROOT`, `LAMMPS_ROOT`, and `LAMMPS_PLUGIN_PATH` environment variables. These variables are essential for locating the LAMMPS-ANI root directory, the LAMMPS root directory, and the LAMMPS plugin path, respectively.
+
+For users running the simulations within a Docker or Singularity container, these environment variables are automatically set within the container.
+
+For users who have built LAMMPS-ANI locally, it is important to set these environment variables manually in the `~/.bashrc` file and also in any script file used to submit SLURM jobs. You can conveniently set these variables by running the `source ./build-env.sh` script, which is provided with LAMMPS-ANI.
+
+Here is an example of how to set these environment variables:
+
 ```bash
-lmp_mpi -help
-# run without kokkos
-mpirun -np 1 lmp_mpi ... -in in.lammps
-# run with kokkos
-mpirun -np 1 lmp_mpi -k on g 1 -sf kk -pk kokkos gpu/aware on ... -in in.lammps
+export LAMMPS_ANI_ROOT=<PATH_TO_LAMMPS_ANI_ROOT>  # Replace with the actual path to LAMMPS-ANI root directory
+export LAMMPS_ROOT=${LAMMPS_ANI_ROOT}/external/lammps/  # Path to the LAMMPS root directory
+export LAMMPS_PLUGIN_PATH=${LAMMPS_ANI_ROOT}/build/  # Path to the LAMMPS plugin directory
 ```
 
-## Build within container
-
-
-## Run examples
-There are 3 environment variables needed to run LAMMPS-ANI with absolute path.
-- For docker and singularity contianer, these variables are already set.
-- For local build users, they need to set them correctly and put them into `~/.bashrc` file and also the script file before submit slurm jobs. You could also run `source ./build-env.sh` to load them automatically.
-```bash
-export LAMMPS_ANI_ROOT=<PATH_TO_LAMMPS_ANI_ROOT>
-export LAMMPS_ROOT=${LAMMPS_ANI_ROOT}/external/lammps/
-export LAMMPS_PLUGIN_PATH=${LAMMPS_ANI_ROOT}/build/
-```
-
-There are several simulation examples under [examples](examples/) folder.
+After setting the environment variables correctly, you can navigate to the [examples](examples/) folder and follow the instructions provided in each example to run the simulations.
 
 ## Benchmark
 
-Use the pre-built docker container
+You can use the pre-built Docker container to run benchmarks for LAMMPS-ANI. Please note that the pre-built container supports Kokkos only for A100 GPUs.
+
 ```bash
+# Pull the Docker container
 docker pull ghcr.io/roitberg-group/lammps-ani:master
+# Run the Docker container
 docker run --gpus all -it ghcr.io/roitberg-group/lammps-ani:master
+# Go to the water example directory
 cd /lammps-ani/examples/water/
-# Run benchmark script. Note that for this container, Kokkos is only available for A100 GPUs
+# Run the benchmark script (Note: For this container, Kokkos is only available for A100 GPUs)
 bash benchmark.sh
 ```
-
-There are several simulation examples under [examples](examples/) folder.

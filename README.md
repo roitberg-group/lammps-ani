@@ -141,7 +141,7 @@ You can build LAMMPS-ANI from source using the following commands:
 ```bash
 git clone --recursive git@github.com:roitberg-group/lammps-ani.git
 ./build.sh
-# By default, this builds CUAEV for all GPU architectures. To speed up the process, specify CMAKE_CUDA_ARCHITECTURES for specific architectures. For example:
+# By default, this builds CUAEV for all GPU architectures. To speed up the process, # specify CMAKE_CUDA_ARCHITECTURES for specific architectures. For example:
 # CMAKE_CUDA_ARCHITECTURES="7.5;8.0" ./build.sh
 ```
 

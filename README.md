@@ -31,15 +31,7 @@ srun -p gpu-shared --nodes=1 --ntasks=2 --account=[YOUR_ACCOUNT_NAME] --cpus-per
 module load singularitypro
 ```
 
-## Benchmark
-Use the pre-built docker container
-```bash
-docker pull ghcr.io/roitberg-group/lammps-ani:master
-docker run --gpus all -it ghcr.io/roitberg-group/lammps-ani:master
-cd /lammps-ani/examples/water/
-# Run benchmark script. Note that for this container, Kokkos is only available for A100 GPUs
-bash benchmark.sh
-```
+Please check [Singularity container](#singularity-container) section on how to use it.
 
 ## Docker container
 You could use the pre-built [docker container](https://github.com/roitberg-group/lammps-ani/pkgs/container/lammps-ani) to avoid compiling the program by yourself. The pre-built container only supports Kokkos for A100 GPUs.
@@ -50,15 +42,66 @@ docker run --gpus all -it ghcr.io/roitberg-group/lammps-ani:master
 
 ## Singularity container
 Some HPCs provide Singularity instead of Docker. The following shows the instruction for Singularity usage:
-```bash
-git clone --recursive git@github.com:roitberg-group/lammps-ani.git
+
+``` bash
+# First load singularity module
+module load singularity  # or `module load singularitypro` for Expanse
+# Setup Cache and TMP directory for singularity, this step is needed for Expanse Users
+export SINGULARITY_CACHEDIR=/scratch/$USER/job_$SLURM_JOB_ID
+export SINGULARITY_TMPDIR=/scratch/$USER/job_$SLURM_JOB_ID
+# Create and enter a new folder
+mkdir ani; cd ani
+# Pull the container
 singularity pull -F docker://ghcr.io/roitberg-group/lammps-ani:master
-mkdir -p ~/singularity-home
-# exec into container
-SINGULARITYENV_CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES singularity exec --cleanenv -H ~/singularity-home:/home --nv lammps-ani_master.sif /bin/bash
-# test
+# Clone the repo
+git clone --recursive git@github.com:roitberg-group/lammps-ani.git
+# The folder structure now should be like:
+# .
+# ├── lammps-ani
+# └── lammps-ani_master.sif
+# Exec into the container
+# [TODO] slurm environment might also be needed
+SINGULARITYENV_CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES singularity exec --cleanenv -H ./:/home --nv lammps-ani_master.sif /bin/bash
+
+# Then run the water example
+cd lammps-ani/examples/water
+# If you don't have A100 GPUs, you need to change the `RUN_KOKKOS` variable to `no` in the `run.sh` script.
+# Run it
+./run.sh
+```
+
+You could also build kokkos for the GPUs you have, which moves all the LAMMPS internal computations such as neighbor list calculation, position update, etc to GPUs. It also eliminates the need for CPU-GPU data transfer and significantly improves the performance. Please check section [build within container](#build-within-container) for more detail.
+
+Please also check the [alanine dipeptide](examples/alanine-dipeptide) example.
+
+## Usage
+```bash
+pair_style     ani 5.1 model_file device num_models ani_aev ani_neighbor
+pair_coeff     * *
+```
+0. `model_file`               = path to the model file
+1. `device`                   = `cuda`/`cpu`
+2. `num_models` (Optional)    = number of models to use, default as `-1` to use all models within the ensemble
+3. `ani_aev` (Optional)       = `cuaev`/`pyaev`, default as `cuaev`
+4. `ani_neighbor` (Optional)  = `full`/`half`, default as full nbrlist. Note that full nbrlist is prefered for performance benefit.
+5. `ani_precision` (Optional) = `single`/`double`, default as single
+
+
+## Models
+
+Currently there are 3 models available, `ani2x.pt`, `ani2x_repulsion.pt`, `ani2x_ext0_repulsion.pt`. They are defined at [models.py](tests/models.py) and tested by [test_models.py](tests/test_models.py). To use custom models, the models need to follow a strict format, user could check the models defined at the [models.py](tests/models.py) for more detail.
+
+
+```bash
 cd lammps-ani
-nvidia-smi && cd external/torchani_sandbox && python setup.py install --ext --user && cd ../../ && cd tests/ && pytest test_models.py -s -v && ./test_all.sh
+# When using singularity container, you may encounter write permission error, you could solve it by install torchani_sandbox to your home directory by:
+# cd external/torchani_sandbox && python setup.py install --ext --user && cd ../../
+cd tests/
+# save models and tests
+pytest test_models.py -s -v
+
+# a longer tests if you want to run
+pytest test_lmp_with_ase.py -s -v
 ```
 
 ## Build from source
@@ -86,6 +129,9 @@ mpirun -np 1 lmp_mpi ... -in in.lammps
 mpirun -np 1 lmp_mpi -k on g 1 -sf kk -pk kokkos gpu/aware on ... -in in.lammps
 ```
 
+## Build within container
+
+
 ## Run examples
 There are 3 environment variables needed to run LAMMPS-ANI with absolute path.
 - For docker and singularity contianer, these variables are already set.
@@ -97,3 +143,14 @@ export LAMMPS_PLUGIN_PATH=${LAMMPS_ANI_ROOT}/build/
 ```
 
 There are several simulation examples under [examples](examples/) folder.
+
+## Benchmark
+
+Use the pre-built docker container
+```bash
+docker pull ghcr.io/roitberg-group/lammps-ani:master
+docker run --gpus all -it ghcr.io/roitberg-group/lammps-ani:master
+cd /lammps-ani/examples/water/
+# Run benchmark script. Note that for this container, Kokkos is only available for A100 GPUs
+bash benchmark.sh
+```

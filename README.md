@@ -84,6 +84,7 @@ Execute into the Singularity container:
 ```bash
 # [TODO] slurm environment might also be needed
 SINGULARITYENV_CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES singularity exec --cleanenv -H ./:/home --nv lammps-ani_master.sif /bin/bash
+# [TODO] how to run with 2 GPUs
 ```
 
 You can then run the water example:
@@ -169,7 +170,7 @@ mpirun -np 1 /lmp_mpi -help
 ```
 
 ## Build within Container
-Detailed instructions for building LAMMPS-ANI within a Docker or Singularity container will be provided here.
+[TODO] Detailed instructions for building LAMMPS-ANI within a Docker or Singularity container will be provided here.
 
 
 ## Run Examples

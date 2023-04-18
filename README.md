@@ -163,6 +163,10 @@ export PATH=${HOME}/.local/bin:$PATH
 export LD_LIBRARY_PATH=${HOME}/.local/lib:$LD_LIBRARY_PATH
 export LAMMPS_PLUGIN_PATH=${HOME}/.local/lib
 ```
+Then lammps could be envoked by
+```
+mpirun -np 1 /lmp_mpi -help
+```
 
 ## Build within Container
 Detailed instructions for building LAMMPS-ANI within a Docker or Singularity container will be provided here.

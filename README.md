@@ -86,6 +86,17 @@ Execute into the Singularity container:
 SINGULARITYENV_CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES singularity exec --cleanenv -H ./:/home --nv lammps-ani_master.sif /bin/bash
 # [TODO] how to run with 2 GPUs
 ```
+The above command allows you to execute a Singularity container (lammps-ani_master.sif) on a system with NVIDIA GPUs. Let's break down the command and its components:
+
+- `SINGULARITYENV_CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES`: This part sets the `CUDA_VISIBLE_DEVICES` environment variable inside the Singularity container to match the value of the `CUDA_VISIBLE_DEVICES` variable outside the container. This ensures that the container has access to the same GPUs as the host system.
+
+- `--cleanenv`: This flag clears the environment inside the container, ensuring that only essential Singularity environment variables are set. This helps prevent conflicts between the host system and container environments.
+
+- `-H ./:/home`: This option allows you to bind a directory from the host system (`./`, which is the current directory) to a directory inside the container (`/home`). Any changes made to the `/home` directory inside the container will be reflected in the current directory on the host system.
+
+- `--nv`: This flag enables GPU support within the Singularity container by automatically binding the necessary NVIDIA libraries and drivers from the host system.
+
+It's important to note that the LAMMPS-ANI plugin is installed in the `/lammps-ani `directory inside the container. However, Singularity containers are read-only by default, which means you cannot write or modify files within the container itself. To work around this limitation, you can use bind mounts (as done with the `-H ./:/home` option) to map writable directories from the host system into the container. When running simulations, make sure to use directories that are writable on the host system.
 
 You can then run the water example:
 ```bash

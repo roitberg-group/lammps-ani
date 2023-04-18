@@ -173,7 +173,7 @@ export LAMMPS_PLUGIN_PATH=${HOME}/.local/lib
 ```
 Then lammps could be envoked by
 ```
-mpirun -np 1 /lmp_mpi -help
+mpirun -np 1 lmp_mpi -help
 ```
 
 ## Build within Container

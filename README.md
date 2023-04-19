@@ -188,11 +188,33 @@ mpirun -np 1 lmp_mpi -help
 ```
 
 ## Build within Container
-[TODO] Detailed instructions for building LAMMPS-ANI within a Docker or Singularity container will be provided here.
+Here are the instructions for building LAMMPS-ANI within a Docker or Singularity container:
 
+```bash
+# Start an interactive session within the Singularity container.
+# The "-H ./:/home" option mounts the current directory as the home directory in the container.
+# The "--nv" option enables GPU support.
+SINGULARITYENV_CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES singularity exec --cleanenv -H ./:/home --nv lammps-ani_master.sif /bin/bash
+
+# Navigate to the lammps-ani directory.
+cd lammps-ani
+
+# Define the installation directory in the INSTALL_DIR environment variable.
+# Make sure to add the following line to your ~/.bashrc file to make it persistent across sessions.
+export INSTALL_DIR=${HOME}/.local
+
+# Execute the build script to compile LAMMPS-ANI.
+./build.sh
+
+# Update environment variables to reflect the new build.
+# These variables are needed to run LAMMPS-ANI using the newly compiled binaries and libraries.
+export LAMMPS_ANI_ROOT=./
+export LAMMPS_ROOT=${LAMMPS_ANI_ROOT}/external/lammps/
+export LAMMPS_PLUGIN_PATH=${LAMMPS_ANI_ROOT}/build/
 ```
-INSTALL_DIR=${HOME}/.local
-```
+
+After successfully building LAMMPS-ANI within the container, you can use the newly compiled binaries and libraries by setting the appropriate environment variables as shown above.
+
 ## Run Examples
 
 The LAMMPS-ANI plugin provides several simulation [examples](examples/) that can be found in the examples folder. To successfully run these examples, you need to properly set the `LAMMPS_ANI_ROOT`, `LAMMPS_ROOT`, and `LAMMPS_PLUGIN_PATH` environment variables. These variables are essential for locating the LAMMPS-ANI root directory, the LAMMPS root directory, and the LAMMPS plugin path, respectively.

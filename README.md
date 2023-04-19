@@ -82,14 +82,12 @@ The folder structure should now be as follows:
 Execute into the Singularity container:
 
 ```bash
-# [TODO] slurm environment might also be needed
 SINGULARITYENV_CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES singularity exec --cleanenv -H ./:/home --nv lammps-ani_master.sif /bin/bash
-# [TODO] how to run with 2 GPUs
 ```
 The above command allows you to execute a Singularity container (lammps-ani_master.sif) on a system with NVIDIA GPUs. Let's break down the command and its components:
 
 - `SINGULARITYENV_CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES`: This part sets the `CUDA_VISIBLE_DEVICES` environment variable inside the Singularity container to match the value of the `CUDA_VISIBLE_DEVICES` variable outside the container. This ensures that the container has access to the same GPUs as the host system.
-- `--cleanenv`: This flag clears the environment inside the container, ensuring that only essential Singularity environment variables are set. This helps prevent conflicts between the host system and container environments.
+- `--cleanenv`: By passing this flag, the host environment variables will not be passed into the container, ensuring a clean environment inside the container. This helps prevent conflicts between the host system and container environments.
 - `-H ./:/home`: This option allows you to bind a directory from the host system (`./`, which is the current directory) to a directory inside the container (`/home`). Any changes made to the `/home` directory inside the container will be reflected in the current directory on the host system.
 
 It's important to note that the LAMMPS-ANI plugin is installed in the `/lammps-ani `directory inside the container. However, Singularity containers are read-only by default, which means you cannot write or modify files within the container itself. To work around this limitation, you can use bind mounts (as done with the `-H ./:/home` option) to map writable directories from the host system into the container. When running simulations, make sure to use directories that are writable on the host system.
@@ -106,6 +104,19 @@ cd lammps-ani/examples/water
 You can also build Kokkos for the GPUs you have, which moves all the LAMMPS internal computations, such as neighbor list calculation and position update, to GPUs. It also eliminates the need for CPU-GPU data transfer and significantly improves performance. Please refer to the [Build Within Container](#build-within-container) section for more details.
 
 The [Alanine Dipeptide](examples/alanine-dipeptide) example is also available for reference.
+
+### Submit Singularity Slurm Job
+When submitting a Slurm job that uses a Singularity container, you need to configure the container execution appropriately. Suppose you are in the directory lammps-ani/examples/water on the host system. To run the simulation with Singularity, create a Slurm job script and include the following command:
+```bash
+# replace [PATH/TO/FOLDER] with the actual path
+SINGULARITYENV_CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES singularity exec --cleanenv -H [PATH/TO/FOLDER]:/home --nv [PATH/TO/FOLDER]/lammps-ani_master.sif ./run.sh
+```
+
+Please note that there appears to be a limitation with using GPU Direct RDMA within Singularity containers. As a result, there may be a significant decrease in performance when using multiple GPUs due to inefficient GPU-GPU communication. Currently, running multiple GPUs within the Singularity container is not recommended.
+
+For more information and discussions on this topic, you can refer to the following resources:
+1. [Singularity issue #4921](https://github.com/apptainer/singularity/issues/4921)
+2. [How to Run NGC Deep Learning Containers with Singularity](https://developer.nvidia.com/blog/how-to-run-ngc-deep-learning-containers-with-singularity/)
 
 ## Usage
 To use the LAMMPS-ANI plugin, you need to specify the `pair_style` and `pair_coeff` commands in your LAMMPS input script as follows:
@@ -179,7 +190,9 @@ mpirun -np 1 lmp_mpi -help
 ## Build within Container
 [TODO] Detailed instructions for building LAMMPS-ANI within a Docker or Singularity container will be provided here.
 
-
+```
+INSTALL_DIR=${HOME}/.local
+```
 ## Run Examples
 
 The LAMMPS-ANI plugin provides several simulation [examples](examples/) that can be found in the examples folder. To successfully run these examples, you need to properly set the `LAMMPS_ANI_ROOT`, `LAMMPS_ROOT`, and `LAMMPS_PLUGIN_PATH` environment variables. These variables are essential for locating the LAMMPS-ANI root directory, the LAMMPS root directory, and the LAMMPS plugin path, respectively.

@@ -4,15 +4,35 @@ set -ex
 # export environment
 source build-env.sh
 
+# Check if the python installation directory is writable
+dir_to_check=$(python -c 'import site; print(site.getsitepackages()[0])')
+temp_file="$dir_to_check/.write_test_$(date +%s%N)"
+# Temporarily disable 'set -e'
+set +e
+# Attempt to create the temporary file
+touch "$temp_file" > /dev/null 2>&1
+# Check the result of the touch command to determine writability
+if [ $? -eq 0 ]; then
+    # If writable, set the variable to an empty string
+    install_option=""
+    # Clean up the temporary file
+    rm -f "$temp_file"
+else
+    # If not writable, set the variable to '--user'
+    install_option="--user"
+fi
+# Re-enable 'set -e'
+set -e
+
 # build torchani
 cd external/torchani_sandbox
-rm -rf build && python setup.py develop --ext
-pip install h5py ase pytest pyyaml --upgrade
+rm -rf build && python setup.py develop --ext $install_option
+pip install h5py ase pytest pyyaml --upgrade $install_option
 cd ../../
 
 # install ani_ext
 cd external/ani_ext
-python setup.py develop
+python setup.py develop $install_option
 cd ../../
 
 # save model

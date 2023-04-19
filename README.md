@@ -1,10 +1,11 @@
 # LAMMPS-ANI
 A plugin that enables LAMMPS to run molecular dynamics simulations using the TorchANI neural network potential.
 
-## Requirement
+## Installation
+### Requirement
 This section describes the steps required to set up the environment for running LAMMPS-ANI.
 
-### For HiPerGator Users
+#### For HiPerGator Users
 To run an interactive session on HiPerGator and load the necessary modules, use the following commands:
 ```bash
 # Run an interactive session
@@ -28,7 +29,7 @@ apt install libnetcdf-dev
 ```
 
 
-### For Expanse Users
+#### For Expanse Users
 
 Expanse does not have the latest CUDA libraries required to compile LAMMPS-ANI. Please use the Singularity container instead. The instructions for using Singularity on Expanse are as follows:
 
@@ -42,7 +43,7 @@ module load singularitypro
 
 For detailed instructions on how to use the Singularity container, please refer to the [Singularity container](#singularity-container) section.
 
-## Docker Container
+### Docker Container
 You can use the pre-built [docker container](https://github.com/roitberg-group/lammps-ani/pkgs/container/lammps-ani) to avoid manually compiling the program. Note that the pre-built container only supports Kokkos for A100 GPUs.
 
 ```bash
@@ -52,7 +53,7 @@ docker pull ghcr.io/roitberg-group/lammps-ani:master
 docker run --gpus all -it ghcr.io/roitberg-group/lammps-ani:master
 ```
 
-## Singularity Container
+### Singularity Container
 Some HPC systems provide Singularity instead of Docker. The following instructions demonstrate how to use Singularity for running LAMMPS-ANI:
 ``` bash
 # First, load the Singularity module
@@ -105,56 +106,7 @@ You can also build Kokkos for the GPUs you have, which moves all the LAMMPS inte
 
 The [Alanine Dipeptide](examples/alanine-dipeptide) example is also available for reference.
 
-### Submit Singularity Slurm Job
-When submitting a Slurm job that uses a Singularity container, you need to configure the container execution appropriately. Suppose you are in the directory lammps-ani/examples/water on the host system. To run the simulation with Singularity, create a Slurm job script and include the following command:
-```bash
-# replace [PATH/TO/FOLDER] with the actual path
-SINGULARITYENV_CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES singularity exec --cleanenv -H [PATH/TO/FOLDER]:/home --nv [PATH/TO/FOLDER]/lammps-ani_master.sif ./run.sh
-```
-
-Please note that there appears to be a limitation with using GPU Direct RDMA within Singularity containers. As a result, there may be a significant decrease in performance when using multiple GPUs due to inefficient GPU-GPU communication. Currently, running multiple GPUs within the Singularity container is not recommended.
-
-For more information and discussions on this topic, you can refer to the following resources:
-1. [Singularity issue #4921](https://github.com/apptainer/singularity/issues/4921)
-2. [How to Run NGC Deep Learning Containers with Singularity](https://developer.nvidia.com/blog/how-to-run-ngc-deep-learning-containers-with-singularity/)
-
-## Usage
-To use the LAMMPS-ANI plugin, you need to specify the `pair_style` and `pair_coeff` commands in your LAMMPS input script as follows:
-
-```bash
-pair_style     ani 5.1 model_file device num_models ani_aev ani_neighbor
-pair_coeff     * *
-```
-
-1. `model_file` - Path to the TorchANI model file
-2. `device` - Specifies the device to use: `cuda` for GPU or `cpu` for CPU.
-3. `num_models` (Optional) - Number of models to use in the ensemble. Default is `-1` to use all models.
-4. `ani_aev` (Optional) - AEV computation method: `cuaev` (CUDA AEV) or `pyaev` (PyTorch AEV). Default is `cuaev`.
-5. `ani_neighbor` (Optional) - Neighbor list type: `full` or `half`. Default is `full` and is prefered for performance benefit.
-6. `ani_precision` (Optional) - Precision mode: `single` or `double`. Default is `single`.
-
-
-## Models
-
-Three models are currently available: `ani2x.pt`, `ani2x_repulsion.pt`, `and ani2x_ext0_repulsion.pt`. These models are defined in the [models.py](tests/models.py) file and can be tested using [test_models.py](tests/test_models.py). To use custom models, ensure that they follow the specified format, as shown in [models.py](tests/models.py).
-
-The `ani2x_repulsion.pt` could only be exported within UF network. But all three models could be found in the container directory `/lammps-ani/tests/*.pt`.
-
-To export the models:
-```bash
-cd lammps-ani
-# When using singularity container, you may encounter write permission error, you could solve it by install torchani_sandbox to your home directory by:
-# cd external/torchani_sandbox && python setup.py install --ext --user && cd ../../
-
-# Save models and tests
-cd tests/
-pytest test_models.py -s -v
-
-# (Optional) Simulation tests against to ASE
-pytest test_lmp_with_ase.py -s -v
-```
-
-## Build from Source
+### Build from Source
 
 You can build LAMMPS-ANI from source using the following commands:
 ```bash
@@ -187,7 +139,7 @@ Then lammps could be envoked by
 mpirun -np 1 lmp_mpi -help
 ```
 
-## Build within Container
+### Build within Container
 Here are the instructions for building LAMMPS-ANI within a Docker or Singularity container:
 
 ```bash
@@ -215,7 +167,44 @@ export LAMMPS_PLUGIN_PATH=${LAMMPS_ANI_ROOT}/build/
 
 After successfully building LAMMPS-ANI within the container, you can use the newly compiled binaries and libraries by setting the appropriate environment variables as shown above.
 
-## Run Examples
+
+## Getting start
+To use the LAMMPS-ANI plugin, you need to specify the `pair_style` and `pair_coeff` commands in your LAMMPS input script as follows:
+
+```bash
+pair_style     ani 5.1 model_file device num_models ani_aev ani_neighbor
+pair_coeff     * *
+```
+
+1. `model_file` - Path to the TorchANI model file
+2. `device` - Specifies the device to use: `cuda` for GPU or `cpu` for CPU.
+3. `num_models` (Optional) - Number of models to use in the ensemble. Default is `-1` to use all models.
+4. `ani_aev` (Optional) - AEV computation method: `cuaev` (CUDA AEV) or `pyaev` (PyTorch AEV). Default is `cuaev`.
+5. `ani_neighbor` (Optional) - Neighbor list type: `full` or `half`. Default is `full` and is prefered for performance benefit.
+6. `ani_precision` (Optional) - Precision mode: `single` or `double`. Default is `single`.
+
+
+### Models
+
+Three models are currently available: `ani2x.pt`, `ani2x_repulsion.pt`, `and ani2x_ext0_repulsion.pt`. These models are defined in the [models.py](tests/models.py) file and can be tested using [test_models.py](tests/test_models.py). To use custom models, ensure that they follow the specified format, as shown in [models.py](tests/models.py).
+
+The `ani2x_repulsion.pt` could only be exported within UF network. But all three models could be found in the container directory `/lammps-ani/tests/*.pt`.
+
+To export the models:
+```bash
+cd lammps-ani
+# When using singularity container, you may encounter write permission error, you could solve it by install torchani_sandbox to your home directory by:
+# cd external/torchani_sandbox && python setup.py install --ext --user && cd ../../
+
+# Save models and tests
+cd tests/
+pytest test_models.py -s -v
+
+# (Optional) Simulation tests against to ASE
+pytest test_lmp_with_ase.py -s -v
+```
+
+### Run Examples
 
 The LAMMPS-ANI plugin provides several simulation [examples](examples/) that can be found in the examples folder. To successfully run these examples, you need to properly set the `LAMMPS_ANI_ROOT`, `LAMMPS_ROOT`, and `LAMMPS_PLUGIN_PATH` environment variables. These variables are essential for locating the LAMMPS-ANI root directory, the LAMMPS root directory, and the LAMMPS plugin path, respectively.
 
@@ -247,3 +236,16 @@ cd /lammps-ani/examples/water/
 # Run the benchmark script (Note: For this container, Kokkos is only available for A100 GPUs)
 bash benchmark.sh
 ```
+
+### Submit Singularity Slurm Job
+When submitting a Slurm job that uses a Singularity container, you need to configure the container execution appropriately. Suppose you are in the directory lammps-ani/examples/water on the host system. To run the simulation with Singularity, create a Slurm job script and include the following command:
+```bash
+# replace [PATH/TO/FOLDER] with the actual path
+SINGULARITYENV_CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES singularity exec --cleanenv -H [PATH/TO/FOLDER]:/home --nv [PATH/TO/FOLDER]/lammps-ani_master.sif ./run.sh
+```
+
+Please note that there appears to be a limitation with using GPU Direct RDMA within Singularity containers. As a result, there may be a significant decrease in performance when using multiple GPUs due to inefficient GPU-GPU communication. Currently, running multiple GPUs within the Singularity container is not recommended.
+
+For more information and discussions on this topic, you can refer to the following resources:
+1. [Singularity issue #4921](https://github.com/apptainer/singularity/issues/4921)
+2. [How to Run NGC Deep Learning Containers with Singularity](https://developer.nvidia.com/blog/how-to-run-ngc-deep-learning-containers-with-singularity/)

@@ -244,8 +244,4 @@ When submitting a Slurm job that uses a Singularity container, you need to confi
 SINGULARITYENV_CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES singularity exec --cleanenv -H [PATH/TO/FOLDER]:/home --nv [PATH/TO/FOLDER]/lammps-ani_master.sif ./run.sh
 ```
 
-Please note that there appears to be a limitation with using GPU Direct RDMA within Singularity containers. As a result, there may be a significant decrease in performance when using multiple GPUs due to inefficient GPU-GPU communication. Currently, running multiple GPUs within the Singularity container is not recommended.
-
-For more information, refer to the following resources:
-1. [Singularity issue #4921](https://github.com/apptainer/singularity/issues/4921)
-2. [How to Run NGC Deep Learning Containers with Singularity](https://developer.nvidia.com/blog/how-to-run-ngc-deep-learning-containers-with-singularity/)
+Please note that there appears to be a limitation with using GPU Direct RDMA within Singularity containers. As a result, there may be a significant decrease in performance when using multiple GPUs due to inefficient GPU-GPU communication. Currently, running multiple GPUs within the Singularity container is not recommended. For more information, refer to issue [#70](https://github.com/roitberg-group/lammps-ani/issues/70).

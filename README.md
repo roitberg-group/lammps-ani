@@ -221,7 +221,7 @@ export LAMMPS_PLUGIN_PATH=${LAMMPS_ANI_ROOT}/build/  # Path to the LAMMPS plugin
 
 After setting the environment variables correctly, you can navigate to the [examples](examples/) folder and follow the instructions provided in each example to run the simulations.
 
-## Benchmark
+### Benchmark
 
 You can use the pre-built Docker container to run benchmarks for LAMMPS-ANI. Please note that the pre-built container supports Kokkos only for A100 GPUs.
 

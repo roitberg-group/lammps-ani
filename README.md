@@ -15,23 +15,9 @@ srun --qos=roitberg --account=roitberg --nodes=1 --ntasks=2 --cpus-per-task=2 --
 module load cuda/11.4.3 gcc/9.3.0 openmpi/4.0.5 cmake/3.21.3 git/2.30.1 netcdf/4.7.2 singularity
 ```
 
-You could skip the following if you use docker or singularity container.
-
-Next, install PyTorch and cuDNN using Conda.
-```bash
-conda install pytorch==1.12.1 torchvision==0.13.1 torchaudio==0.12.1 cudatoolkit=11.6 -c pytorch -c conda-forge
-conda install -c conda-forge cudnn=8.3.2
-```
-
-NetCDF should be available in most HPC systems and can be loaded using the module load command. If you are running Ubuntu and need to install NetCDF, use the following command:
-```bash
-apt install libnetcdf-dev
-```
-
-
 #### For Expanse Users
 
-Expanse does not have the latest CUDA libraries required to compile LAMMPS-ANI. Please use the Singularity container instead. The instructions for using Singularity on Expanse are as follows:
+Expanse does not have the latest CUDA libraries required to compile LAMMPS-ANI. Please use the Singularity container instead.
 
 ```bash
 # Request an interactive session on Expanse
@@ -42,6 +28,52 @@ module load singularitypro
 ```
 
 For detailed instructions on how to use the Singularity container, please refer to the [Singularity container](#singularity-container) section.
+
+### Build from Source
+
+Requirements
+- OpenMPI
+- CUDA >= 11.1
+- PyTorch >= 1.12.1
+- NetCDF
+
+Install PyTorch and cuDNN using Conda.
+```bash
+conda install pytorch==1.12.1 torchvision==0.13.1 torchaudio==0.12.1 cudatoolkit=11.6 -c pytorch -c conda-forge
+conda install -c conda-forge cudnn=8.3.2
+```
+
+NetCDF should be available in most HPC systems and can be loaded using the module load command. If you are running Ubuntu and need to install NetCDF, use the following command:
+```bash
+apt install libnetcdf-dev
+```
+
+You can build LAMMPS-ANI from source using the following commands:
+```bash
+git clone --recursive git@github.com:roitberg-group/lammps-ani.git
+./build.sh
+# By default, this builds CUAEV for all GPU architectures. To speed up the process, # specify CMAKE_CUDA_ARCHITECTURES for specific architectures. For example:
+# CMAKE_CUDA_ARCHITECTURES="7.5;8.0" ./build.sh
+```
+
+To use the LAMMPS-ANI plugin, you need to set environment variables for the paths. You can add these variables to your `~/.bashrc` file or use the provided source ./build-env.sh script to load them automatically:
+
+```bash
+export LAMMPS_ANI_ROOT=<PATH_TO_LAMMPS_ANI_ROOT>
+export LAMMPS_ROOT=${LAMMPS_ANI_ROOT}/external/lammps/
+export LAMMPS_PLUGIN_PATH=${LAMMPS_ANI_ROOT}/build/
+```
+Then lammps could be envoked by
+```
+mpirun -np 1 ${LAMMPS_ROOT}/lmp_mpi -help
+```
+
+(Optional) User could also install lammps binaries and libraries into `${HOME}/.local`. In this case, you need to set `PATH` and `LD_LIBRARY_PATH` environment variables, then you would be able to use `lmp_mpi` directly.
+```bash
+export PATH=${HOME}/.local/bin:$PATH
+export LD_LIBRARY_PATH=${HOME}/.local/lib:$LD_LIBRARY_PATH
+export LAMMPS_PLUGIN_PATH=${HOME}/.local/lib
+```
 
 ### Docker Container
 You can use the pre-built [docker container](https://github.com/roitberg-group/lammps-ani/pkgs/container/lammps-ani) to avoid manually compiling the program. Note that the pre-built container only supports Kokkos for A100 GPUs.
@@ -105,39 +137,6 @@ cd lammps-ani/examples/water
 You can also build Kokkos for the GPUs you have, which moves all the LAMMPS internal computations, such as neighbor list calculation and position update, to GPUs. It also eliminates the need for CPU-GPU data transfer and significantly improves performance. Please refer to the [Build Within Container](#build-within-container) section for more details.
 
 The [Alanine Dipeptide](examples/alanine-dipeptide) example is also available for reference.
-
-### Build from Source
-
-You can build LAMMPS-ANI from source using the following commands:
-```bash
-git clone --recursive git@github.com:roitberg-group/lammps-ani.git
-./build.sh
-# By default, this builds CUAEV for all GPU architectures. To speed up the process, # specify CMAKE_CUDA_ARCHITECTURES for specific architectures. For example:
-# CMAKE_CUDA_ARCHITECTURES="7.5;8.0" ./build.sh
-```
-
-To use the LAMMPS-ANI plugin, you need to set environment variables for the paths. You can add these variables to your `~/.bashrc` file or use the provided source ./build-env.sh script to load them automatically:
-
-```bash
-export LAMMPS_ANI_ROOT=<PATH_TO_LAMMPS_ANI_ROOT>
-export LAMMPS_ROOT=${LAMMPS_ANI_ROOT}/external/lammps/
-export LAMMPS_PLUGIN_PATH=${LAMMPS_ANI_ROOT}/build/
-```
-Then lammps could be envoked by
-```
-mpirun -np 1 ${LAMMPS_ROOT}/lmp_mpi -help
-```
-
-(Optional) User could also install lammps binaries and libraries into `${HOME}/.local`. In this case, you need to set `PATH` and `LD_LIBRARY_PATH` environment variables to be able to use `lmp_mpi` directly.
-```bash
-export PATH=${HOME}/.local/bin:$PATH
-export LD_LIBRARY_PATH=${HOME}/.local/lib:$LD_LIBRARY_PATH
-export LAMMPS_PLUGIN_PATH=${HOME}/.local/lib
-```
-Then lammps could be envoked by
-```
-mpirun -np 1 lmp_mpi -help
-```
 
 ### Build within Container
 Here are the instructions for building LAMMPS-ANI within a Docker or Singularity container:

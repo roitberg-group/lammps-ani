@@ -72,6 +72,13 @@ else()
   message(STATUS "libtorch ${libtorch_VERSION} - found")
 endif()
 
+# setting RPATH
+set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+# add the automatically determined parts of the RPATH
+# which point to directories outside the build tree to the install RPATH
+# https://gitlab.kitware.com/cmake/community/-/wikis/doc/cmake/RPATH-handling#always-full-rpath 
+SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+
 # packages
 find_package(Torch REQUIRED)
 find_package(Python REQUIRED COMPONENTS Interpreter Development)
@@ -95,6 +102,10 @@ target_link_libraries(ani_plugin PRIVATE -Wl,--no-as-needed ani)
 
 set_target_properties(ani_plugin PROPERTIES PREFIX "" SUFFIX ".so" LINK_FLAGS "-rdynamic")
 
+# install
+install(TARGETS cuaev LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
+install(TARGETS ani LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
+install(TARGETS test_model LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
 install(TARGETS ani_plugin LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
 
 add_custom_target(plugins ALL ${CMAKE_COMMAND} -E echo "Building Plugins" DEPENDS ani_plugin)

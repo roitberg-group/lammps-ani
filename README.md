@@ -2,14 +2,16 @@
 A plugin that enables LAMMPS to run molecular dynamics simulations using the TorchANI neural network potential.
 
 ## Installation
+This section outlines two options for setting up LAMMPS-ANI: building from source or using a container. Building from source offers customization, multi-GPU support and Kokkos. Using a container is simpler but currently limited to single-GPU usage, and kokkos is only supported for A100 GPUs.
+
 ### Requirement
-This section describes the steps required to set up the environment for running LAMMPS-ANI.
 
 #### For HiPerGator Users
 To run an interactive session on HiPerGator and load the necessary modules, use the following commands:
 ```bash
 # Run an interactive session
-srun --qos=roitberg --account=roitberg --nodes=1 --ntasks=2 --cpus-per-task=2 --mem=80gb --gres=gpu:2 --partition=hpg-ai -t 3:00:00 --pty /bin/bash -i
+# If you plan to build from source, you could adjust `cpus-per-task` to allocate more CPU cores and speed up compilation.
+srun --qos=roitberg --account=roitberg --nodes=1 --ntasks=1 --cpus-per-task=2 --mem=80gb --gres=gpu:1 --partition=hpg-ai -t 3:00:00 --pty /bin/bash -i
 
 # Load modules
 module load cuda/11.4.3 gcc/9.3.0 openmpi/4.0.5 cmake/3.21.3 git/2.30.1 netcdf/4.7.2 singularity
@@ -17,17 +19,16 @@ module load cuda/11.4.3 gcc/9.3.0 openmpi/4.0.5 cmake/3.21.3 git/2.30.1 netcdf/4
 
 #### For Expanse Users
 
-Expanse does not have the latest CUDA libraries required to compile LAMMPS-ANI. Please use the Singularity container instead.
+To run an interactive session on Expanse and load the necessary modules, use the following commands:
 
 ```bash
 # Request an interactive session on Expanse
-srun -p gpu-shared --nodes=1 --ntasks=2 --account=[YOUR_ACCOUNT_NAME] --cpus-per-task=2 --gpus=2 --time=03:00:00 --mem=80gb --pty -u bash -i
+# If you plan to build from source, you could adjust `cpus-per-task` to allocate more CPU cores and speed up compilation.
+srun -p gpu-shared --nodes=1 --ntasks=1 --account=[YOUR_ACCOUNT_NAME] --cpus-per-task=2 --gpus=1 --time=05:00:00 --mem=80gb --pty -u bash -i
 
-# Load the Singularity module
-module load singularitypro
+# Load modules
+module load gpu/0.15.4 openmpi/4.0.4 cuda11.7/toolkit/11.7.1 cmake/3.19.8 netcdf-c/4.7.4 singularitypro
 ```
-
-For detailed instructions on how to use the Singularity container, please refer to the [Singularity container](#singularity-container) section.
 
 ### Build from Source
 
@@ -56,7 +57,8 @@ git clone --recursive git@github.com:roitberg-group/lammps-ani.git
 # CMAKE_CUDA_ARCHITECTURES="7.5;8.0" ./build.sh
 ```
 
-To use the LAMMPS-ANI plugin, you need to set environment variables for the paths. You can add these variables to your `~/.bashrc` file or use the provided source ./build-env.sh script to load them automatically:
+To use the LAMMPS-ANI plugin, you need to set environment variables for the paths. You can do this by running the provided `source ./build-env.sh` script to load the variables automatically. Verify the variables are set correctly by running `printenv | grep LAMMPS`. You can then add the outputted environment variables to your `~/.bashrc` file for future use, remember to add `export` before each line!
+
 
 ```bash
 export LAMMPS_ANI_ROOT=<PATH_TO_LAMMPS_ANI_ROOT>

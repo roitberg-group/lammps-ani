@@ -44,6 +44,10 @@ velocity       all create 300.0 12345 rot yes mom yes dist gaussian
 timestep       ${timestep}
 
 # run nvt
+# fix            0 all npt temp 300.0 300.0 100.0 iso 2500.0 2500.0 100.0
+# run            10000
+# unfix          0
+
 fix            1 all langevin 300.0 300.0 100.0 12345
 fix            2 all nve
 run            50000000 

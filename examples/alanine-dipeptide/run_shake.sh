@@ -25,10 +25,10 @@ if  [[ $RUN_KOKKOS == "yes" ]]; then
     LAMMPS_ANI_PROFILING=1 mpirun -np ${NUM_GPUS} ${LAMMPS_ROOT}/build/lmp_mpi \
         -k on g ${NUM_GPUS} -sf kk -pk kokkos gpu/aware on \
         -var newton_pair on -var num_models ${NUM_MODELS} -var datafile ${DATA_FILE} -var timestamp ${TIMESTAMP} -var modelfile ${MODEL_FILE} -var timestep ${TIMESTEP}\
-        -log logs/${TIMESTAMP}-kokkos-models_${NUM_MODELS}-gpus_${NUM_GPUS}.log -in in.bonds.lammps
+        -log logs/${TIMESTAMP}-kokkos-models_${NUM_MODELS}-gpus_${NUM_GPUS}.log -in in.shake.lammps
 else
     # run without kokkos
     mpirun -np ${NUM_GPUS} ${LAMMPS_ROOT}/build/lmp_mpi \
         -var newton_pair off -var num_models ${NUM_MODELS} -var datafile ${DATA_FILE} -var timestamp ${TIMESTAMP} -var modelfile ${MODEL_FILE} -var timestep ${TIMESTEP}\
-        -log logs/${TIMESTAMP}-models_${NUM_MODELS}-gpus_${NUM_GPUS}.log -in in.bonds.lammps
+        -log logs/${TIMESTAMP}-models_${NUM_MODELS}-gpus_${NUM_GPUS}.log -in in.shake.lammps
 fi

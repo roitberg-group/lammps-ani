@@ -7,7 +7,7 @@ TIMESTAMP=`date +%F-%H%M%S`
 
 ################################# Configure here ################################# 
 
-RUN_KOKKOS=no
+RUN_KOKKOS=yes
 NUM_GPUS=1
 NUM_MODELS=1
 DATA_FILE=alanine-dipeptide.data

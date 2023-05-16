@@ -37,6 +37,7 @@ class LammpsModelBase(torch.nn.Module):
         para3: Tensor,
         species_ghost_as_padding: Tensor,
         atomic: bool = False,
+        virial_flag: bool = False,
     ):
         """
         The forward function will be called by the lammps interfact with necessary inputs, and it
@@ -51,6 +52,7 @@ class LammpsModelBase(torch.nn.Module):
             para3 (Tensor): if use_fullnbr, it is `numneigh`, otherwise `distances`
             species_ghost_as_padding (Tensor): The species tensor that ghost atoms are set as -1.
             atomic (bool, optional): Whether the atomic_energies should be returned. Defaults to False.
+            virial_flag (bool, optional): Whether the virial should be returned. Defaults to False.
 
         Raises:
             NotImplementedError: The User needs to override this function.
@@ -134,10 +136,16 @@ class LammpsANI(LammpsModelBase):
         para3: Tensor,
         species_ghost_as_padding: Tensor,
         atomic: bool = False,
+        virial_flag: bool = True,
     ):
         assert (
             self.initialized
         ), "Model is not initialized, You need to call init() method before forward function"
+
+        # TODO we need to get diff_vector from full nbrlist as well
+        atom_index12, diff_vector, distances = para1, para2, para3
+        if virial_flag:
+            diff_vector.requires_grad_()
 
         if self.use_cuaev and not self.aev_computer.cuaev_is_initialized:
             self.aev_computer._init_cuaev_computer()
@@ -166,15 +174,23 @@ class LammpsANI(LammpsModelBase):
             energies += rep_energies
             torch.ops.mnp.nvtx_range_pop()
 
-        torch.ops.mnp.nvtx_range_push("Force")
-        force = torch.autograd.grad(
-            [energies.sum()], [coordinates], create_graph=True, retain_graph=True
-        )[0]
+        if virial_flag:
+            torch.ops.mnp.nvtx_range_push("Force and Stress")
+            force, dEdR = torch.autograd.grad([energies.sum()], [coordinates, diff_vector], create_graph=True, retain_graph=True)
+            assert dEdR is not None
+            virial = dEdR.transpose(0, 1) @ diff_vector
+            torch.ops.mnp.nvtx_range_pop()
+        else:
+            torch.ops.mnp.nvtx_range_push("Force")
+            force = torch.autograd.grad(
+                [energies.sum()], [coordinates], create_graph=True, retain_graph=True
+            )[0]
+            torch.ops.mnp.nvtx_range_pop()
+            virial = torch.empty(0)
+
         assert force is not None
         force = -force
-        torch.ops.mnp.nvtx_range_pop()
-
-        return energies, force, atomic_energies
+        return energies, force, atomic_energies, virial
 
     @torch.jit.export
     def forward_total(

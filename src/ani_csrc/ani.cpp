@@ -6,6 +6,7 @@
 #include <iostream>
 #include <tuple>
 #include <vector>
+#include <c10/util/env.h>
 
 // Modified from the following URL, so it **only** casts floating point parameters and buffers, and skips non-floating ones.
 // https://github.com/pytorch/pytorch/blob/1237cf6b6ca86ac6afd5c0a8d3075c9a2d85b6e4/torch/csrc/jit/api/module.cpp#L166-L190
@@ -36,8 +37,12 @@ ANI::ANI(const std::string& model_file, int local_rank, int use_num_models, bool
       use_cuaev(use_cuaev_),
       use_fullnbr(use_fullnbr_),
       use_single(use_single_) {
-  at::globalContext().setAllowTF32CuBLAS(false);
-  at::globalContext().setAllowTF32CuDNN(false);
+
+  // configure whether to allow TF32
+  bool allow_tf32 = c10::utils::check_env("LAMMPS_ANI_ALLOW_TF32") == true;
+  at::globalContext().setAllowTF32CuBLAS(allow_tf32);
+  at::globalContext().setAllowTF32CuDNN(allow_tf32);
+
   try {
     model = torch::jit::load(model_file, device);
 
@@ -74,6 +79,7 @@ ANI::ANI(const std::string& model_file, int local_rank, int use_num_models, bool
     torch::jit::setGraphExecutorOptimize(false);
 
     std::cout << "Successfully loaded the model \nfile: '" << model_file << "' \ndevice: " << device << " \ndtype: " << dtype
+              << ", allow_tf32: " << allow_tf32
               << " \nnbrlist: " << nbrlist << " \nani_aev: " << ani_aev
               << " \nuse_num_models: " << model.attr("use_num_models").toInt() << "/" << model.attr("num_models").toInt()
               << std::endl

@@ -184,6 +184,7 @@ pair_coeff     * *
 5. `ani_neighbor` (Optional) - Neighbor list type: `full` or `half`. Default is `full` and is prefered for performance benefit.
 6. `ani_precision` (Optional) - Precision mode: `single` or `double`. Default is `single`.
 
+On NVIDIA GPUs, tensor cores that are used to speed up matrix multiplication using TF32 precision format are disabled by default. One could enable it by setting environment virable: `export LAMMPS_ANI_ALLOW_TF32=1`.
 
 ### Models
 

@@ -33,12 +33,10 @@ fix            1 all langevin 2500.0 2500.0 50.0 12345
 fix            2 all nve
 timestep       0.5  # 0.1
 
-# Output: dump atom positions every 0.5 ps and log info every 0.5 ps
-dump           1 all xyz 100 logs/${timestamp}.xyz
-# dump           1 all netcdf 100 combustion.nc type x y z vx vy vz
-# dump           1 all atom 100 combustion.lammpstrj
+# Output: 
+dump           1 all custom 100 logs/${timestamp}.lammpstrj id element x y z ix iy iz
 dump_modify    1 element H C N O F S Cl
-dump           2 all netcdf 100 logs/${timestamp}.nc type x y z
+dump           2 all dcd 100 logs/${timestamp}.dcd
 thermo_style   custom step pe ke etotal temp press vol density
 thermo         100
 

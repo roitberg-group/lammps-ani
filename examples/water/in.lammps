@@ -33,9 +33,10 @@ pair_style     ani 5.1 ${modelfile} cuda ${num_models} cuaev full single
 pair_coeff     * *
 
 # Output: dump atom positions every 0.5 ps and log info every 0.5 ps
-dump           1 all xyz 100 ${timestamp}.xyz
+dump           1 all custom 100 ${timestamp}.lammpstrj id element x y z ix iy iz
 dump_modify    1 element H C N O F S Cl
-thermo_style   custom step pe ke etotal temp press vol
+dump           2 all dcd 100 ${timestamp}.dcd
+thermo_style   custom step pe ke etotal temp press vol density
 thermo         100
 
 # Settings: temperature at 300 K, timestep (0.5 fs)

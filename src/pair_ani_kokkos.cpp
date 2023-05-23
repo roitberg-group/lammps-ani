@@ -123,7 +123,7 @@ void PairANIKokkos<DeviceType>::compute(int eflag_in, int vflag_in) {
 
   int max_neighs = d_neighbors.extent(1);
 
-  torch::Tensor out_energy, out_force, out_atomic_energies;
+  torch::Tensor out_energy, out_force, out_atomic_energies, out_virial;
   torch::Tensor species, coordinates, ilist_unique, jlist, numneigh;
 
   auto kokkos_device = torch::Device(torch::kCPU);
@@ -177,6 +177,7 @@ void PairANIKokkos<DeviceType>::compute(int eflag_in, int vflag_in) {
   ani.compute(
       out_energy,
       out_force,
+      out_virial,
       species,
       coordinates,
       npairs,
@@ -186,7 +187,8 @@ void PairANIKokkos<DeviceType>::compute(int eflag_in, int vflag_in) {
       nlocal,
       ago,
       out_atomic_energies,
-      eflag_atom);
+      eflag_atom,
+      vflag);
 
   torch::Tensor d_force_tensor = torch::from_blob(f.data(), {1, ntotal, 3}, tensor_kokkos_force_option);
   d_force_tensor += out_force.to(kokkos_device);
@@ -197,6 +199,15 @@ void PairANIKokkos<DeviceType>::compute(int eflag_in, int vflag_in) {
   if (eflag_atom) {
     torch::Tensor d_eatom_tensor = torch::from_blob(d_eatom.data(), {1, nlocal}, tensor_kokkos_float64_option);
     d_eatom_tensor += out_atomic_energies.to(kokkos_device);
+  }
+
+  if (vflag) {
+    virial[0] += out_virial[0][0].item<double>();
+    virial[0] += out_virial[1][1].item<double>();
+    virial[0] += out_virial[2][2].item<double>();
+    virial[0] += out_virial[0][1].item<double>();
+    virial[0] += out_virial[0][2].item<double>();
+    virial[0] += out_virial[1][2].item<double>();
   }
 
   if (lammps_ani_profiling) {

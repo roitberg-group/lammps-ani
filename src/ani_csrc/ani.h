@@ -40,18 +40,21 @@ class ANI {
   void compute(
       double& out_energy,
       std::vector<double>& out_force,
+      std::vector<double>& out_virial,
       std::vector<int64_t>& species,
       std::vector<double>& coordinates,
       int npairs_half,
       int64_t* atom_index12,
       int nlocal,
       int ago = 0,
-      std::vector<double>* out_atomic_energies = nullptr);
+      std::vector<double>* out_atomic_energies = nullptr,
+      bool vflag = false);
 
   // compute with full nbrlist
   void compute(
       double& out_energy,
       std::vector<double>& out_force,
+      std::vector<double>& out_virial,
       std::vector<int64_t>& species,
       std::vector<double>& coordinates,
       int npairs,
@@ -60,12 +63,14 @@ class ANI {
       int* numneigh,
       int nlocal,
       int ago = 0,
-      std::vector<double>* out_atomic_energies = nullptr);
+      std::vector<double>* out_atomic_energies = nullptr,
+      bool vflag = false);
 
   // kokkos compute with full nbrlist
   void compute(
       torch::Tensor& out_energy,
       torch::Tensor& out_force,
+      torch::Tensor& out_virial,
       torch::Tensor& species,
       torch::Tensor& coordinates,
       int npairs,
@@ -75,7 +80,8 @@ class ANI {
       int nlocal,
       int ago,
       torch::Tensor& out_atomic_energies,
-      bool eflag_atom);
+      bool eflag_atom,
+      bool vflag = false);
 };
 
 #endif

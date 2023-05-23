@@ -64,9 +64,9 @@ def test_models(runpbc, device, use_double, use_cuaev, use_fullnbr, modelfile, v
         pytest.skip("Cuaev does not support CPU")
     if device == "cuda" and (not torch.cuda.is_available()):
         pytest.skip("GPU is not available")
-    # viral currenly only works for halfnbr and pyaev
-    if virial_flag and not ((not use_fullnbr) and (not use_cuaev)):
-        pytest.skip("virial currently only works for half neighbor list and PyAEV")
+    # viral currenly only works for pyaev
+    if virial_flag and use_cuaev:
+        pytest.skip("virial currently only works for PyAEV")
     if virial_flag and (not runpbc):
         pytest.skip("we only test virial for pbc system")
 
@@ -274,6 +274,7 @@ def run_one_test(
         mol.calc = calculator
         stress = mol.get_stress(voigt=False)
         virial_ref = stress * mol.get_volume() / ase.units.Hartree * hartree2kcalmol
+        virial_ref = - virial_ref
 
         # calculate error
         virial_ref = torch.tensor(virial_ref)

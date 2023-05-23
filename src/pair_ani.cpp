@@ -88,6 +88,7 @@ void PairANI::compute(int eflag, int vflag) {
   double out_energy;
   out_force.resize(ntotal * 3);
   std::vector<double> out_atomic_energies;
+  std::vector<double> out_virial(9);
 
   // ani model inputs
   std::vector<int64_t> species(ntotal);
@@ -160,9 +161,32 @@ void PairANI::compute(int eflag, int vflag) {
   // run ani model
   if (ani.use_fullnbr) {
     ani.compute(
-        out_energy, out_force, species, coordinates, npairs, ilist, jlist, numneigh, nlocal, ago, out_atomic_energies_ptr);
+        out_energy,
+        out_force,
+        out_virial,
+        species,
+        coordinates,
+        npairs,
+        ilist, // full nbrlist
+        jlist,
+        numneigh,
+        nlocal,
+        ago,
+        out_atomic_energies_ptr,
+        vflag);
   } else {
-    ani.compute(out_energy, out_force, species, coordinates, npairs, atom_index12, nlocal, ago, out_atomic_energies_ptr);
+    ani.compute(
+        out_energy,
+        out_force,
+        out_virial,
+        species,
+        coordinates,
+        npairs,
+        atom_index12, // half nbrlist
+        nlocal,
+        ago,
+        out_atomic_energies_ptr,
+        vflag);
   }
 
   // When newton is off, there will be no reverse communication of the ghost atom's force to the neighboring
@@ -195,6 +219,17 @@ void PairANI::compute(int eflag, int vflag) {
       eatom[ii] += out_atomic_energies[ii];
     }
   }
+
+  // write out virial
+  if (vflag) {
+    virial[0] += out_virial[0 * 3 + 0];
+    virial[0] += out_virial[1 * 3 + 1];
+    virial[0] += out_virial[2 * 3 + 2];
+    virial[0] += out_virial[0 * 3 + 1];
+    virial[0] += out_virial[0 * 3 + 2];
+    virial[0] += out_virial[1 * 3 + 2];
+  }
+
 }
 
 /* ----------------------------------------------------------------------

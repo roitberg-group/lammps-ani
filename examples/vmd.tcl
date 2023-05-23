@@ -16,3 +16,5 @@ mol selection all
 mol material Opaque
 mol addrep 0
 
+# pbc
+pbc box

@@ -325,6 +325,10 @@ class LammpsANI(LammpsModelBase):
             assert (
                 atom_index12.max() < coordinates.shape[1]
             ), f"neighbor {atom_index12.max().item()} larger than num_atoms {coordinates.shape[1]}"
+        # When using half nbrlist, distances are calculated from diff_vector, although it is before
+        # we set diff_vector.requires_grad_(), the backpropogation will still work.
+        # else:
+        #     distances = diff_vector.norm(2, -1)
         repulsion_energies = self.rep_calc(
             species, atom_index12, distances, ghost_flags=ghost_flags
         )

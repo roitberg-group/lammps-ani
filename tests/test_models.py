@@ -67,8 +67,6 @@ def test_models(runpbc, device, use_double, use_cuaev, use_fullnbr, modelfile, v
     # viral currenly only works for pyaev
     if virial_flag and use_cuaev:
         pytest.skip("virial currently only works for PyAEV")
-    if virial_flag and (not runpbc):
-        pytest.skip("we only test virial for pbc system")
 
     # dtype
     dtype = torch.float64 if use_double else torch.float32
@@ -164,16 +162,12 @@ def run_one_test(
         (species_periodic_table, coordinates)
     )
     cell = torch.tensor(mol.cell.array, device=device, dtype=dtype)
+    if not runpbc:
+        mol.set_pbc([False, False, False])
     pbc = torch.tensor(mol.pbc, device=device)
 
-    if runpbc:
-        atom_index12, distances, diff_vector, _ = model_ref.aev_computer.neighborlist(
-            species, coordinates, cell, pbc
-        )
-    else:
-        atom_index12, distances, diff_vector, _ = model_ref.aev_computer.neighborlist(
-            species, coordinates
-        )
+    atom_index12, distances, diff_vector, _ = model_ref.aev_computer.neighborlist(species, coordinates, cell, pbc)
+
     if use_fullnbr:
         ilist_unique, jlist, numneigh = model_ref.aev_computer._half_to_full_nbrlist(
             atom_index12
@@ -238,10 +232,7 @@ def run_one_test(
         ), f"error {(energy - atomic_energies.sum(dim=-1)).abs().max()}"
 
     # now we run reference calculations
-    if runpbc:
-        _, energy_ref = model_ref((species_periodic_table, coordinates), cell, pbc)
-    else:
-        _, energy_ref = model_ref((species_periodic_table, coordinates))
+    _, energy_ref = model_ref((species_periodic_table, coordinates), cell, pbc)
     force_ref = -torch.autograd.grad(
         energy_ref.sum(), coordinates, create_graph=True, retain_graph=True
     )[0]
@@ -274,7 +265,7 @@ def run_one_test(
         mol.calc = calculator
         stress = mol.get_stress(voigt=False)
         virial_ref = stress * mol.get_volume() / ase.units.Hartree * hartree2kcalmol
-        virial_ref = - virial_ref
+        virial_ref = -virial_ref
 
         # calculate error
         virial_ref = torch.tensor(virial_ref)

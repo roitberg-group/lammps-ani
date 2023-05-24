@@ -11,8 +11,10 @@ def plot_properties_vs_time(
     lammps_log = File(log_file)
 
     # Regular expression pattern for finding timestep
+    with open(log_file, 'r') as file:
+        contents = file.read()
     timestep_pattern = re.compile(r"timestep\s+(\d+\.\d+|\d+)")
-    matches = timestep_pattern.findall(lammps_log.output_before_first_run)
+    matches = timestep_pattern.findall(contents)
     # The final timestep value is usually the last one if multiple timestep settings are present
     timestep = None
     for match in matches:

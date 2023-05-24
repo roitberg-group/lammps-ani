@@ -50,8 +50,8 @@ def ANI2x_Repulsion_Model():
         periodic_table_index=True,
         model_index=None,
         cell_list=False,
-        use_cuaev_interface=True,
-        use_cuda_extension=True,
+        # use_cuaev_interface=False,
+        # use_cuda_extension=False,
     )
     state_dict = torchani.models._fetch_state_dict(
         "anid_state_dict_mod.pt", private=True
@@ -127,7 +127,7 @@ class CustomLogger(MDLogger):
         density = mass / (volume * 1e-24)
 
         stress = self.atoms.get_stress(voigt=False, include_ideal_gas=True)
-        pressure_Pa = -stress.trace() / 3 * 1e-5 / units.Pascal
+        pressure_Pa = -stress.trace() / 3 / units.Pascal
         pressure_atm = pressure_Pa * 9.86923267e-6
 
         dat += [volume, density, pressure_atm]
@@ -179,6 +179,7 @@ def run(pdb_file, pbc=False, use_double=True, use_cuaev=False, repulsion=False):
         taup=1.0 * 1000 * units.fs,
         compressibility_au=4.57e-5 / units.bar,
         trajectory=trajfile,
+        loginterval=100,
     )
 
     # Create an MDLogger instance to log the properties

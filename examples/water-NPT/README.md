@@ -27,8 +27,8 @@ $$
 
 The approach should be universal and work for all potentials, including 2-body (radial), 3-body (angular), repulsion, dispersion, etc. This requires the very first `diff_vectors` to be saved and differentiable.
 
-Reference:
-[1] Louwerse, M. J.; Baerends, E. J. Calculation of Pressure in Case of Periodic Boundary Conditions. Chem Phys Lett 2006, 421 (1–3), 138–141. https://doi.org/10.1016/j.cplett.2006.01.087.
+Reference:  
+[1] Louwerse, M. J.; Baerends, E. J. Calculation of Pressure in Case of Periodic Boundary Conditions. Chem Phys Lett 2006, 421 (1–3), 138–141. https://doi.org/10.1016/j.cplett.2006.01.087.  
 [2] Thompson, A. P.; Plimpton, S. J.; Mattson, W. General Formulation of Pressure and Stress Tensor for Arbitrary Many-Body Interaction Potentials under Periodic Boundary Conditions. J Chem Phys 2009, 131 (15), 154107. https://doi.org/10.1063/1.3245303.
 
 ## lammps vs ase

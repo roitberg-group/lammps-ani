@@ -52,9 +52,6 @@ The results are very close.
 |:-----------------:|:--------------:|
 | ![](resc/lammps.png) | ![](resc/ase.png) |
 
-Movie of lammps simulation in the first 5 ps:
-[![](resc/lammps_movie.png)](resc/lammps.mp4)
-
 Movie of the lammps simulation in the first 5 ps:
 <p align="center">
   <a href="resc/lammps.mp4">

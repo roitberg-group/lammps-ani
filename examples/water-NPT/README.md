@@ -1,9 +1,8 @@
 ## Introduction
-This example shows how to use LAMMPS-ANI interface to run NPT simulation of water.
+This example demonstrates how to perform an NPT simulation of water using the LAMMPS-ANI interface.
 
 ## Background
-This PR provides another approach for stress calculation. There are two ways of calculating stress.
-The first one <sup>[1]</sup> needs to calculate total forces (per atom) dot R, and it only applies to non-periodic boundary systems.
+There are two approaches to calculating stress in molecular dynamics simulations. The first approach<sup>[1]</sup> calculates stress by taking the dot product of total forces (per atom) and the displacement vector. This method is applicable to non-periodic boundary systems.
 
 $$
 P=\frac{N k_{\mathrm{B}} T}{V}+\frac{1}{3 V}\left\langle\sum_{i=1}^N \mathbf{r}_i \cdot \mathbf{f}_i\right\rangle
@@ -31,7 +30,7 @@ Reference:
 [1] Louwerse, M. J.; Baerends, E. J. Calculation of Pressure in Case of Periodic Boundary Conditions. Chem Phys Lett 2006, 421 (1–3), 138–141. https://doi.org/10.1016/j.cplett.2006.01.087.  
 [2] Thompson, A. P.; Plimpton, S. J.; Mattson, W. General Formulation of Pressure and Stress Tensor for Arbitrary Many-Body Interaction Potentials under Periodic Boundary Conditions. J Chem Phys 2009, 131 (15), 154107. https://doi.org/10.1063/1.3245303.
 
-## lammps vs ase
+## Lammps vs ASE
 
 Run Lammps
 ```bash
@@ -52,6 +51,9 @@ The results are very close.
 | LAMMPS Simulation | ASE Simulation |
 |:-----------------:|:--------------:|
 | ![](resc/lammps.png) | ![](resc/ase.png) |
+
+Movie of lammps simulation in the first 5 ps:
+[![](resc/lammps_movie.png)](resc/lammps.mp4)
 
 ## Repulsion model
 Working in progress, there is still problems, the density finally reach to 0.8 g/cm3, which is not correct.

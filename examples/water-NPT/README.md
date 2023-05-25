@@ -55,6 +55,13 @@ The results are very close.
 Movie of lammps simulation in the first 5 ps:
 [![](resc/lammps_movie.png)](resc/lammps.mp4)
 
+Movie of the lammps simulation in the first 5 ps:
+<p align="center">
+  <a href="resc/lammps.mp4">
+    <img src="resc/lammps_movie.png" width="300">
+  </a>
+</p>
+
 ## Repulsion model
 Working in progress, there is still problems, the density finally reach to 0.8 g/cm3, which is not correct.
 It is possible because of dispersion is not included.

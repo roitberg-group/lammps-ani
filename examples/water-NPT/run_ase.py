@@ -1,3 +1,4 @@
+import os
 import ase
 import torch
 import datetime
@@ -140,7 +141,7 @@ class CustomLogger(MDLogger):
         self.logfile.flush()
 
 
-def run(pdb_file, pbc=False, use_double=True, use_cuaev=False, repulsion=False):
+def run(pdb_file, pbc=False, use_double=True, use_cuaev=False, repulsion=False, name=""):
     atoms = read(pdb_file)
 
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -167,9 +168,13 @@ def run(pdb_file, pbc=False, use_double=True, use_cuaev=False, repulsion=False):
         atoms.set_pbc([False, False, False])
 
     # generate filenames
+    # Create the directory if it doesn't exist
+    if not os.path.exists('logs'):
+        os.makedirs('logs')
+
     now = datetime.datetime.now()
-    logfile = now.strftime("%Y-%m-%d-%H%M%S") + f"-NPT_{pdb_file}.log"
-    trajfile = now.strftime("%Y-%m-%d-%H%M%S") + f"-NPT_{pdb_file}.trajectories"
+    logfile = 'logs/ase-' + now.strftime("%Y-%m-%d-%H%M%S") + f"-NPT_{pdb_file}-{name}.log"
+    trajfile = 'logs/ase-' + now.strftime("%Y-%m-%d-%H%M%S") + f"-NPT_{pdb_file}.trajectories"
 
     print("Begin minimizing...")
     opt = BFGS(atoms)
@@ -199,7 +204,8 @@ def run(pdb_file, pbc=False, use_double=True, use_cuaev=False, repulsion=False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("pdb", type=str)
+    parser.add_argument("--name", type=str, default="")
     parser.add_argument('--rep', action='store_true')
     args = parser.parse_args()
 
-    run(args.pdb, True, False, False, args.rep)
+    run(args.pdb, True, False, False, args.rep, args.name)

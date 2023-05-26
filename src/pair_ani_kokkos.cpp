@@ -203,11 +203,11 @@ void PairANIKokkos<DeviceType>::compute(int eflag_in, int vflag_in) {
 
   if (vflag) {
     virial[0] += out_virial[0][0].item<double>();
-    virial[0] += out_virial[1][1].item<double>();
-    virial[0] += out_virial[2][2].item<double>();
-    virial[0] += out_virial[0][1].item<double>();
-    virial[0] += out_virial[0][2].item<double>();
-    virial[0] += out_virial[1][2].item<double>();
+    virial[1] += out_virial[1][1].item<double>();
+    virial[2] += out_virial[2][2].item<double>();
+    virial[3] += out_virial[0][1].item<double>();
+    virial[4] += out_virial[0][2].item<double>();
+    virial[5] += out_virial[1][2].item<double>();
   }
 
   if (lammps_ani_profiling) {

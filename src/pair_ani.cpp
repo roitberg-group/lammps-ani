@@ -223,11 +223,11 @@ void PairANI::compute(int eflag, int vflag) {
   // write out virial
   if (vflag) {
     virial[0] += out_virial[0 * 3 + 0];
-    virial[0] += out_virial[1 * 3 + 1];
-    virial[0] += out_virial[2 * 3 + 2];
-    virial[0] += out_virial[0 * 3 + 1];
-    virial[0] += out_virial[0 * 3 + 2];
-    virial[0] += out_virial[1 * 3 + 2];
+    virial[1] += out_virial[1 * 3 + 1];
+    virial[2] += out_virial[2 * 3 + 2];
+    virial[3] += out_virial[0 * 3 + 1];
+    virial[4] += out_virial[0 * 3 + 2];
+    virial[5] += out_virial[1 * 3 + 2];
   }
 
 }

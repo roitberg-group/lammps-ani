@@ -42,11 +42,17 @@ pair_coeff     * *
 fix            1 all nve
 timestep       0.1
 
-# Output: dump atom positions every 0.5 ps and log info every 0.5 ps
-# dump           dumpXYZ all xyz 50 water.xyz
-dump           myDump all yaml 1 dump.yaml id type x y z fx fy fz  # c_atomicenergies
-dump_modify    myDump time yes units yes thermo yes format float "% 10.10e"
-thermo_style   custom step pe ke etotal temp press vol
+
+# compute pressure (with thermo contribution)
+compute        press all pressure thermo_temp 
+
+# dump
+dump           yaml_dump all yaml 1 dump.yaml id type x y z fx fy fz  # c_atomicenergies
+# add thermo yes once the issue is fixed: https://github.com/lammps/lammps/issues/3799
+# so we could read the thermo info directly from the dump file
+dump_modify    yaml_dump time yes units yes format float "% 10.10e"
+thermo_style   custom step pe ke etotal temp press vol density c_press[*]
+thermo_modify  line yaml format none
 thermo         1
 
 # Run the simulation: first run (5 ps)

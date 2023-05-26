@@ -3,6 +3,15 @@ import argparse
 import matplotlib.pyplot as plt
 from lammps_logfile import File
 
+# Set the global font size for labels in the figure
+plt.rcParams['axes.labelsize'] = 14
+# Set the global font size for titles in the figure
+plt.rcParams['axes.titlesize'] = 16
+# Set the global font size for the tick parameters in the figure
+plt.rcParams['xtick.labelsize'] = 14
+plt.rcParams['ytick.labelsize'] = 14
+plt.rcParams['legend.fontsize'] = 14
+
 
 def plot_properties_vs_time(
     log_file, output_filename
@@ -34,7 +43,7 @@ def plot_properties_vs_time(
     temperatures = lammps_log.get("Temp")
     pressures = lammps_log.get("Press")
 
-    fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, sharex=True, figsize=(8, 16))
+    fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, sharex=True, figsize=(8, 12))
 
     # Create a plot of Volume vs. Time
     ax1.plot(time, volumes, label="Volume", color="blue")

@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from ase.md import MDLogger
 from ase.io import read
+from ase.optimize import BFGS
 from ase.md.verlet import VelocityVerlet
 from ase.md.nptberendsen import NPTBerendsen
 from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
@@ -170,6 +171,11 @@ def run(pdb_file, pbc=False, use_double=True, use_cuaev=False, repulsion=False):
     logfile = now.strftime("%Y-%m-%d-%H%M%S") + f"-NPT_{pdb_file}.log"
     trajfile = now.strftime("%Y-%m-%d-%H%M%S") + f"-NPT_{pdb_file}.trajectories"
 
+    print("Begin minimizing...")
+    opt = BFGS(atoms)
+    opt.run(fmax=0.05)
+
+    print("Start NPT simulation...")
     dyn = NPTBerendsen(
         atoms,
         timestep=0.1 * units.fs,

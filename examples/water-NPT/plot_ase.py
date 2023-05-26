@@ -2,6 +2,15 @@ import argparse
 import matplotlib.pyplot as plt
 from ase.io import read
 
+# Set the global font size for labels in the figure
+plt.rcParams['axes.labelsize'] = 14
+# Set the global font size for titles in the figure
+plt.rcParams['axes.titlesize'] = 16
+# Set the global font size for the tick parameters in the figure
+plt.rcParams['xtick.labelsize'] = 14
+plt.rcParams['ytick.labelsize'] = 14
+plt.rcParams['legend.fontsize'] = 14
+
 
 def read_log_file(log_file):
     data = {"time": [], "temperature": [], "volume": [], "density": [], "pressure": []}
@@ -23,7 +32,7 @@ def read_log_file(log_file):
 
 
 def plot_data(data, output_filename):
-    fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, sharex=True, figsize=(8, 16))
+    fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, sharex=True, figsize=(8, 12))
 
     # Plot volume
     ax1.plot(data["time"], data["volume"], label="Volume", color="blue")

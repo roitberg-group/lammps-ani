@@ -55,7 +55,7 @@ The generated plots for the LAMMPS and ASE simulations are shown below:
 |:-----------------:|:--------------:|
 | ![](resc/lammps.png) | ![](resc/ase.png) |
 
-The results obtained from both simulations are in close agreement, indicating that the NPT simulations using the LAMMPS-ANI interface and ASE yield comparable results.
+The results obtained from both simulations are in close agreement, indicating that the NPT simulations using the LAMMPS-ANI interface and ASE yield comparable results. The simulations were performed on A100 GPUs. In this setting, the ASE simulation took a substantial amount of time, finishing in 386 minutes, whereas the LAMMPS simulation completed in 53 minutes, which is more than 7 times faster than the ASE simulation.
 
 Here is a visualization of the LAMMPS simulation in the initial 5 picoseconds:
 <p align="center">

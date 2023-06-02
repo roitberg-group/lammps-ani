@@ -68,7 +68,7 @@ Here is a visualization of the LAMMPS simulation in the initial 5 picoseconds:
 Work in progress: The NPT simulation with the repulsion model is still under development. Currently, there are some issues, and the final density does not reach the expected value of 0.8 g/cm³. This discrepancy could potentially be attributed to the exclusion of dispersion interactions in the current implementation.
 
 ## Multi-GPU tests
-The performance and scalability of the NPT simulation using the LAMMPS-ANI interface with multiple GPUs were also evaluated. Details and results of the multi-GPU tests will be provided in the future.
+The performance and scalability of the NPT simulation using the LAMMPS-ANI interface were evaluated across multiple GPUs. A simulation was conducted using 2 GPUs, and the results were consistent with the single GPU simulation.
 
 ## Limitatoins
 It is important to note that the current implementation of stress/pressure calculation in the LAMMPS-ANI interface only works with PyAEV. CUAEV is not compatible with stress/pressure calculations at this time.

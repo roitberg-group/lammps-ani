@@ -15,7 +15,7 @@ from ase.io.trajectory import Trajectory
 from ase import units
 from .models import all_models
 
-
+np.set_printoptions(precision=12)
 LAMMPS_PATH = os.path.join(os.environ["LAMMPS_ROOT"], "build/lmp_mpi")
 STEPS = 4
 

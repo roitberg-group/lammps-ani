@@ -48,7 +48,7 @@ compute        press all pressure thermo_temp
 
 # dump
 dump           yaml_dump all yaml 1 dump.yaml id type x y z fx fy fz  # c_atomicenergies
-# add thermo yes once the issue is fixed: https://github.com/lammps/lammps/issues/3799
+# TODO: add thermo yes once the issue is fixed: https://github.com/lammps/lammps/issues/3799
 # so we could read the thermo info directly from the dump file
 dump_modify    yaml_dump time yes units yes format float "% 10.10e"
 thermo_style   custom step pe ke etotal temp press vol density c_press[*]

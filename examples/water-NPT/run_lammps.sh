@@ -1,5 +1,5 @@
 #!/bin/bash
-# usage example: ./run_lammps.sh repulsion_with_minimization
+# usage example: ./run_lammps.sh run_name
 
 set -ex
 

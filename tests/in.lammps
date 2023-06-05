@@ -45,6 +45,7 @@ timestep       0.1
 
 # compute pressure (with thermo contribution)
 compute        press all pressure thermo_temp 
+# compute pressure (only pair style contribution)
 compute        press_pair all pressure NULL pair
 
 # dump

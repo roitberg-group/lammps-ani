@@ -1,0 +1,68 @@
+# variables
+variable       lammps_ani_root getenv LAMMPS_ANI_ROOT
+# kokkos needs newton_pair on for reverse communication between gpus
+variable       newton_pair     index  off
+variable       num_models      index  1
+variable       datafile        index  none
+variable       timestamp       index  timestamp
+variable       modelfile       index  none
+variable       timestep        index  timestep
+
+# Intialization
+units          real
+atom_style     atomic
+
+neighbor       2.0 bin
+# check yes = only build if at least one atom has moved half the skin distance or more
+neigh_modify   every 10 delay 0 check yes
+newton         ${newton_pair} off
+
+# Atom Definition
+read_data      ${datafile}
+# replicate      3 3 3
+change_box     all boundary p p p
+
+# pair_style ani 5.1 model_file device num_models ani_aev ani_neighbor
+# 0. model_file               = path to the model file
+# 1. device                   = cuda/cpu
+# 2. num_models (Optional)    = number of models to use, default as -1 to use all models
+# 3. ani_aev (Optional)       = cuaev/pyaev, default as cuaev
+# 4. ani_neighbor (Optional)  = full/half, default as full nbrlist
+# 5. ani_precision (Optional) = single/double, default as single
+# TODO here i'm using pyaev
+pair_style     ani 5.1 ${modelfile} cuda ${num_models} pyaev full single
+pair_coeff     * *
+
+# Thermo
+thermo_style   custom step pe ke etotal temp press vol density
+thermo         100
+
+# Minimization
+minimize       1.0e-8 1.0e-8 1000 10000
+
+# Reset timestep
+reset_timestep 0
+
+# Dump
+dump           1 all custom 100 logs/${timestamp}.lammpstrj id element x y z ix iy iz
+dump_modify    1 element H C N O F S Cl
+dump           2 all dcd 100 logs/${timestamp}.dcd
+
+# Settings: temperature at 300 K
+velocity       all create 300.0 12345 rot yes mom yes dist gaussian
+timestep       ${timestep}
+
+# run npt
+fix            0 all npt temp 300.0 300.0 100.0 iso 1.0 1.0 500.0
+run            500000
+unfix          0
+
+# run nvt
+# fix            1 all langevin 300.0 300.0 100.0 12345
+# fix            2 all nve
+# run            2000
+
+
+# Write final state of simulation
+write_data    logs/${timestamp}.final
+

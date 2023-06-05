@@ -1,3 +1,4 @@
+import ase
 import copy
 import torch
 import pytest
@@ -29,6 +30,10 @@ use_fullnbr_params = [
     pytest.param(True, id="full"),
     pytest.param(False, id="half"),
 ]
+virial_flag_params = [
+    pytest.param(True, id="virial_true"),
+    pytest.param(False, id="virial_false"),
+]
 modelfile_params = all_models.keys()
 # remove modelfiles that have unittest as False
 modelfile_params = [
@@ -50,7 +55,8 @@ def session_start():
 @pytest.mark.parametrize("use_cuaev", use_cuaev_params)
 @pytest.mark.parametrize("use_fullnbr", use_fullnbr_params)
 @pytest.mark.parametrize("modelfile", modelfile_params)
-def test_models(runpbc, device, use_double, use_cuaev, use_fullnbr, modelfile):
+@pytest.mark.parametrize("virial_flag", virial_flag_params)
+def test_models(runpbc, device, use_double, use_cuaev, use_fullnbr, modelfile, virial_flag):
     # when pbc is on, full nbrlist converted from half nbrlist is not correct
     if use_fullnbr and runpbc:
         pytest.skip("Does not support full neighbor list using pyaev when pbc is on")
@@ -58,6 +64,9 @@ def test_models(runpbc, device, use_double, use_cuaev, use_fullnbr, modelfile):
         pytest.skip("Cuaev does not support CPU")
     if device == "cuda" and (not torch.cuda.is_available()):
         pytest.skip("GPU is not available")
+    # viral currenly only works for pyaev
+    if virial_flag and use_cuaev:
+        pytest.skip("virial currently only works for PyAEV")
 
     # dtype
     dtype = torch.float64 if use_double else torch.float32
@@ -99,6 +108,9 @@ def test_models(runpbc, device, use_double, use_cuaev, use_fullnbr, modelfile):
     model_ref_all_models = all_models[modelfile]["model"]().to(dtype).to(device)
     model_ref_all_models = set_ref_cuda_aev(model_ref_all_models, use_cuaev)
 
+    if virial_flag and not isinstance(model_ref_all_models, torchani.models.BuiltinModel):
+        pytest.skip("we only test virial for torchani.models.BuiltinModel")
+
     # we need a fewer iterations to tigger the fuser
     total_num_models = len(model_ref_all_models.neural_networks)
     test_num_models_list = []
@@ -121,6 +133,7 @@ def test_models(runpbc, device, use_double, use_cuaev, use_fullnbr, modelfile):
                 use_repulsion,
                 dtype,
                 verbose=(i == 0),
+                virial_flag=virial_flag,
             )
 
 
@@ -134,6 +147,7 @@ def run_one_test(
     use_repulsion,
     dtype,
     verbose=False,
+    virial_flag=False,
 ):
     input_file = "water-0.8nm.pdb"
     mol = read(input_file)
@@ -148,16 +162,12 @@ def run_one_test(
         (species_periodic_table, coordinates)
     )
     cell = torch.tensor(mol.cell.array, device=device, dtype=dtype)
+    if not runpbc:
+        mol.set_pbc([False, False, False])
     pbc = torch.tensor(mol.pbc, device=device)
 
-    if runpbc:
-        atom_index12, distances, diff_vector, _ = model_ref.aev_computer.neighborlist(
-            species, coordinates, cell, pbc
-        )
-    else:
-        atom_index12, distances, diff_vector, _ = model_ref.aev_computer.neighborlist(
-            species, coordinates
-        )
+    atom_index12, distances, diff_vector, _ = model_ref.aev_computer.neighborlist(species, coordinates, cell, pbc)
+
     if use_fullnbr:
         ilist_unique, jlist, numneigh = model_ref.aev_computer._half_to_full_nbrlist(
             atom_index12
@@ -169,7 +179,7 @@ def run_one_test(
     torch.set_printoptions(profile="full")
 
     torch.set_printoptions(precision=13)
-    energy, force, _ = model_loaded(
+    energy, force, _, virial = model_loaded(
         species,
         coordinates,
         para1,
@@ -177,18 +187,20 @@ def run_one_test(
         para3,
         species_ghost_as_padding,
         atomic=False,
+        virial_flag=virial_flag,
     )
 
     # test forward_atomic API
-    energy_, force_, atomic_energies = model_loaded(
-        species, coordinates, para1, para2, para3, species_ghost_as_padding, atomic=True
+    energy_, force_, atomic_energies, virial_ = model_loaded(
+        species, coordinates, para1, para2, para3, species_ghost_as_padding, atomic=True, virial_flag=virial_flag
     )
 
-    energy, force = energy * hartree2kcalmol, force * hartree2kcalmol
-    energy_, atomic_energies, force_ = (
+    energy, force, virial = energy * hartree2kcalmol, force * hartree2kcalmol, virial * hartree2kcalmol
+    energy_, atomic_energies, force_, virial_ = (
         energy_ * hartree2kcalmol,
         atomic_energies * hartree2kcalmol,
         force_ * hartree2kcalmol,
+        virial_ * hartree2kcalmol,
     )
 
     if verbose:
@@ -210,20 +222,23 @@ def run_one_test(
     assert torch.allclose(
         force, force_, atol=threshold
     ), f"error {(force - force_).abs().max()}"
+    assert torch.allclose(
+        virial, virial_, atol=threshold
+    ), f"error {(virial - virial_).abs().max()}"
+    # when adding repulsion, atomic_energies does not sum up to total energy
     if not use_repulsion:
         assert torch.allclose(
             energy, atomic_energies.sum(dim=-1), atol=threshold
         ), f"error {(energy - atomic_energies.sum(dim=-1)).abs().max()}"
 
-    if runpbc:
-        _, energy_ref = model_ref((species_periodic_table, coordinates), cell, pbc)
-    else:
-        _, energy_ref = model_ref((species_periodic_table, coordinates))
+    # now we run reference calculations
+    _, energy_ref = model_ref((species_periodic_table, coordinates), cell, pbc)
     force_ref = -torch.autograd.grad(
         energy_ref.sum(), coordinates, create_graph=True, retain_graph=True
     )[0]
     energy_ref, force_ref = energy_ref * hartree2kcalmol, force_ref * hartree2kcalmol
 
+    # calculate errors
     energy_err = (energy_ref.cpu() - energy.cpu()).abs().max()
     force_err = (force_ref.cpu() - force.cpu()).abs().max()
 
@@ -243,3 +258,23 @@ def run_one_test(
     assert torch.allclose(
         force, force_ref, atol=threshold
     ), f"error {(force - force_ref).abs().max()}"
+
+    if virial_flag:
+        # calculate virial_ref
+        calculator = model_ref.ase()
+        mol.calc = calculator
+        stress = mol.get_stress(voigt=False)
+        virial_ref = stress * mol.get_volume() / ase.units.Hartree * hartree2kcalmol
+        virial_ref = -virial_ref
+
+        # calculate error
+        virial_ref = torch.tensor(virial_ref)
+        virial = virial.to(virial_ref.dtype).to(virial_ref.device)
+        virial_err = (virial_ref.cpu() - virial.cpu()).abs().max()
+
+        if verbose:
+            print("virial max err: ".ljust(15), virial_err.item())
+
+        assert torch.allclose(
+            virial, virial_ref, atol=threshold
+        ), f"error {(virial - virial_ref).abs().max()}"

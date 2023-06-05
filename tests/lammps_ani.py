@@ -1,4 +1,5 @@
 import torch
+import warnings
 import torchani
 from typing import Tuple, Optional
 from torch import Tensor
@@ -37,6 +38,7 @@ class LammpsModelBase(torch.nn.Module):
         para3: Tensor,
         species_ghost_as_padding: Tensor,
         atomic: bool = False,
+        virial_flag: bool = False,
     ):
         """
         The forward function will be called by the lammps interfact with necessary inputs, and it
@@ -51,6 +53,7 @@ class LammpsModelBase(torch.nn.Module):
             para3 (Tensor): if use_fullnbr, it is `numneigh`, otherwise `distances`
             species_ghost_as_padding (Tensor): The species tensor that ghost atoms are set as -1.
             atomic (bool, optional): Whether the atomic_energies should be returned. Defaults to False.
+            virial_flag (bool, optional): Whether the virial should be returned. Defaults to False.
 
         Raises:
             NotImplementedError: The User needs to override this function.
@@ -123,6 +126,8 @@ class LammpsANI(LammpsModelBase):
         self.use_cuaev = use_cuaev
         self.use_fullnbr = use_fullnbr
         self.initialized = True
+        if use_cuaev:
+            warnings.warn("Forcing virial_flag as False because CUAEV currently does not support virial/stress/pressure calculations")
 
     @torch.jit.export
     def forward(
@@ -134,6 +139,7 @@ class LammpsANI(LammpsModelBase):
         para3: Tensor,
         species_ghost_as_padding: Tensor,
         atomic: bool = False,
+        virial_flag: bool = True,
     ):
         assert (
             self.initialized
@@ -144,8 +150,29 @@ class LammpsANI(LammpsModelBase):
             self.aev_computer.cuaev_is_initialized = True
         # when use ghost_index and mnp, the input system must be a single molecule
 
+        # Force virial_flag as false because cuaev does not support virial calculation
+        if self.use_cuaev:
+            virial_flag = False
+
+        # prepare diff_vector for virial/stress calculations
+        if self.use_fullnbr:  # although cuaev does not need this, repulsion needs to use this anyway
+            ilist_unique, jlist, numneigh = para1, para2, para3
+            ilist_unique = ilist_unique.long()
+            jlist = jlist.long()
+            ilist = torch.repeat_interleave(ilist_unique, numneigh)
+            atom_index12 = torch.cat([ilist.unsqueeze(0), jlist.unsqueeze(0)], 0)
+
+            coords0 = coordinates.view(-1, 3).index_select(0, atom_index12[0])
+            coords1 = coordinates.view(-1, 3).index_select(0, atom_index12[1])
+            diff_vector = coords0 - coords1
+        else:
+            diff_vector = para2
+
+        if virial_flag:
+            diff_vector.requires_grad_()
+
         torch.ops.mnp.nvtx_range_push("AEV forward")
-        aev = self.compute_aev(species, coordinates, para1, para2, para3)
+        aev = self.compute_aev(species, coordinates, para1, para2, para3, fullnbr_diff_vector=diff_vector)
         torch.ops.mnp.nvtx_range_pop()
 
         if atomic:
@@ -161,20 +188,33 @@ class LammpsANI(LammpsModelBase):
             torch.ops.mnp.nvtx_range_push("Repulsion forward")
             ghost_flags = species_ghost_as_padding == -1
             rep_energies = self.compute_repulsion(
-                species, coordinates, para1, para2, para3, ghost_flags
+                species, coordinates, para1, para2, para3, ghost_flags, fullnbr_diff_vector=diff_vector
             )
             energies += rep_energies
             torch.ops.mnp.nvtx_range_pop()
 
-        torch.ops.mnp.nvtx_range_push("Force")
-        force = torch.autograd.grad(
-            [energies.sum()], [coordinates], create_graph=True, retain_graph=True
-        )[0]
+        if virial_flag:
+            torch.ops.mnp.nvtx_range_push("Force and Stress")
+            force, dEdR = torch.autograd.grad([energies.sum()], [coordinates, diff_vector], create_graph=True, retain_graph=True)
+            assert dEdR is not None
+            virial = dEdR.transpose(0, 1) @ diff_vector
+            virial = (virial.t() + virial) / 2
+            torch.ops.mnp.nvtx_range_pop()
+        else:
+            torch.ops.mnp.nvtx_range_push("Force")
+            force = torch.autograd.grad(
+                [energies.sum()], [coordinates], create_graph=True, retain_graph=True
+            )[0]
+            torch.ops.mnp.nvtx_range_pop()
+            # When using cuaev and lammps needs to calculate pressure thermo property,
+            # although we force the vflag here is False, the flag is on internally.
+            # That is why these zeros are needed.
+            virial = torch.zeros([3, 3])
+
         assert force is not None
         force = -force
-        torch.ops.mnp.nvtx_range_pop()
-
-        return energies, force, atomic_energies
+        virial = -virial
+        return energies, force, atomic_energies, virial
 
     @torch.jit.export
     def forward_total(
@@ -228,6 +268,7 @@ class LammpsANI(LammpsModelBase):
         para1: Tensor,
         para2: Tensor,
         para3: Tensor,
+        fullnbr_diff_vector: Optional[Tensor],
     ):
         atom_index12, diff_vector, distances = para1, para2, para3
         ilist_unique, jlist, numneigh = para1, para2, para3
@@ -249,17 +290,14 @@ class LammpsANI(LammpsModelBase):
             # diff_vector, distances from lammps are always in double,
             # we need to convert it to single precision if needed
             if self.use_fullnbr:
-                atom_index12 = self.aev_computer._full_to_half_nbrlist(
-                    ilist_unique, jlist, numneigh, species
+                assert fullnbr_diff_vector is not None
+                atom_index12, diff_vector, distances = self.aev_computer._full_to_half_nbrlist(
+                    ilist_unique, jlist, numneigh, species, fullnbr_diff_vector
                 )
                 # print(f"{atom_index12.device}, max_neighbor_index {atom_index12.max().item()}, num_atoms {coordinates.shape[1]}")
                 assert (
                     atom_index12.max() < coordinates.shape[1]
                 ), f"neighbor {atom_index12.max().item()} larger than num_atoms {coordinates.shape[1]}"
-                coords0 = coordinates.view(-1, 3).index_select(0, atom_index12[0])
-                coords1 = coordinates.view(-1, 3).index_select(0, atom_index12[1])
-                diff_vector = coords0 - coords1
-                distances = diff_vector.norm(2, -1)
             aev = self.aev_computer._compute_aev(
                 species, atom_index12, distances, diff_vector
             )
@@ -275,20 +313,22 @@ class LammpsANI(LammpsModelBase):
         para2: Tensor,
         para3: Tensor,
         ghost_flags: Tensor,
+        fullnbr_diff_vector: Optional[Tensor],
     ):
         atom_index12, diff_vector, distances = para1, para2, para3
         ilist_unique, jlist, numneigh = para1, para2, para3
         if self.use_fullnbr:
-            atom_index12 = self.aev_computer._full_to_half_nbrlist(
-                ilist_unique, jlist, numneigh, species
+            assert fullnbr_diff_vector is not None
+            atom_index12, diff_vector, distances = self.aev_computer._full_to_half_nbrlist(
+                ilist_unique, jlist, numneigh, species, fullnbr_diff_vector
             )
             assert (
                 atom_index12.max() < coordinates.shape[1]
             ), f"neighbor {atom_index12.max().item()} larger than num_atoms {coordinates.shape[1]}"
-            coords0 = coordinates.view(-1, 3).index_select(0, atom_index12[0])
-            coords1 = coordinates.view(-1, 3).index_select(0, atom_index12[1])
-            diff_vector = coords0 - coords1
-            distances = diff_vector.norm(2, -1)
+        # When using half nbrlist, distances are calculated from diff_vector, although it is before
+        # we set diff_vector.requires_grad_(), the backpropogation will still work.
+        # else:
+        #     distances = diff_vector.norm(2, -1)
         repulsion_energies = self.rep_calc(
             species, atom_index12, distances, ghost_flags=ghost_flags
         )

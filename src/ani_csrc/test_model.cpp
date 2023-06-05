@@ -144,10 +144,11 @@ int test_ani2x_withnbr(int argc, const char* argv[]) {
   double force_err;
   int ntotal = species.size();
   std::vector<double> out_force(ntotal * 3);
+  std::vector<double> out_virial;
   int npairs = atom_index12.size() / 2;
 
   // run the model
-  ani.compute(out_energy, out_force, species, coords, npairs, atom_index12.data(), nlocal);
+  ani.compute(out_energy, out_force, out_virial, species, coords, npairs, atom_index12.data(), nlocal);
 
   // check error
   energy_err = abs(out_energy - expected_energy) / hartree2kcalmol; // use hartree for error

@@ -88,17 +88,23 @@ ANI::ANI(const std::string& model_file, int local_rank, int use_num_models, bool
 void ANI::compute(
     double& out_energy,
     std::vector<double>& out_force,
+    std::vector<double>& out_virial,
     std::vector<int64_t>& species,
     std::vector<double>& coordinates,
     int npairs_half,
     int64_t* atom_index12,
     int nlocal,
     int ago,
-    std::vector<double>* out_atomic_energies) {
+    std::vector<double>* out_atomic_energies,
+    bool vflag) {
   int ntotal = species.size();
 
   // output tensor
   auto out_force_t = torch::from_blob(out_force.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat64));
+  torch::Tensor out_virial_t;
+  if (vflag) {
+    out_virial_t = torch::from_blob(out_virial.data(), {3, 3}, torch::dtype(torch::kFloat64));
+  }
   // input tensor
   auto coordinates_t = torch::from_blob(coordinates.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat64))
                            .to(dtype)
@@ -137,7 +143,7 @@ void ANI::compute(
   inputs.push_back(atomic);
 
   // run ani model
-  torch::Tensor energy, force, atomic_energies;
+  torch::Tensor energy, force, atomic_energies, virial;
   auto outputs = model.forward(inputs).toTuple();
   // extract energy and force from model outputs, and convert the unit to kcal/mol
   energy = outputs->elements()[0].toTensor() * hartree2kcalmol;
@@ -153,12 +159,20 @@ void ANI::compute(
     auto out_atomic_energies_t = torch::from_blob(out_atomic_energies->data(), {1, nlocal}, torch::dtype(torch::kFloat64));
     out_atomic_energies_t.copy_(atomic_energies);
   }
+
+  // write virial out
+  if (vflag) {
+    virial = outputs->elements()[3].toTensor() * hartree2kcalmol;
+    out_virial_t.copy_(virial);
+  }
+
 }
 
 // compute with full nbrlist
 void ANI::compute(
     double& out_energy,
     std::vector<double>& out_force,
+    std::vector<double>& out_virial,
     std::vector<int64_t>& species,
     std::vector<double>& coordinates,
     int npairs,
@@ -167,11 +181,16 @@ void ANI::compute(
     int* numneigh,
     int nlocal,
     int ago,
-    std::vector<double>* out_atomic_energies) {
+    std::vector<double>* out_atomic_energies,
+    bool vflag) {
   int ntotal = species.size();
 
   // output tensor
   auto out_force_t = torch::from_blob(out_force.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat64));
+  torch::Tensor out_virial_t;
+  if (vflag) {
+    out_virial_t = torch::from_blob(out_virial.data(), {3, 3}, torch::dtype(torch::kFloat64));
+  }
   // input tensor
   auto coordinates_t = torch::from_blob(coordinates.data(), {1, ntotal, 3}, torch::dtype(torch::kFloat64))
                            .to(dtype)
@@ -210,7 +229,7 @@ void ANI::compute(
   inputs.push_back(eflag_atom);
 
   // run ani model
-  torch::Tensor energy, force, atomic_energies;
+  torch::Tensor energy, force, atomic_energies, virial;
   auto outputs = model.forward(inputs).toTuple();
   // extract energy and force from model outputs, and convert the unit to kcal/mol
   energy = outputs->elements()[0].toTensor() * hartree2kcalmol;
@@ -226,12 +245,19 @@ void ANI::compute(
     auto out_atomic_energies_t = torch::from_blob(out_atomic_energies->data(), {1, nlocal}, torch::dtype(torch::kFloat64));
     out_atomic_energies_t.copy_(atomic_energies);
   }
+
+  // write virial out
+  if (vflag) {
+    virial = outputs->elements()[3].toTensor() * hartree2kcalmol;
+    out_virial_t.copy_(virial);
+  }
 }
 
 // kokkos compute with full nbrlist
 void ANI::compute(
     torch::Tensor& out_energy,
     torch::Tensor& out_force,
+    torch::Tensor& out_virial,
     torch::Tensor& species,
     torch::Tensor& coordinates,
     int npairs, // TODO remove?
@@ -241,7 +267,8 @@ void ANI::compute(
     int nlocal,
     int ago,
     torch::Tensor& out_atomic_energies,
-    bool eflag_atom) {
+    bool eflag_atom,
+    bool vflag) {
   int ntotal = species.size(0);
 
   torch::Tensor species_ghost_as_padding = species.detach().clone();
@@ -260,7 +287,6 @@ void ANI::compute(
   inputs.push_back(eflag_atom);
 
   // run ani model
-  torch::Tensor energy, force, atomic_energies;
   auto outputs = model.forward(inputs).toTuple();
   // extract energy and force from model outputs, and convert the unit to kcal/mol
   out_energy = outputs->elements()[0].toTensor() * hartree2kcalmol;
@@ -269,5 +295,11 @@ void ANI::compute(
   // if eflag_atom is false, atomic_energies will be an empty tensor
   if (eflag_atom) {
     out_atomic_energies = outputs->elements()[2].toTensor() * hartree2kcalmol;
+  }
+
+  // write virial out
+  if (vflag) {
+    out_virial = outputs->elements()[3].toTensor() * hartree2kcalmol;
+    out_virial = out_virial.to(torch::kCPU);
   }
 }

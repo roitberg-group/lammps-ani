@@ -1,4 +1,5 @@
-
+# TODO add the following to document
+# This file is actually to run alanine-dipeptide-bonds.data with NPT to generate equilibrium data for simulation with shake
 #!/bin/bash
 set -ex
 
@@ -13,7 +14,7 @@ RUN_KOKKOS=yes
 NUM_GPUS=1
 NUM_MODELS=1
 DATA_FILE=alanine-dipeptide-bonds.data
-TIMESTEP=2
+TIMESTEP=0.1
 # choose ani2x.pt or ani2x_repulsion.pt
 # repulsion model's density is not correct, so it is not recommended to use it
 MODEL_FILE=${LAMMPS_ANI_ROOT}/tests/ani2x.pt

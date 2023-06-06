@@ -7,14 +7,16 @@ TIMESTAMP=`date +%F-%H%M%S`
 
 ################################# Configure here ################################# 
 
-LAMMPS_INPUT=in.lammps
+LAMMPS_INPUT=in.npt.lammps
 RUN_KOKKOS=yes
 NUM_GPUS=1
+# TODO better use all models for NPT?
 NUM_MODELS=1
-DATA_FILE=alanine-dipeptide.npt.data
+DATA_FILE=alanine-dipeptide.data
 TIMESTEP=0.1
 # choose ani2x.pt or ani2x_repulsion.pt
-MODEL_FILE=${LAMMPS_ANI_ROOT}/tests/ani2x_repulsion.pt
+# repulsion model's density is not correct, so it is not recommended to use it
+MODEL_FILE=${LAMMPS_ANI_ROOT}/tests/ani2x.pt
 
 # create logs folder
 mkdir -p logs

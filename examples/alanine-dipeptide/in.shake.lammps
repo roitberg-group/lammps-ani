@@ -37,7 +37,7 @@ special_bonds lj/coul 1.0 1.0 1.0
 
 
 # Thermo
-thermo_style   custom step pe ke etotal temp press vol
+thermo_style   custom step pe ke etotal temp press vol density
 thermo         100
 
 # Dump

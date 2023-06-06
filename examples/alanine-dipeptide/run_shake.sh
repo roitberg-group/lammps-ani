@@ -7,10 +7,12 @@ TIMESTAMP=`date +%F-%H%M%S`
 
 ################################# Configure here ################################# 
 
+LAMMPS_INPUT=in.shake.lammps
 RUN_KOKKOS=yes
 NUM_GPUS=1
 NUM_MODELS=1
-DATA_FILE=alanine-dipeptide-bonds.data
+# todo, this needs another NPT data file
+DATA_FILE=alanine-dipeptide-bonds.npt.data
 TIMESTEP=2
 # choose ani2x.pt or ani2x_repulsion.pt
 MODEL_FILE=${LAMMPS_ANI_ROOT}/tests/ani2x_repulsion.pt
@@ -27,10 +29,10 @@ if  [[ $RUN_KOKKOS == "yes" ]]; then
     LAMMPS_ANI_PROFILING=1 mpirun -np ${NUM_GPUS} ${LAMMPS_ROOT}/build/lmp_mpi \
         -k on g ${NUM_GPUS} -sf kk -pk kokkos gpu/aware on \
         -var newton_pair on -var num_models ${NUM_MODELS} -var datafile ${DATA_FILE} -var timestamp ${TIMESTAMP} -var modelfile ${MODEL_FILE} -var timestep ${TIMESTEP}\
-        -log logs/${TIMESTAMP}-kokkos-models_${NUM_MODELS}-gpus_${NUM_GPUS}.log -in in.shake.lammps
+        -log logs/${TIMESTAMP}-kokkos-models_${NUM_MODELS}-gpus_${NUM_GPUS}.log -in ${LAMMPS_INPUT}
 else
     # run without kokkos
     mpirun -np ${NUM_GPUS} ${LAMMPS_ROOT}/build/lmp_mpi \
         -var newton_pair off -var num_models ${NUM_MODELS} -var datafile ${DATA_FILE} -var timestamp ${TIMESTAMP} -var modelfile ${MODEL_FILE} -var timestep ${TIMESTEP}\
-        -log logs/${TIMESTAMP}-models_${NUM_MODELS}-gpus_${NUM_GPUS}.log -in in.shake.lammps
+        -log logs/${TIMESTAMP}-models_${NUM_MODELS}-gpus_${NUM_GPUS}.log -in ${LAMMPS_INPUT}
 fi

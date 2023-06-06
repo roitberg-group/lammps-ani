@@ -29,7 +29,7 @@ change_box     all boundary p p p
 # 3. ani_aev (Optional)       = cuaev/pyaev, default as cuaev
 # 4. ani_neighbor (Optional)  = full/half, default as full nbrlist
 # 5. ani_precision (Optional) = single/double, default as single
-# TODO here i'm using pyaev
+# NPT requires pyaev
 pair_style     ani 5.1 ${modelfile} cuda ${num_models} pyaev full single
 pair_coeff     * *
 

@@ -15,7 +15,6 @@ else
 fi
 
 
-# TOOD test kokkos
 RUN_KOKKOS=yes
 NUM_GPUS=1
 NUM_MODELS="-1"

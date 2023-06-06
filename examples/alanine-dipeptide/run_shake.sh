@@ -15,7 +15,9 @@ TIMESTEP=2
 # choose ani2x.pt or ani2x_repulsion.pt
 MODEL_FILE=${LAMMPS_ANI_ROOT}/tests/ani2x_repulsion.pt
 
+# create logs folder
 mkdir -p logs
+
 #################################################################################
 
 

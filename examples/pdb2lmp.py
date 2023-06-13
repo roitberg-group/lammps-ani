@@ -1,9 +1,8 @@
-from ase.io import read
-import os
 import numpy as np
 import argparse
 import warnings
 import textwrap
+from ase.io import read
 from ase.geometry.analysis import Analysis
 # from ase.data.chemical_symbols import chemical_symbols
 
@@ -32,15 +31,20 @@ Masses
 
 """
 
-numbers_to_species = {1: 0, 6: 1, 7: 2, 8: 3, 16: 4, 9: 5, 17: 6}
-numbers_to_lmp_types = {1: 1, 6: 2, 7: 3, 8: 4, 16: 5, 9: 6, 17: 7}
-bond_lengths_data = {"HC": 1.09, "HO": 0.96, "HN": 1.01}
-bond_lengths = {}
-# sort each bond_type
-for bond_type in bond_lengths_data:
-    bond_type_sorted = "".join(sorted(bond_type))
-    bond_lengths[bond_type_sorted] = bond_lengths_data[bond_type]
-print(bond_lengths)
+
+def all_bond_lengths():
+    bond_lengths_data = {"HC": 1.09, "HO": 0.96, "HN": 1.01}
+    bond_lengths = {}
+    # sort each bond_type to make sure it is unique
+    for bond_type in bond_lengths_data:
+        bond_type_sorted = "".join(sorted(bond_type))
+        bond_lengths[bond_type_sorted] = bond_lengths_data[bond_type]
+    return bond_lengths
+
+
+NUMBERS_TO_SPECIES = {1: 0, 6: 1, 7: 2, 8: 3, 16: 4, 9: 5, 17: 6}
+NUMBERS_TO_LMP_TYPES = {1: 1, 6: 2, 7: 3, 8: 4, 16: 5, 9: 6, 17: 7}
+BOND_LENGTHS = all_bond_lengths()
 
 
 def get_bonds_by_type(atoms, bond_types):
@@ -72,13 +76,12 @@ def generate_data(input_file, output_file, system_size=None, bond_types=[]):
     all_bond_types = ",".join(["-".join(bond_type) for bond_type in bond_types])
     detected_bond_types = ",".join(["-".join(bond_type) for bond_type in bonds_by_type.keys() if bonds_by_type[bond_type]])
 
-    # determine whether we need to center the cell\
+    # determine whether we need to center the cell
     positions = mol.get_positions()
     positions_x_min = positions[:, 0].min()
     xlen_quarter = (cell.lengths() / 4)[0]
     # center is True if it is negative and it is less tha xlen_quarter
     center = True if positions_x_min < (- xlen_quarter) else False
-    print(f"Center is {center}, x_min is {positions_x_min}")
 
     data = ""
     if center:
@@ -106,9 +109,9 @@ def generate_data(input_file, output_file, system_size=None, bond_types=[]):
         )
 
     # header
-    print(f"Box information:\nlengths: {cell.lengths()}\nangles: {cell.angles()}\n")
+    print(f"Box information:\nlengths: {cell.lengths()}\nangles: {cell.angles()}")
     print(
-        f"Assume the box is {'not' if not center else ''} centered, you may need to modify it if necessary\n"
+        f"Assume the box is {'not ' if not center else ''}centered in origin, because x_min is {positions_x_min}\n"
     )
     if not np.array_equal(cell.angles(), [90.0, 90.0, 90.0]):
         warnings.warn(
@@ -118,15 +121,11 @@ def generate_data(input_file, output_file, system_size=None, bond_types=[]):
 
     # atoms data
     data += "Atoms\n\n"
-    # if bond_types:
-    #     data += "# atom-ID\tmolecule-ID\tatom-type\tx\ty\tz\n"
-    # else:
-    #     data += "# atom-ID\tatom-type\tx\ty\tz\n"
 
     symbols = mol.get_chemical_symbols()
     numbers = mol.get_atomic_numbers()
     residuenumbers = mol.get_array("residuenumbers")
-    types = [numbers_to_lmp_types[i] for i in numbers]
+    types = [NUMBERS_TO_LMP_TYPES[i] for i in numbers]
     for i in range(num_atoms):
         position = positions[i]
         if bond_types:
@@ -139,14 +138,9 @@ def generate_data(input_file, output_file, system_size=None, bond_types=[]):
     # add bonds into data
     if bond_types:
         data += "\nBonds\n\n"
-        # data += "# ID\ttype\tatom1\tatom2\n"
         index = 1
         bond_type_index = 1
         for bond_type, bonds in bonds_by_type.items():
-            # atom1 = chemical_symbols.index(bond_type[0])
-            # atom2 = chemical_symbols.index(bond_type[1])
-            # type1 = numbers_to_lmp_types[atom1]
-            # type2 = numbers_to_lmp_types[atom2]
             for bond in bonds:
                 line = f"{index}\t{bond_type_index}\t{bond[0]+1}\t{bond[1]+1}\t# {bond_type[0]}-{bond_type[1]}\n"
                 data += line
@@ -156,8 +150,8 @@ def generate_data(input_file, output_file, system_size=None, bond_types=[]):
         data += "\nBond Coeffs\n\n"
         index = 1
         for bond_type, bonds in bonds_by_type.items():
-            key = "".join(sorted(f"{bond_type[0]}{bond_type[1]}"))
-            bond_length = bond_lengths[key]
+            key = "".join(sorted(bond_type))
+            bond_length = BOND_LENGTHS[key]
             line = f"{index}\t{bond_length}\t# {bond_type[0]}-{bond_type[1]}\n"
             data += line
             index += 1
@@ -168,18 +162,21 @@ def generate_data(input_file, output_file, system_size=None, bond_types=[]):
         file.write(data)
 
 
-def convert_bond_string_to_list(input_string):
+def convert_and_validate_bond_string(input_string):
     if len(input_string) == 0:
         return {}
 
     # Split the input string using the semicolon delimiter
-    substrings = input_string.split(',')
+    bonds = input_string.split(',')
 
     # Split each substring using the empty string delimiter and create pairs of elements
     result = []
-    for substring in substrings:
-        assert len(substring) == 2, print(f"wrong format: {input_string}")
-        result.append((substring[0], substring[1]))
+    for bond_type in bonds:
+        assert len(bond_type) == 2, print(f"wrong format: {input_string}")
+        # sort it to make sure it is unique
+        sorted_bond_type = "".join(sorted(bond_type))
+        assert sorted_bond_type in BOND_LENGTHS, print(f"bond type {bond_type} is not supported")
+        result.append(bond_type)
 
     return result
 
@@ -200,8 +197,6 @@ if __name__ == "__main__":
     parser.add_argument("--bonds", type=str, default="")
     args = parser.parse_args()
 
-    bond_types = convert_bond_string_to_list(args.bonds)
-    if bond_types:
-        print(f"generating bonds for {bond_types}")
+    bond_types = convert_and_validate_bond_string(args.bonds)
 
     generate_data(args.in_file, args.out_file, args.system_size, bond_types)

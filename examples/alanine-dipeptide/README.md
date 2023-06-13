@@ -54,7 +54,16 @@ The SHAKE algorithm allows for a larger timestep (e.g., 2 fs) without compromisi
 
 ### 5. Ramachandran Plot
 Generate a Ramachandran plot to visualize the distribution of the backbone dihedral angles (phi and psi) and assess the conformational states visited by the alanine dipeptide.
+You could run `plot_ramachandran.py` to generate the plot. The script will read the trajectory files and plot the dihedral angles over time.
 
+```bash
+# usage: plot_ramachandran.py traj_file top_file timestep [-d DUMP_INTERVAL]
+# replace 0.1 with 2 for SHAKE
+# replace with the real trajectory file name (dcd)
+python plot_ramachandran.py logs/traj.dcd alanine-dipeptide.pdb 0.1 -d 100
+```
+
+The resulting plot is shown below:
 |                 |    Without Shake     |    With Shake     |
 | --------------- | :------------------: | :---------------: |
 | Timestep        |        0.1 fs        |       2 fs        |

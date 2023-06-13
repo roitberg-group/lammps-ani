@@ -59,7 +59,7 @@ You could run `plot_ramachandran.py` to generate the plot. The script will read 
 ```bash
 # usage: plot_ramachandran.py traj_file top_file timestep [-d DUMP_INTERVAL]
 # replace 0.1 with 2 for SHAKE
-# replace with the real trajectory file name (dcd)
+# replace with your trajectory file name (.dcd file)
 python plot_ramachandran.py logs/traj.dcd alanine-dipeptide.pdb 0.1 -d 100
 ```
 

@@ -32,19 +32,28 @@ change_box     all boundary p p p
 pair_style     ani 5.1 ${modelfile} cuda ${num_models} cuaev full single
 pair_coeff     * *
 
-# Output: dump atom positions every 0.5 ps and log info every 0.5 ps
-dump           1 all custom 100 ${timestamp}.lammpstrj id element x y z ix iy iz
-dump_modify    1 element H C N O F S Cl
-dump           2 all dcd 100 ${timestamp}.dcd
+# Thermo
 thermo_style   custom step pe ke etotal temp press vol density
 thermo         100
 
-# Settings: temperature at 300 K, timestep (0.5 fs)
+# Dump
+dump           1 all custom 100 logs/${timestamp}.lammpstrj id element x y z ix iy iz
+dump_modify    1 element H C N O F S Cl
+dump           2 all dcd 100 logs/${timestamp}.dcd
+
+# Settings: temperature at 300 K
 velocity       all create 300.0 12345 rot yes mom yes dist gaussian
 timestep       ${timestep}
+
+# run npt
+# fix            0 all npt temp 300.0 300.0 100.0 iso 2500.0 2500.0 100.0
+# run            10000
+# unfix          0
 
 # run nvt
 fix            1 all langevin 300.0 300.0 100.0 12345
 fix            2 all nve
-run            2000
+run            50000000
 
+# Write final state of simulation
+write_data    logs/${timestamp}.final

@@ -48,6 +48,7 @@ if [ -f "build-kokkos/install_manifest.txt" ]; then
     xargs rm -vf < build-kokkos/install_manifest.txt
 fi
 rm -rf build-kokkos; mkdir -p build-kokkos; cd build-kokkos
+# get current gpu architecture by using pytorch to get device capability
 KOKKOS_ARCH=${OVERRIDE_KOKKOS_ARCH:=$(python -c "import torch; gpu_sm = ''.join(map(str, torch.cuda.get_device_capability(0))); gpu_name = torch.cuda.get_device_name(0); kokkos_dict = {'70': 'Kokkos_ARCH_VOLTA70', '75': 'Kokkos_ARCH_TURING75', '80': 'Kokkos_ARCH_AMPERE80', '86': 'Kokkos_ARCH_AMPERE86', '89': 'Kokkos_ARCH_ADA89', '90': 'Kokkos_ARCH_HOPPER90'}; kokkos_arch = kokkos_dict[gpu_sm]; print(kokkos_arch)")}
 echo Building KOKKOS for ${KOKKOS_ARCH}
 # kokkos does not support compiling for multiple GPU archs
@@ -88,7 +89,8 @@ rm -rf build; mkdir -p build; cd build
 cmake -DCMAKE_C_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DLAMMPS_INSTALL_RPATH=yes \
 -DCMAKE_INSTALL_PREFIX=${INSTALL_DIR}/ -DCMAKE_PREFIX_PATH=${INSTALL_DIR}/ -DCMAKE_INSTALL_LIBDIR=lib \
 -DPKG_PLUGIN=yes -DPKG_EXTRA-DUMP=yes -DBUILD_MPI=yes -DBUILD_SHARED_LIBS=yes -DLAMMPS_MACHINE=mpi \
--DPKG_EXTRA-PAIR=no -DPKG_MOLECULE=no -DENABLE_TESTING=no -DLAMMPS_EXCEPTIONS=yes \
+-DPKG_EXTRA-PAIR=no -DPKG_MOLECULE=yes -DPKG_RIGID=yes -DPKG_KSPACE=yes \
+-DENABLE_TESTING=no -DLAMMPS_EXCEPTIONS=yes \
 -DPKG_OPENMP=yes -DPKG_NETCDF=yes \
 $KOKKOS_FLAGS \
 ../cmake/

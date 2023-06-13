@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
-# the flag -use_fast_math is removed for accuray
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-extended-lambda --expt-relaxed-constexpr")
+
+# speed up mathmatics
+string(APPEND CMAKE_CUDA_FLAGS " -use_fast_math")
+string(APPEND CMAKE_CUDA_FLAGS " -DTORCHANI_OPT")
 
 # use cub in a safe manner, see:
 # https://github.com/pytorch/pytorch/pull/55292

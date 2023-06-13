@@ -54,15 +54,15 @@ timestep       ${timestep}
 
 # run npt
 fix            0 all npt temp 300.0 300.0 100.0 iso 1.0 1.0 500.0
-run            500000
+run            100000
 unfix          0
 
 # run nvt
 # fix            1 all langevin 300.0 300.0 100.0 12345
 # fix            2 all nve
-# run            2000
-
+# run            50000000
 
 # Write final state of simulation
+write_data    alanine-dipeptide.npt.data
 write_data    logs/${timestamp}.final
 

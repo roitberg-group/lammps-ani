@@ -16,6 +16,7 @@ fi
 rm -rf build; mkdir -p build; cd build
 # cmake -DCMAKE_C_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DLAMMPS_HEADER_DIR=${LAMMPS_ROOT}/src -DCUDNN_INCLUDE_PATH=${CONDA_PREFIX}/include -DCUDNN_LIBRARY_PATH=${CONDA_PREFIX}/lib ..
 # For NGC PyTorch: we need to use the built-in PyTorch shared libraries, and we don't need to use custom cudnn
+# For debugging symbols, please add: -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake -DCMAKE_C_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" \
 -DLAMMPS_HEADER_DIR=${LAMMPS_ROOT}/src -DCMAKE_PREFIX_PATH="$(python -c 'import torch.utils; print(torch.utils.cmake_prefix_path)');${INSTALL_DIR}/" \
 -DCMAKE_INSTALL_LIBDIR=lib \

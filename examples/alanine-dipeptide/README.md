@@ -22,7 +22,7 @@ Below is a plot showing the system's volume, density, temperature and pressure o
 
 ### 3. Run Simulation Without SHAKE
 
-To run the simulation without SHAKE constraints, you can adjust the timestep by setting the TIMESTEP variable in the run.sh script. Then, execute the script to start the simulation:
+To run the simulation without SHAKE constraints, you can adjust the timestep by setting the TIMESTEP variable in the `run.sh` script. Then, execute the script to start the simulation:
 
 ```bash
 ./run.sh

@@ -14,6 +14,11 @@ python pdb2lmp.py alanine-dipeptide.pdb alanine-dipeptide.data
 
 Prior to the production simulation, it's necessary to relax the system to attain the correct density through an NPT simulation. Refer to the [water-NPT](../water-NPT/) example for further details about NPT simulations. For systems without bonds information (which will be used for simulations without the SHAKE algorithm), execute `run_npt.sh`. This script uses `alanine-dipeptide.data` as the initial structure and saves the final equilibrated structure as `alanine-dipeptide.npt.data`.
 
+Below is a plot showing the system's volume, density, temperature and pressure over time:
+
+![Temperature and pressure of the system over time](resc/npt.png)
+
+
 ### 3. Run Simulation Without SHAKE
 
 To run the simulation without SHAKE constraints, you can adjust the timestep by setting the TIMESTEP variable in the run.sh script. Then, execute the script to start the simulation:
@@ -46,15 +51,16 @@ The LAMMPS input file for the SHAKE simulation is `in.shake.lammps`. Here are th
 
 The SHAKE algorithm allows for a larger timestep (e.g., 2 fs) without compromising stability. Without SHAKE, the simulation may fail quickly due to high-frequency bond vibrations.
 
-### 5. Analyze Results
+### 5. Ramachandran Plot
+Generate a Ramachandran plot to visualize the distribution of the backbone dihedral angles (phi and psi) and assess the conformational states visited by the alanine dipeptide.
 
-After the simulation is complete, you can analyze the results. Key aspects to examine include:
+|                 |    Without Shake     |    With Shake     |
+| --------------- | :------------------: | :---------------: |
+| Timestep        |        0.1 fs        |       2 fs        |
+| Simulation time |   5 ns (76 hours)    | 100 ns (94 hour)  |
+|                 | ![](resc/ramachandran.png) | ![](resc/ramachandran.shake.png) |
 
-Temperature: Monitor the temperature of the system over time to assess its stability and equilibration.
-
-Ramachandran Plot: Generate a Ramachandran plot to visualize the distribution of the backbone dihedral angles (phi and psi) and assess the conformational states visited by the alanine dipeptide.
-
-For the Ramachandran plot, you can use computational tools such as MDTraj or PyMOL to calculate the phi and psi angles from the trajectory and create the plot.
+It's important to note that the current model employs a repulsion model that missing the inclusion of dispersion interactions. The absence of these interactions could impact the result of the model, potentially influencing the distribution of conformational states observed.
 
 ### 6. Conclusion
 

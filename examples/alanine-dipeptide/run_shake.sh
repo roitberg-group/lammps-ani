@@ -12,7 +12,6 @@ LAMMPS_INPUT=in.shake.lammps
 RUN_KOKKOS=yes
 NUM_GPUS=1
 NUM_MODELS=1
-# todo, this needs another NPT data file
 DATA_FILE=alanine-dipeptide-bonds.npt.data
 TIMESTEP=2
 # choose ani2x.pt or ani2x_repulsion.pt

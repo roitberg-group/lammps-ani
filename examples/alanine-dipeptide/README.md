@@ -16,8 +16,7 @@ Prior to the production simulation, it's necessary to relax the system to attain
 
 Below is a plot showing the system's volume, density, temperature and pressure over time:
 
-![Temperature and pressure of the system over time](resc/npt.png)
-
+<center> <img height="400" alt="Temperature and pressure of the system over time" src="resc/npt.png"> </center>
 
 ### 3. Run Simulation Without SHAKE
 

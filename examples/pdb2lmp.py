@@ -5,10 +5,8 @@ import textwrap
 from ase.io import read
 from ase.geometry.analysis import Analysis
 
-# from ase.data.chemical_symbols import chemical_symbols
-
-
-header = """# LAMMPS data
+# Template for LAMMPS data file header
+HEADER = """# LAMMPS data
 {num_atoms} atoms
 7 atom types
 
@@ -34,9 +32,10 @@ Masses
 
 
 def all_bond_lengths():
+    """Function to return all bond lengths"""
     bond_lengths_data = {"HC": 1.09, "HO": 0.96, "HN": 1.01}
     bond_lengths = {}
-    # sort each bond_type to make sure it is unique
+    # Sort each bond_type to ensure uniqueness
     for bond_type in bond_lengths_data:
         bond_type_sorted = "".join(sorted(bond_type))
         bond_lengths[bond_type_sorted] = bond_lengths_data[bond_type]
@@ -49,6 +48,7 @@ BOND_LENGTHS = all_bond_lengths()
 
 
 def get_bonds_by_type(atoms, bond_types):
+    """Function to get bonds by type"""
     if not bond_types:
         return {}, 0
 
@@ -64,16 +64,9 @@ def get_bonds_by_type(atoms, bond_types):
     return bonds_by_type, num_bonds
 
 
-def generate_data(input_file, output_file, system_size=None, bond_types=[]):
-
-    mol = read(input_file)
+def generate_header(mol, num_atoms, bond_types, bonds_by_type, num_bonds):
+    """Function to generate the header for LAMMPS data file"""
     cell = mol.cell
-    if system_size is None or system_size > len(mol):
-        num_atoms = len(mol)
-    else:
-        num_atoms = system_size
-
-    bonds_by_type, num_bonds = get_bonds_by_type(mol, bond_types=bond_types)
     all_bond_types = ",".join(["-".join(bond_type) for bond_type in bond_types])
     detected_bond_types = ",".join(
         [
@@ -83,7 +76,7 @@ def generate_data(input_file, output_file, system_size=None, bond_types=[]):
         ]
     )
 
-    # determine whether we need to center the cell
+    # Determine whether we need to center the cell
     positions = mol.get_positions()
     positions_x_min = positions[:, 0].min()
     xlen_quarter = (cell.lengths() / 4)[0]
@@ -93,7 +86,7 @@ def generate_data(input_file, output_file, system_size=None, bond_types=[]):
     data = ""
     if center:
         xlen_half, ylen_half, zlen_half = cell.lengths() / 2
-        data += header.format(
+        data += HEADER.format(
             num_atoms=num_atoms,
             xlo=-xlen_half,
             xhi=xlen_half,
@@ -108,7 +101,7 @@ def generate_data(input_file, output_file, system_size=None, bond_types=[]):
         )
     else:
         xlen, ylen, zlen = cell.lengths()
-        data += header.format(
+        data += HEADER.format(
             num_atoms=num_atoms,
             xlo=0.0,
             xhi=xlen,
@@ -122,7 +115,7 @@ def generate_data(input_file, output_file, system_size=None, bond_types=[]):
             detected_bond_types=detected_bond_types,
         )
 
-    # header
+    # Print cell info
     print(f"Box information:\nlengths: {cell.lengths()}\nangles: {cell.angles()}")
     print(
         f"Assume the box is {'not ' if not center else ''}centered in origin, because x_min is {positions_x_min}\n"
@@ -133,9 +126,13 @@ def generate_data(input_file, output_file, system_size=None, bond_types=[]):
         )
     print(f"Generated header is the following:\n{data}")
 
-    # atoms data
-    data += "Atoms\n\n"
+    return data
 
+
+def generate_atoms_data(mol, num_atoms, bond_types):
+    """Function to generate atoms data section for LAMMPS data file"""
+    data = "Atoms\n\n"
+    positions = mol.get_positions()
     symbols = mol.get_chemical_symbols()
     numbers = mol.get_atomic_numbers()
     residuenumbers = mol.get_array("residuenumbers")
@@ -147,6 +144,13 @@ def generate_data(input_file, output_file, system_size=None, bond_types=[]):
         else:
             line = f"{i+1}\t{types[i]}\t{position[0]}\t{position[1]}\t{position[2]}\t# {symbols[i]}\n"
         data += line
+    return data
+
+
+def generate_bonds_data(mol, bond_types):
+    """Function to generate bonds data section for LAMMPS data file"""
+    data = ""
+    bonds_by_type, num_bonds = get_bonds_by_type(mol, bond_types=bond_types)
 
     # add bonds into data
     if bond_types:
@@ -169,12 +173,32 @@ def generate_data(input_file, output_file, system_size=None, bond_types=[]):
             data += line
             index += 1
 
+    return bonds_by_type, num_bonds, data
+
+
+# TODO remove system_size
+
+
+def generate_data(input_file, output_file, system_size=None, bond_types=[]):
+
+    mol = read(input_file)
+    if system_size is None or system_size > len(mol):
+        num_atoms = len(mol)
+    else:
+        num_atoms = system_size
+
+    bonds_by_type, num_bonds, bonds_data = generate_bonds_data(mol, bond_types)
+    header_data = generate_header(mol, num_atoms, bond_types, bonds_by_type, num_bonds)
+    atoms_data = generate_atoms_data(mol, num_atoms, bond_types)
+
+    data = header_data + atoms_data + bonds_data
     # write out data
     with open(output_file, "w") as file:
         file.write(data)
 
 
 def convert_and_validate_bond_string(input_string):
+    """Function to validate the bond string provided by the user"""
     if len(input_string) == 0:
         return {}
 
@@ -196,6 +220,7 @@ def convert_and_validate_bond_string(input_string):
 
 
 if __name__ == "__main__":
+    # Parse command line arguments
     parser = argparse.ArgumentParser(
         description=textwrap.dedent(
             """\
@@ -215,6 +240,7 @@ if __name__ == "__main__":
     parser.add_argument("--bonds", type=str, default="")
     args = parser.parse_args()
 
+    # Validate bond types
     bond_types = convert_and_validate_bond_string(args.bonds)
 
     generate_data(args.in_file, args.out_file, args.system_size, bond_types)

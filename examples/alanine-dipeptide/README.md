@@ -58,7 +58,7 @@ Generate a Ramachandran plot to visualize the distribution of the backbone dihed
 |                 |    Without Shake     |    With Shake     |
 | --------------- | :------------------: | :---------------: |
 | Timestep        |        0.1 fs        |       2 fs        |
-| Simulation time |   5 ns (76 hours)    | 100 ns (94 hour)  |
+| Simulation time |   5 ns (76 hours)    | 100 ns (94 hours)  |
 |                 | ![](resc/ramachandran.png) | ![](resc/ramachandran.shake.png) |
 
 It's important to note that the current model employs a repulsion model that missing the inclusion of dispersion interactions. The absence of these interactions could impact the result of the model, potentially influencing the distribution of conformational states observed.

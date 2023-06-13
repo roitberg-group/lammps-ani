@@ -64,9 +64,10 @@ def get_bonds_by_type(atoms, bond_types):
     return bonds_by_type, num_bonds
 
 
-def generate_header(mol, num_atoms, bond_types, bonds_by_type, num_bonds):
+def generate_header(mol, bond_types, bonds_by_type, num_bonds):
     """Function to generate the header for LAMMPS data file"""
     cell = mol.cell
+    num_atoms = len(mol)
     all_bond_types = ",".join(["-".join(bond_type) for bond_type in bond_types])
     detected_bond_types = ",".join(
         [
@@ -129,9 +130,10 @@ def generate_header(mol, num_atoms, bond_types, bonds_by_type, num_bonds):
     return data
 
 
-def generate_atoms_data(mol, num_atoms, bond_types):
+def generate_atoms_data(mol, bond_types):
     """Function to generate atoms data section for LAMMPS data file"""
     data = "Atoms\n\n"
+    num_atoms = len(mol)
     positions = mol.get_positions()
     symbols = mol.get_chemical_symbols()
     numbers = mol.get_atomic_numbers()
@@ -176,20 +178,13 @@ def generate_bonds_data(mol, bond_types):
     return bonds_by_type, num_bonds, data
 
 
-# TODO remove system_size
-
-
-def generate_data(input_file, output_file, system_size=None, bond_types=[]):
+def generate_data(input_file, output_file, bond_types=[]):
 
     mol = read(input_file)
-    if system_size is None or system_size > len(mol):
-        num_atoms = len(mol)
-    else:
-        num_atoms = system_size
 
     bonds_by_type, num_bonds, bonds_data = generate_bonds_data(mol, bond_types)
-    header_data = generate_header(mol, num_atoms, bond_types, bonds_by_type, num_bonds)
-    atoms_data = generate_atoms_data(mol, num_atoms, bond_types)
+    header_data = generate_header(mol, bond_types, bonds_by_type, num_bonds)
+    atoms_data = generate_atoms_data(mol, bond_types)
 
     data = header_data + atoms_data + bonds_data
     # write out data
@@ -236,11 +231,10 @@ if __name__ == "__main__":
     )
     parser.add_argument("in_file", type=str)
     parser.add_argument("out_file", type=str)
-    parser.add_argument("--system_size", type=int, default=None)
     parser.add_argument("--bonds", type=str, default="")
     args = parser.parse_args()
 
     # Validate bond types
     bond_types = convert_and_validate_bond_string(args.bonds)
 
-    generate_data(args.in_file, args.out_file, args.system_size, bond_types)
+    generate_data(args.in_file, args.out_file, bond_types)

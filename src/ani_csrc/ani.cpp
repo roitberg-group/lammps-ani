@@ -1,4 +1,5 @@
 #include "ani.h"
+#include <c10/util/env.h>
 #include <nvToolsExt.h>
 #include <torch/script.h>
 #include <torch/torch.h>
@@ -36,8 +37,11 @@ ANI::ANI(const std::string& model_file, int local_rank, int use_num_models, bool
       use_cuaev(use_cuaev_),
       use_fullnbr(use_fullnbr_),
       use_single(use_single_) {
-  at::globalContext().setAllowTF32CuBLAS(false);
-  at::globalContext().setAllowTF32CuDNN(false);
+  // configure whether to allow TF32
+  bool allow_tf32 = c10::utils::check_env("LAMMPS_ANI_ALLOW_TF32") == true;
+  at::globalContext().setAllowTF32CuBLAS(allow_tf32);
+  at::globalContext().setAllowTF32CuDNN(allow_tf32);
+
   try {
     model = torch::jit::load(model_file, device);
 
@@ -46,6 +50,14 @@ ANI::ANI(const std::string& model_file, int local_rank, int use_num_models, bool
     // change precision
     // Torchscript Module API Reference: https://pytorch.org/cppdocs/api/structtorch_1_1jit_1_1_module.html
     dtype = use_single ? torch::kFloat32 : torch::kFloat64;
+    std::string dtype_str;
+
+    if (use_single) {
+      dtype_str = allow_tf32 ? "float (TF32)" : "float (FP32)";
+    } else {
+      dtype_str = "double (FP64)";
+    }
+
     module_to_dtype(model, dtype);
 
     // prepare inputs
@@ -73,7 +85,7 @@ ANI::ANI(const std::string& model_file, int local_rank, int use_num_models, bool
     // torch::jit::fuser::cuda::setEnabled(false);
     torch::jit::setGraphExecutorOptimize(false);
 
-    std::cout << "Successfully loaded the model \nfile: '" << model_file << "' \ndevice: " << device << " \ndtype: " << dtype
+    std::cout << "Successfully loaded the model \nfile: '" << model_file << "' \ndevice: " << device << " \ndtype: " << dtype_str
               << " \nnbrlist: " << nbrlist << " \nani_aev: " << ani_aev
               << " \nuse_num_models: " << model.attr("use_num_models").toInt() << "/" << model.attr("num_models").toInt()
               << std::endl
@@ -165,7 +177,6 @@ void ANI::compute(
     virial = outputs->elements()[3].toTensor() * hartree2kcalmol;
     out_virial_t.copy_(virial);
   }
-
 }
 
 // compute with full nbrlist

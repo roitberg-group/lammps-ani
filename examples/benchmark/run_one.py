@@ -1,6 +1,7 @@
-import subprocess
 import os
 import datetime
+import argparse
+import subprocess
 from typing import Dict
 
 LAMMPS_PATH = os.path.join(os.environ["LAMMPS_ROOT"], "build/lmp_mpi")
@@ -74,32 +75,52 @@ class LammpsRunner:
 
 
 if __name__ == "__main__":
-    # run parameters
-    run_name = "run_nvt"
-    num_gpus = 1
-    kokkos = True
-    log_dir = "logs"
-    input_file = "in.lammps"
-    allow_tf32 = True
+    parser = argparse.ArgumentParser(description="Run LAMMPS simulation.")
+    parser.add_argument("data_file", help="Data file for the simulation.")
 
-    # variables for lammps input file
+    parser.add_argument("--input_file", default="in.lammps", help="LAMMPS input file.")
+    parser.add_argument("--run_name", default="run", help="Name of the run.")
+    parser.add_argument("--num_gpus", type=int, default=1, help="Number of GPUs to use.")
+    parser.add_argument("--kokkos", action="store_true", help="Use Kokkos.")
+    parser.add_argument("--log_dir", default="logs", help="Directory to store log files.")
+    parser.add_argument("--allow_tf32", action="store_true", help="Allow TensorFlow 32.")
+
+    parser.add_argument("--timestep", type=float, default=0.5, help="Timestep for the simulation.")
+    parser.add_argument("--run_steps", type=int, default=1000, help="Number of steps for the simulation.")
+    parser.add_argument("--ani_model_file", default="ani2x.pt", help="ANI model file.")
+    parser.add_argument("--ani_num_models", type=int, default=1, help="Number of ANI models to use. -1 means use all models.")
+    parser.add_argument("--ani_aev", choices=["cuaev", "pyaev"], default="cuaev", help="ANI AEV method.")
+    parser.add_argument("--ani_neighbor", choices=["full", "half"], default="full", help="ANI neighbor list.")
+    parser.add_argument("--ani_precision", choices=["single", "double"], default="single", help="ANI precision method.")
+
+    parser.add_argument("--run", action="store_true", help="If specified, run the simulation.")
+
+    args = parser.parse_args()
+    args.ani_model_file = os.path.join(os.getenv("LAMMPS_ANI_ROOT"), "tests", args.ani_model_file)
+
     var_dict = {
         # configuration
-        "data_file": "data/water-150k.data",
-        "timestep": 0.5,
-        "run_steps": 1000,
+        "data_file": args.data_file,
+        "timestep": args.timestep,
+        "run_steps": args.run_steps,
         # ani variables
-        "ani_model_file": os.getenv("LAMMPS_ANI_ROOT") + "/tests/ani2x.pt",
-        "ani_num_models": 1,  # -1 means use all models
-        "ani_aev": "cuaev",  # switch to pyaev if run npt
-        "ani_neighbor": "full",
-        "ani_precision": "single",
+        "ani_model_file": args.ani_model_file,
+        "ani_num_models": args.ani_num_models,
+        "ani_aev": args.ani_aev,
+        "ani_neighbor": args.ani_neighbor,
+        "ani_precision": args.ani_precision,
     }
 
-    lmp_runner = LammpsRunner(
-        LAMMPS_PATH, input_file, var_dict, kokkos, num_gpus, log_dir, run_name, allow_tf32
-    )
-    lmp_runner.run()
+    # Pretty print all arguments
+    from pprint import pprint
+    pprint(args.__dict__)
 
-    # warmup!
-    # benchmark tf32 again
+    lmp_runner = LammpsRunner(
+        LAMMPS_PATH, args.input_file, var_dict, args.kokkos, args.num_gpus, args.log_dir, args.run_name, args.allow_tf32
+    )
+
+    # Only run if --run is specified
+    if args.run:
+        lmp_runner.run()
+    else:
+        print("Simulation not run. Use --run to start the simulation.")

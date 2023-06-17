@@ -1,8 +1,10 @@
 import os
+import pprint
 import datetime
 import argparse
 import subprocess
 from typing import Dict
+from pathlib import Path
 
 LAMMPS_PATH = os.path.join(os.environ["LAMMPS_ROOT"], "build/lmp_mpi")
 
@@ -36,9 +38,10 @@ class LammpsRunner:
 
         # Create logs directory and logfile name
         os.makedirs(log_dir, exist_ok=True)
+        data_filename = Path(var_dict["data_file"]).stem
         logfile = os.path.join(
             log_dir,
-            f"{var_dict['timestamp']}-{'kokkos-' if kokkos else ''}models_{var_dict['ani_num_models']}-gpus_{num_gpus}-{run_name}.log",
+            f"{var_dict['timestamp']}-{'kokkos-' if kokkos else ''}models_{var_dict['ani_num_models']}-gpus_{num_gpus}-{data_filename}-{run_name}.log",
         )
 
         self.run_commands = (
@@ -57,8 +60,9 @@ class LammpsRunner:
         for k, v in add_env_vars.items():
             env_vars += f"{k}={v} "
 
+        self.var_dict = var_dict
         self.run_commands = env_vars + self.run_commands
-        print(f"Run with command:\n{self.run_commands}")
+        print(f"Run with command:\n{self.run_commands}", flush=True)
 
     def run(self):
         """
@@ -112,8 +116,7 @@ if __name__ == "__main__":
     }
 
     # Pretty print all arguments
-    from pprint import pprint
-    pprint(args.__dict__)
+    pprint.pprint(args.__dict__)
 
     lmp_runner = LammpsRunner(
         LAMMPS_PATH, args.input_file, var_dict, args.kokkos, args.num_gpus, args.log_dir, args.run_name, args.allow_tf32
@@ -121,6 +124,11 @@ if __name__ == "__main__":
 
     # Only run if --run is specified
     if args.run:
+        # save the configurations
+        formatted_dict = pprint.pformat(args.__dict__)
+        with open(f"{args.log_dir}/{lmp_runner.var_dict['timestamp']}.conf", 'w') as file:
+            file.write(formatted_dict)
+        # run
         lmp_runner.run()
     else:
         print("Simulation not run. Use --run to start the simulation.")

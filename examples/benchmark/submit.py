@@ -22,7 +22,7 @@ def calculate_nodes_and_tasks(num_gpus):
 def setup_and_run_job(num_gpus, submit=False):
     # Variables for easy adjustment
     job_name = "lammps_ani"
-    output_filename = f"{job_name}_{num_gpus}GPUs_%j.log"
+    output_filename = f"{job_name}_%j_{num_gpus}GPUs.log"
 
     nodes, ntasks_per_node, gres = calculate_nodes_and_tasks(num_gpus)
 
@@ -63,7 +63,7 @@ def setup_and_run_job(num_gpus, submit=False):
         "echo using python: $(which python)",
         # run the job commands
         # "python run_one.py --help",
-        f"python run_one.py capsid-aa/capsid5/capsid-pill-cleaned.data --kokkos --num_gpus={num_gpus} --run_steps=5000 --allow_tf32 --run_name='run' --run"
+        f"python run_one.py capsid-aa/capsid5/capsid-pill-cleaned.data --kokkos --num_gpus={num_gpus} --run_steps=5000 --allow_tf32 --run_name='run' --log_dir=log_capsid --run"
     ]
     commands = "\n".join(commands)
     if submit:

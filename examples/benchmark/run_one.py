@@ -17,7 +17,6 @@ class LammpsRunner:
         var_dict: Dict,
         kokkos: bool,
         num_gpus: int = 1,
-        log_dir: str = "logs",
         run_name: str = "run",
         allow_tf32: bool = False,
     ):
@@ -37,10 +36,10 @@ class LammpsRunner:
         )
 
         # Create logs directory and logfile name
-        os.makedirs(log_dir, exist_ok=True)
+        os.makedirs(var_dict["log_dir"], exist_ok=True)
         data_filename = Path(var_dict["data_file"]).stem
         logfile = os.path.join(
-            log_dir,
+            var_dict["log_dir"],
             f"{var_dict['timestamp']}-{'kokkos-' if kokkos else ''}models_{var_dict['ani_num_models']}-gpus_{num_gpus}-{data_filename}-{run_name}.log",
         )
 
@@ -77,6 +76,10 @@ class LammpsRunner:
         except subprocess.CalledProcessError as e:
             print(f"Error occurred while running LAMMPS: {e}")
 
+    def write_conf(self, args):
+        formatted_dict = pprint.pformat(args.__dict__)
+        with open(f"{self.var_dict['log_dir']}/{self.var_dict['timestamp']}.conf", 'w') as file:
+            file.write(formatted_dict)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run LAMMPS simulation.")
@@ -107,6 +110,7 @@ if __name__ == "__main__":
         "data_file": args.data_file,
         "timestep": args.timestep,
         "run_steps": args.run_steps,
+        "log_dir": args.log_dir,
         # ani variables
         "ani_model_file": args.ani_model_file,
         "ani_num_models": args.ani_num_models,
@@ -119,15 +123,13 @@ if __name__ == "__main__":
     pprint.pprint(args.__dict__)
 
     lmp_runner = LammpsRunner(
-        LAMMPS_PATH, args.input_file, var_dict, args.kokkos, args.num_gpus, args.log_dir, args.run_name, args.allow_tf32
+        LAMMPS_PATH, args.input_file, var_dict, args.kokkos, args.num_gpus, args.run_name, args.allow_tf32
     )
 
     # Only run if --run is specified
     if args.run:
         # save the configurations
-        formatted_dict = pprint.pformat(args.__dict__)
-        with open(f"{args.log_dir}/{lmp_runner.var_dict['timestamp']}.conf", 'w') as file:
-            file.write(formatted_dict)
+        lmp_runner.write_conf(args)
         # run
         lmp_runner.run()
     else:

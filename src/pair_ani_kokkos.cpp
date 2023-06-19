@@ -113,13 +113,7 @@ void PairANIKokkos<DeviceType>::compute(int eflag_in, int vflag_in) {
   NeighListKokkos<DeviceType>* k_list = static_cast<NeighListKokkos<DeviceType>*>(list);
   auto d_numneigh = k_list->d_numneigh;
   auto d_ilist = k_list->d_ilist;
-  // d_neighbors = Kokkos::create_mirror(k_list->d_neighbors);
   d_neighbors = k_list->d_neighbors;
-
-  using FloatView2D = Kokkos::View<float**, Kokkos::LayoutRight, DeviceType>;
-  using UnmanagedFloatView1D = Kokkos::View<float*, Kokkos::LayoutRight, DeviceType>;
-  using UnmanagedFloatView2D = Kokkos::View<float**, Kokkos::LayoutRight, DeviceType>;
-  FloatView2D d_xfloat;
 
   int max_neighs = d_neighbors.extent(1);
 
@@ -173,6 +167,9 @@ void PairANIKokkos<DeviceType>::compute(int eflag_in, int vflag_in) {
   torch::Tensor mask = torch::arange(max_neighs, ani.device).unsqueeze(0) < numneigh.unsqueeze(1);
   jlist = jlist.masked_select(mask);
   int npairs = jlist.size(0);
+
+  // std::cout << "kokkos_nlocal: " << kokkos_nlocal << ", max_neighs: " << max_neighs << ", npairs: " << npairs
+  //           << ", nlocal: " << nlocal << ", ntotal: " << ntotal << std::endl;
 
   ani.compute(
       out_energy,

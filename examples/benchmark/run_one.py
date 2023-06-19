@@ -19,6 +19,7 @@ class LammpsRunner:
         num_gpus: int = 1,
         run_name: str = "run",
         allow_tf32: bool = False,
+        nsys_profile: bool = False,
     ):
         """
         Initialize LammpsRunner.
@@ -60,7 +61,11 @@ class LammpsRunner:
             env_vars += f"{k}={v} "
 
         self.var_dict = var_dict
-        self.run_commands = env_vars + self.run_commands
+        if nsys_profile:
+            nsys_commands = f"nsys profile --stats=true --trace cuda,nvtx,mpi --cudabacktrace=true -o {var_dict['log_dir'] + '/' +var_dict['timestamp']}.qdrep "
+            self.run_commands = env_vars + nsys_commands + self.run_commands
+        else:
+            self.run_commands = env_vars + self.run_commands
         print(f"Run with command:\n{self.run_commands}", flush=True)
 
     def run(self):
@@ -94,6 +99,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--timestep", type=float, default=0.5, help="Timestep for the simulation.")
     parser.add_argument("--run_steps", type=int, default=1000, help="Number of steps for the simulation.")
+    parser.add_argument("--replicate", type=str, default="1 1 1", help="Replicate the current simulation one or more times in each dimension")
     parser.add_argument("--ani_model_file", default="ani2x.pt", help="ANI model file.")
     parser.add_argument("--ani_num_models", type=int, default=1, help="Number of ANI models to use. -1 means use all models.")
     parser.add_argument("--ani_aev", choices=["cuaev", "pyaev"], default="cuaev", help="ANI AEV method.")
@@ -101,6 +107,7 @@ if __name__ == "__main__":
     parser.add_argument("--ani_precision", choices=["single", "double"], default="single", help="ANI precision method.")
 
     parser.add_argument("--run", action="store_true", help="If specified, run the simulation.")
+    parser.add_argument("--nsys", action="store_true", help="If specified, run nsight profiling.")
 
     args = parser.parse_args()
     args.ani_model_file = os.path.join(os.getenv("LAMMPS_ANI_ROOT"), "tests", args.ani_model_file)
@@ -111,6 +118,7 @@ if __name__ == "__main__":
         "timestep": args.timestep,
         "run_steps": args.run_steps,
         "log_dir": args.log_dir,
+        "replicate": f"'{args.replicate}'",
         # ani variables
         "ani_model_file": args.ani_model_file,
         "ani_num_models": args.ani_num_models,
@@ -123,7 +131,7 @@ if __name__ == "__main__":
     pprint.pprint(args.__dict__)
 
     lmp_runner = LammpsRunner(
-        LAMMPS_PATH, args.input_file, var_dict, args.kokkos, args.num_gpus, args.run_name, args.allow_tf32
+        LAMMPS_PATH, args.input_file, var_dict, args.kokkos, args.num_gpus, args.run_name, args.allow_tf32, args.nsys
     )
 
     # Only run if --run is specified

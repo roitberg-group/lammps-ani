@@ -3,12 +3,22 @@ import argparse
 from simple_slurm import Slurm
 
 
-def calculate_nodes_and_tasks(num_gpus):
+def calculate_nodes_and_tasks(num_gpus, weak_scaling=False):
     # Logic to calculate nodes and tasks per node based on number of GPUs
     if num_gpus <= 8:
         nodes = 1
         ntasks_per_node = num_gpus
         gres = f"gpu:{num_gpus}"
+        if num_gpus == 1:
+            replicate = "1 1 1"
+        elif num_gpus == 2:
+            replicate = "2 1 1"
+        elif num_gpus == 4:
+            replicate = "2 2 1"
+        elif num_gpus == 8:
+            replicate = "2 2 2"
+        else:
+            raise ValueError("Number of GPUs should be 1, 2, 4 or 8")
     else:
         assert (
             num_gpus % 8 == 0
@@ -16,15 +26,17 @@ def calculate_nodes_and_tasks(num_gpus):
         nodes = num_gpus // 8
         ntasks_per_node = 8
         gres = f"gpu:{8}"
-    return nodes, ntasks_per_node, gres
+        replicate = f"2 2 {nodes * 2}"
+    if not weak_scaling:
+        replicate = "1 1 1"
+    return nodes, ntasks_per_node, gres, replicate
 
 
-def setup_and_run_job(num_gpus, submit=False):
+def setup_and_run_job(num_gpus, data_file, job_name, submit=False, weak_scaling=False, log_dir="logs"):
     # Variables for easy adjustment
-    job_name = "lammps_ani"
     output_filename = f"{job_name}_%j_{num_gpus}GPUs.log"
 
-    nodes, ntasks_per_node, gres = calculate_nodes_and_tasks(num_gpus)
+    nodes, ntasks_per_node, gres, replicate = calculate_nodes_and_tasks(num_gpus, weak_scaling)
 
     slurm = Slurm(
         job_name=job_name,
@@ -64,7 +76,7 @@ def setup_and_run_job(num_gpus, submit=False):
         # run the job commands
         # "python run_one.py --help",
         # --allow_tf32
-        f"python run_one.py capsid-aa/capsid5/capsid-pill-cleaned.data --kokkos --num_gpus={num_gpus} --run_steps=5000 --run_name='run' --log_dir=log_capsid --run"
+        f"python run_one.py {data_file} --input_file=in.lammps --replicate='{replicate}' --kokkos --num_gpus={num_gpus} --run_steps=5000 --run_name='run' --log_dir={log_dir} --run"
     ]
     commands = "\n".join(commands)
     if submit:
@@ -79,11 +91,28 @@ def setup_and_run_job(num_gpus, submit=False):
 def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Run LAMMPS-ANI benchmarks.")
-    parser.add_argument("num_gpus", type=int, help="Number of GPUs to use for the job.")
+    # parser.add_argument("num_gpus", type=int, help="Number of GPUs to use for the job.")
+    parser.add_argument("data_file", type=str, help="Path to the data file.")
     parser.add_argument('-y', action='store_true', help='If provided, the job will be submitted. If not, the job will only be prepared but not submitted.')
     args = parser.parse_args()
 
-    setup_and_run_job(args.num_gpus, submit=args.y)
+    # control weak or strong scaling
+    weak_scaling = False
+    log_dir = "log_water_strong_scaling"
+    # run
+    if weak_scaling:
+        job_name = "lammps_ani_weak_scaling"
+    else:
+        job_name = "lammps_ani_strong_scaling"
+    setup_and_run_job(num_gpus=1, data_file=args.data_file, job_name=job_name, submit=args.y, weak_scaling=weak_scaling, log_dir=log_dir)
+    setup_and_run_job(num_gpus=2, data_file=args.data_file, job_name=job_name, submit=args.y, weak_scaling=weak_scaling, log_dir=log_dir)
+    setup_and_run_job(num_gpus=4, data_file=args.data_file, job_name=job_name, submit=args.y, weak_scaling=weak_scaling, log_dir=log_dir)
+    setup_and_run_job(num_gpus=8, data_file=args.data_file, job_name=job_name, submit=args.y, weak_scaling=weak_scaling, log_dir=log_dir)
+    setup_and_run_job(num_gpus=16, data_file=args.data_file, job_name=job_name, submit=args.y, weak_scaling=weak_scaling, log_dir=log_dir)
+    setup_and_run_job(num_gpus=32, data_file=args.data_file, job_name=job_name, submit=args.y, weak_scaling=weak_scaling, log_dir=log_dir)
+    setup_and_run_job(num_gpus=48, data_file=args.data_file, job_name=job_name, submit=args.y, weak_scaling=weak_scaling, log_dir=log_dir)
+    setup_and_run_job(num_gpus=56, data_file=args.data_file, job_name=job_name, submit=args.y, weak_scaling=weak_scaling, log_dir=log_dir)
+    setup_and_run_job(num_gpus=64, data_file=args.data_file, job_name=job_name, submit=args.y, weak_scaling=weak_scaling, log_dir=log_dir)
 
 
 if __name__ == "__main__":

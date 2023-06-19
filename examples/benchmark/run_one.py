@@ -26,7 +26,7 @@ class LammpsRunner:
         """
         var_dict["newton_pair"] = "on" if kokkos else "off"
         var_dict["ani_device"] = "cuda"
-        var_dict["timestamp"] = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
+        var_dict["timestamp"] = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S.%f")[:-3]
 
         # create run commands
         var_commands = " ".join(

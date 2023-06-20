@@ -8,7 +8,6 @@ variable       timestamp       index  timestamp
 variable       data_file       index  none
 variable       timestep        index  timestep
 variable       run_steps       index  1000
-variable       replicate       index  "1 1 1"
 # ani variables
 variable       ani_model_file  index  none
 variable       ani_device      index  cuda
@@ -28,7 +27,6 @@ newton         ${newton_pair} off
 
 # Atom Definition
 read_data      ${data_file}
-replicate      ${replicate}
 change_box     all boundary p p p
 
 # pair_style ani 5.1 model_file device num_models ani_aev ani_neighbor
@@ -38,39 +36,35 @@ change_box     all boundary p p p
 # 3. ani_aev (Optional)       = cuaev/pyaev, default as cuaev
 # 4. ani_neighbor (Optional)  = full/half, default as full nbrlist
 # 5. ani_precision (Optional) = single/double, default as single
-pair_style     ani 5.1 ${ani_model_file} ${ani_device} ${ani_num_models} ${ani_aev} ${ani_neighbor} ${ani_precision}
+# NPT requires pyaev, we force it to be pyaev here
+pair_style     ani 5.1 ${ani_model_file} ${ani_device} ${ani_num_models} pyaev ${ani_neighbor} ${ani_precision}
 pair_coeff     * *
 
 # Thermo
 thermo_style   custom step pe ke etotal temp press vol density
 thermo         100
 
+# Minimization
+minimize       1.0e-8 1.0e-8 1000 10000
+
+# Reset timestep
+reset_timestep 0
+
 # Dump
-# dump           1 all custom 1000 ${log_dir}/${timestamp}.lammpstrj id element x y z ix iy iz
+# dump           1 all custom 100 logs/${timestamp}.lammpstrj id element x y z ix iy iz
 # dump_modify    1 element H C N O F S Cl
-dump           2 all dcd 1000 ${log_dir}/${timestamp}.dcd
+dump           2 all dcd 100 ${log_dir}/${timestamp}.dcd
 
 # Settings: temperature at 300 K
 velocity       all create 300.0 12345 rot yes mom yes dist gaussian
 timestep       ${timestep}
 
-# run nvt
-fix            1 all langevin 300.0 300.0 100.0 12345
-fix            2 all nve
-# warmup steps
-run            500
-run            500
-run            500
-run            500
-
-run            5000
-# run            5000
-# run            5000
-
-
-# production run
+# run npt
+fix            0 all npt temp 300.0 300.0 100.0 iso 1.0 1.0 500.0
 run            ${run_steps}
 
 
 # Write final state of simulation
 write_data    ${log_dir}/${timestamp}.final
+# For NPT we save the final state of the simulation
+write_data    ${data_file}.final

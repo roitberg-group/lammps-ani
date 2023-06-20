@@ -8,7 +8,6 @@ variable       timestamp       index  timestamp
 variable       data_file       index  none
 variable       timestep        index  timestep
 variable       run_steps       index  1000
-variable       replicate       index  "1 1 1"
 # ani variables
 variable       ani_model_file  index  none
 variable       ani_device      index  cuda
@@ -28,7 +27,6 @@ newton         ${newton_pair} off
 
 # Atom Definition
 read_data      ${data_file}
-replicate      ${replicate}
 change_box     all boundary p p p
 
 # pair_style ani 5.1 model_file device num_models ani_aev ani_neighbor
@@ -38,6 +36,7 @@ change_box     all boundary p p p
 # 3. ani_aev (Optional)       = cuaev/pyaev, default as cuaev
 # 4. ani_neighbor (Optional)  = full/half, default as full nbrlist
 # 5. ani_precision (Optional) = single/double, default as single
+# pair_style     ani 5.1 ${modelfile} cuda ${num_models} pyaev full single
 pair_style     ani 5.1 ${ani_model_file} ${ani_device} ${ani_num_models} ${ani_aev} ${ani_neighbor} ${ani_precision}
 pair_coeff     * *
 
@@ -58,15 +57,6 @@ timestep       ${timestep}
 fix            1 all langevin 300.0 300.0 100.0 12345
 fix            2 all nve
 # warmup steps
-run            500
-run            500
-run            500
-run            500
-
-run            5000
-# run            5000
-# run            5000
-
 
 # production run
 run            ${run_steps}
@@ -74,3 +64,4 @@ run            ${run_steps}
 
 # Write final state of simulation
 write_data    ${log_dir}/${timestamp}.final
+write_data    ${data_file}.final

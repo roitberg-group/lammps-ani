@@ -1,5 +1,6 @@
 # variables
 variable       lammps_ani_root getenv LAMMPS_ANI_ROOT
+variable       log_dir         index  logs
 # kokkos needs newton_pair on for reverse communication between gpus
 variable       newton_pair     index  off
 variable       timestamp       index  timestamp
@@ -21,7 +22,7 @@ atom_style     atomic
 
 neighbor       2.0 bin
 # check yes = only build if at least one atom has moved half the skin distance or more
-neigh_modify   every 10 delay 0 check yes
+neigh_modify   every 10 delay 0 check no
 newton         ${newton_pair} off
 
 # Atom Definition
@@ -35,7 +36,6 @@ change_box     all boundary p p p
 # 3. ani_aev (Optional)       = cuaev/pyaev, default as cuaev
 # 4. ani_neighbor (Optional)  = full/half, default as full nbrlist
 # 5. ani_precision (Optional) = single/double, default as single
-# pair_style     ani 5.1 ${modelfile} cuda ${num_models} pyaev full single
 pair_style     ani 5.1 ${ani_model_file} ${ani_device} ${ani_num_models} ${ani_aev} ${ani_neighbor} ${ani_precision}
 pair_coeff     * *
 
@@ -208,4 +208,4 @@ run            10
 
 
 # Write final state of simulation
-# write_data    logs/${timestamp}.final
+# write_data    ${log_dir}/${timestamp}.final

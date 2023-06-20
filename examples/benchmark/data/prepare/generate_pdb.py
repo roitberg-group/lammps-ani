@@ -15,8 +15,17 @@ end structure
 """
 
 # Simulation details.
-names = ["150k", "300k", "500k", "1M", "3M", "5M"]
-num_atoms = [150000, 300003, 500001, 1000002, 3000003, 5000001]
+names = ["50k", "100k", "200k", "300k", "400k", "500k", "600k", "700k", "800k", "900k", "1M", "5M"]
+num_atoms = [50001, 100002, 200001, 300003, 400002, "500001", 600000, 700002, 800001, 900000, 1000002, 5000001]
+
+# 10M takes about 2 hours
+# names = ["10M"]
+# num_atoms = [10000002]
+
+# 100M takes about 2 days
+# names = ["100M"]
+# num_atoms = [100000002]
+
 density = 0.98  # g / cm^3
 
 # Iterate over each simulation.
@@ -51,7 +60,7 @@ for i, atoms in enumerate(num_atoms):
         f.write(content)
 
     # Run packmol to generate the pdb file.
-    subprocess.run(f"packmol < {inp_file}", check=True)
+    subprocess.run(f"packmol < {inp_file}", check=True, shell=True)
 
     # Add the box length information to the generated pdb file.
     pdb_file = f"water-{names[i]}.pdb"

@@ -167,3 +167,20 @@ Allegro:
 8.7 timesteps/s on 5120 GPUs
 
 ### saturation test on a single GPU
+The goal of this benchmarking is to determine the saturation point of a single GPU, beyond which increasing the system size does not yield further performance improvement.
+
+| atoms   | ns/day | timesteps/s | Matoms_step/s |
+|---------|--------|-------------|---------------|
+| 50001   | 2.827  | 65.446      | 3.272         |
+| 100002  | 1.495  | 34.617      | 3.462         |
+| 200001  | 0.772  | 17.869      | 3.574         |
+| 300003  | 0.521  | 12.065      | 3.62          |
+| 400002  | 0.394  | 9.122       | 3.649         |
+| 500001  | 0.316  | 7.315       | 3.658         |
+| 600000  | 0.265  | 6.133       | 3.68          |
+| 700002  | 0.227  | 5.257       | 3.68          |
+| 800001  | 0.199  | 4.608       | 3.686         |
+| 900000  | 0.177  | 4.1         | 3.69          |
+
+We could see that the performance is saturated around 3.68 Matoms_step/s at 500k.
+We believe this could be improved by reducing memory reallocation, CPU syncronization, etc.

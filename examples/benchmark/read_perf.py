@@ -1,3 +1,4 @@
+import os
 import re
 import pandas as pd
 import argparse
@@ -20,6 +21,7 @@ def extract_data_from_log(filename):
         if 'steps with' in line:
             steps = int(re.search(r'(\d+) steps', line).group(1))
             atoms = int(re.search(r'with (\d+) atoms', line).group(1))
+            num_gpus = int(re.search(r'on (\d+) procs', line).group(1))
             in_a_block = True
         elif 'Performance:' in line:
             assert in_a_block
@@ -27,11 +29,11 @@ def extract_data_from_log(filename):
             perf_ns_day = perf[0]
             perf_timesteps_s = perf[2]
             perf_Matoms_step_s = perf[-1]
-            data.append([steps, atoms, perf_ns_day, perf_timesteps_s, perf_Matoms_step_s])
+            data.append([steps, atoms, num_gpus, perf_ns_day, perf_timesteps_s, perf_Matoms_step_s])
             in_a_block = False
 
     # Convert the list to DataFrame
-    df = pd.DataFrame(data, columns=['steps', 'atoms', 'ns/day', 'timesteps/s', 'Matoms_step/s'])
+    df = pd.DataFrame(data, columns=['steps', 'atoms', 'num_gpus', 'ns/day', 'timesteps/s', 'Matoms_step/s'])
 
     return df
 
@@ -66,22 +68,45 @@ def plot(df):
     plt.savefig(png_file)
 
     print(f"png saved to {png_file}")
+    plt.close()
 
 
 # Argument parser
-parser = argparse.ArgumentParser(description='Process a log file.')
-parser.add_argument('filename', type=str, help='The filename of the log file to process')
+parser = argparse.ArgumentParser(description='Process log files.')
+parser.add_argument('path', type=str, help='The path to a directory or a log file')
 parser.add_argument('--plot', action='store_true', help='If provided, also make a plot.')
 args = parser.parse_args()
 
-# Call the function and print the dataframe
-df = extract_data_from_log(args.filename)
-print(df)
+# Check if path is a file or a directory
+if os.path.isfile(args.path):
+    files_to_process = [args.path]  # Single file provided
+elif os.path.isdir(args.path):
+    # Get the list of all .log files in the directory
+    files_to_process = sorted([os.path.join(args.path, f) for f in os.listdir(args.path) if f.endswith('.log')])
 
-log_path = Path(args.filename)
-csv_file = log_path.parent / f"{log_path.stem}.csv"
-df.to_csv(csv_file, index=False)
-print(f"csv saved to {csv_file}")
+    # Check if there are .log files in the directory
+    if not files_to_process:
+        print("No .log files found in the directory.")
+        exit()
+else:
+    print(f"Provided path {args.path} is not a valid file or directory.")
+    exit()
 
-if args.plot:
-    plot(df)
+# Process each log file
+for full_path in files_to_process:
+    filename = os.path.basename(full_path)
+    print(f"Processing {filename}...")
+
+    # Call the function and print the dataframe
+    df = extract_data_from_log(full_path)
+    print(df.iloc[-1:])
+
+    log_path = Path(full_path)
+    csv_file = log_path.parent / f"{log_path.stem}.csv"
+    df.to_csv(csv_file, index=False)
+    print(f"Csv saved to {csv_file}")
+
+    if args.plot:
+        plot(df)
+
+print("Finished processing all files.")

@@ -8,6 +8,7 @@ variable       timestamp       index  timestamp
 variable       data_file       index  none
 variable       timestep        index  timestep
 variable       run_steps       index  1000
+variable       replicate       index  "1 1 1"
 # ani variables
 variable       ani_model_file  index  none
 variable       ani_device      index  cuda
@@ -27,6 +28,7 @@ newton         ${newton_pair} off
 
 # Atom Definition
 read_data      ${data_file}
+replicate      ${replicate}
 change_box     all boundary p p p
 
 # pair_style ani 5.1 model_file device num_models ani_aev ani_neighbor
@@ -63,8 +65,8 @@ run            500
 run            500
 
 run            5000
-run            5000
-run            5000
+# run            5000
+# run            5000
 
 
 # production run

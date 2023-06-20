@@ -19,7 +19,7 @@ def calculate_nodes_and_tasks(num_gpus):
     return nodes, ntasks_per_node, gres
 
 
-def setup_and_run_job(num_gpus, submit=False):
+def setup_and_run_job(num_gpus, data_file, submit=False):
     # Variables for easy adjustment
     job_name = "lammps_ani"
     output_filename = f"{job_name}_%j_{num_gpus}GPUs.log"
@@ -64,7 +64,7 @@ def setup_and_run_job(num_gpus, submit=False):
         # run the job commands
         # "python run_one.py --help",
         # --allow_tf32
-        f"python run_one.py capsid-aa/capsid5/capsid-pill-cleaned.data --kokkos --num_gpus={num_gpus} --run_steps=5000 --run_name='run' --log_dir=log_capsid --run"
+        f"python run_one.py {data_file} --kokkos --num_gpus={num_gpus} --run_steps=5000 --run_name='run' --log_dir=log_capsid --run"
     ]
     commands = "\n".join(commands)
     if submit:
@@ -83,7 +83,8 @@ def main():
     parser.add_argument('-y', action='store_true', help='If provided, the job will be submitted. If not, the job will only be prepared but not submitted.')
     args = parser.parse_args()
 
-    setup_and_run_job(args.num_gpus, submit=args.y)
+    data_file = "capsid-aa/capsid5/capsid-pill-cleaned.data"
+    setup_and_run_job(args.num_gpus, data_file=data_file, submit=args.y)
 
 
 if __name__ == "__main__":

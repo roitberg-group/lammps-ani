@@ -35,9 +35,43 @@ def extract_data_from_log(filename):
 
     return df
 
+
+def plot(df):
+    fig, axs = plt.subplots(3, figsize=(7, 9), dpi=150)
+
+    # Accumulate steps
+    df['accumulated_steps'] = df['steps'].cumsum()
+
+    # Plot 'ns/day' vs 'accumulated_steps'
+    axs[0].plot(df['accumulated_steps'], df['ns/day'])
+    axs[0].set_xlabel('Accumulated Steps')
+    axs[0].set_ylabel('ns/day')
+    axs[0].set_title('ns/day vs Accumulated Steps')
+
+    # Plot 'timesteps/s' vs 'accumulated_steps'
+    axs[1].plot(df['accumulated_steps'], df['timesteps/s'])
+    axs[1].set_xlabel('Accumulated Steps')
+    axs[1].set_ylabel('timesteps/s')
+    axs[1].set_title('timesteps/s vs Accumulated Steps')
+
+    # Plot 'Matoms_step/s' vs 'accumulated_steps'
+    axs[2].plot(df['accumulated_steps'], df['Matoms_step/s'])
+    axs[2].set_xlabel('Accumulated Steps')
+    axs[2].set_ylabel('Matoms_step/s')
+    axs[2].set_title('Matoms_step/s vs Accumulated Steps')
+
+    plt.tight_layout()
+    # plt.show()
+    png_file = log_path.parent / f"{log_path.stem}.png"
+    plt.savefig(png_file)
+
+    print(f"png saved to {png_file}")
+
+
 # Argument parser
 parser = argparse.ArgumentParser(description='Process a log file.')
 parser.add_argument('filename', type=str, help='The filename of the log file to process')
+parser.add_argument('--plot', action='store_true', help='If provided, also make a plot.')
 args = parser.parse_args()
 
 # Call the function and print the dataframe
@@ -49,35 +83,5 @@ csv_file = log_path.parent / f"{log_path.stem}.csv"
 df.to_csv(csv_file, index=False)
 print(f"csv saved to {csv_file}")
 
-# plot
-
-fig, axs = plt.subplots(3, figsize=(7, 9), dpi=150)
-
-# Accumulate steps
-df['accumulated_steps'] = df['steps'].cumsum()
-
-# Plot 'ns/day' vs 'accumulated_steps'
-axs[0].plot(df['accumulated_steps'], df['ns/day'])
-axs[0].set_xlabel('Accumulated Steps')
-axs[0].set_ylabel('ns/day')
-axs[0].set_title('ns/day vs Accumulated Steps')
-
-# Plot 'timesteps/s' vs 'accumulated_steps'
-axs[1].plot(df['accumulated_steps'], df['timesteps/s'])
-axs[1].set_xlabel('Accumulated Steps')
-axs[1].set_ylabel('timesteps/s')
-axs[1].set_title('timesteps/s vs Accumulated Steps')
-
-# Plot 'Matoms_step/s' vs 'accumulated_steps'
-axs[2].plot(df['accumulated_steps'], df['Matoms_step/s'])
-axs[2].set_xlabel('Accumulated Steps')
-axs[2].set_ylabel('Matoms_step/s')
-axs[2].set_title('Matoms_step/s vs Accumulated Steps')
-
-plt.tight_layout()
-# plt.show()
-png_file = log_path.parent / f"{log_path.stem}.png"
-plt.savefig(png_file)
-
-print(f"png saved to {png_file}")
-
+if args.plot:
+    plot(df)

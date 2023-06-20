@@ -80,6 +80,7 @@ The benchmark result:
 | 400002        | 19200096 | 48       | 0.374  | 8.662       | 166.318       |
 
 Here is the plot
+
 ![](resc/weak_scale.png)
 
 <!-- Explain the weak scaling plot *briefly* -->
@@ -125,6 +126,7 @@ python submit_scaling.py data/water-200k.data.final
 
 
 Here is the plot
+
 ![](resc/strong_scale.png)
 
 <!-- Explain the weak scaling plot *briefly* -->

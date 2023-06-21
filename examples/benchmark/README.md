@@ -79,7 +79,9 @@ Benchmark results and a plot of weak scaling are provided in the table and the i
 
 Here is the plot
 
-![](resc/weak_scale.png)
+<p align="center">
+    <img height="400" src="resc/weak_scale.png">
+</p>
 
 As the number of GPUs increases, the number of timesteps per second remains relatively constant for each group of atoms per GPU. This shows good weak scaling, as the problem size increases, the simulation is able to effectively utilize additional resources to maintain performance.
 
@@ -122,7 +124,9 @@ python submit_scaling.py data/water-200k.data.final
 
 Here is the plot
 
-![](resc/strong_scale.png)
+<p align="center">
+    <img height="700" src="resc/strong_scale.png">
+</p>
 
 For all system sizes, the performance increases as the number of GPUs increases, indicating that the problem scales well across multiple GPUs. This is expected in a strong scaling scenario, where we keep the problem size constant and increase the resources (GPUs, in this case).
 
@@ -153,7 +157,9 @@ Below is the performance data collected from the benchmark runs:
 | 43911876 | 56       | 0.17   | 3.936       | 172.835       |
 | 43911876 | 64       | 0.192  | 4.445       | 195.173       |
 
-![44M](resc/capsid.png)
+<p align="center">
+    <img height="400" src="resc/capsid.png">
+</p>
 
 The results demonstrate an increasing performance trend as the number of GPUs are augmented. Despite the large size of the capsid system, the strong scaling performance continues to improve with more resources, suggesting good scalability of the algorithm in large systems.
 

@@ -1,9 +1,9 @@
 # Lammps-ANI benchmark
-This document provides a detailed guide on how to conduct a benchmark test on two systems: a water box system and an HIV capsid system. The procedures for data preparation, relaxation of the water system, as well as the weak and strong scaling tests are thoroughly explained. The benchmark results are presented in tables, and the performance is also compared to the Allegro system.
+This document provides a detailed guide on how to conduct a benchmark test on two systems: a water box system and an HIV capsid system. The procedures for data preparation, relaxation of the water system, as well as the weak and strong scaling tests are thoroughly explained. The benchmark results are presented in tables, and the performance is also compared to the Allegro.
 
 ## Data Preparation
 
-#### Water box sysetem
+#### 1. Water box sysetem
 
 Generate PDB files for water systems ranging from 50k atoms to 10M atoms by using the `generate_pdb.py` script located at `./data/water/prepare/`. The script calculates the density and utilizes packmol to build the system. Note: Generating a system with 10M atoms may take around 2 hours, while a system with 100M atoms may take up to 2 days.
 
@@ -15,7 +15,7 @@ python path/to/pdb2lmp.py water.pdb water.data
 
 Finally, move all the generated LAMMPS data files from `data/water/prepare` to the `data/water` folder.
 
-#### HIV Capsid System
+#### 2. HIV Capsid System
 
 For the HIV capsid system, we obtained the structures from Gregory Voth. There are two PDB files:
 - `data/capsid-aa/capsid-cone.pdb` onsisting of 70M atoms, with 65.6M of them being water.
@@ -32,9 +32,7 @@ After preparing the data, the water system needs to be relaxed. For this, run LA
 python run_one.py data/water/water-50k.data --kokkos --num_gpus=4 --run_steps=5000 --input_file=in.relax.lammps --log_dir=log_water_relax --run
 ```
 
-The number of GPUs can be adjusted based on the size of the system. For smaller systems, each job typically finishes within a few minutes. Once the relaxation is complete, the final state is saved as `.final` file, e.g. `data/water/water-50k.data.final`, and are is for benchmarking.
-
-
+The number of GPUs can be adjusted based on the size of the system. For smaller systems, each job typically finishes within a few minutes. Once the relaxation is complete, the final state is saved as `.final` file, e.g. `data/water/water-50k.data.final`, and is ready for benchmarking.
 
 ## Weak Scaling
 Weak scaling benchmarks are used to evaluate the ability of a system to maintain its performance as the size of the problem increases proportionally to the resources. Ideally, when both the problem size and resources are doubled, performance should remain constant.
@@ -87,10 +85,10 @@ As the number of GPUs increases, the number of timesteps per second remains rela
 
 For a comparison, our implementation achieved around 9 timesteps/second with 400k atoms per GPU using FP32 precision. In contrast, the Allegro system achieved approximately 8 timesteps/second with a lesser workload of 12.5k atoms per GPU, even though it uses a potentially more performant TF32 precision for matrix operations.
 
-## strong scaling
+## Strong Scaling
 Strong scaling, also known as scale-up, is a concept in parallel computing that measures the performance improvement of a system as more resources (like processors or GPUs) are added, while keeping the total problem size or workload constant. In other words, solve a fixed-size problem faster with more GPUs.
 
-We conducted tests on three distinct systems consisting of 300k, 1M, and 10M atoms respectively, and increased the number of GPUs from 1 to 56.
+We conducted benchmarks on three systems consisting of 300k, 1M, and 10M atoms respectively, and increased the number of GPUs from 1 to 56.
 
 To execute the benchmark, use the following command:
 ```bash
@@ -135,7 +133,7 @@ For the largest system size (10M atoms), the performance keeps increasing even a
 For comparative purposes, consider the following:
 ANI, using FP32 precision with 48 GPUs for a 1M atoms (water) system, achieves 112 timesteps/sec. In contrast, Allegro, utilizing TF32 precision with 2048 GPUs for a similar 1M atoms (water) system, yields 100 timesteps/sec.
 
-### 44M biosystem of capsid
+## 44M Bio-system of Capsid
 In this section, we will explore the performance of our benchmark run on a large biological system - a capsid with 44M atoms. The benchmark can be executed using the following command:
 
 ```bash

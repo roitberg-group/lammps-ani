@@ -1,15 +1,3 @@
-Hi, I would like you assist me on writing a readme document on how I conducted the benchmark. Here is a draft, could you complete, improve and polish it?
-There are a few sections.
-1. data preparation
-2. relax the water system
-3. weak scaling
-4. strong scaling
-5. capsid
-6. saturation test on a single GPU
-7. conclusion
-
-Because it is quite long, so I will devide it into 2 parts. This is part 1. Feel free even to reorganize and rename my sections if you think it is better.
-
 # Lammps-ANI benchmark
 This document provides a detailed guide on how to conduct a benchmark test on two systems: a water box system and an HIV capsid system. The procedures for data preparation, relaxation of the water system, as well as the weak and strong scaling tests are thoroughly explained. The benchmark results are presented in tables, and the performance is also compared to the Allegro system.
 
@@ -102,9 +90,9 @@ For a comparison, our implementation achieved around 9 timesteps/second with 400
 ## strong scaling
 Strong scaling, also known as scale-up, is a concept in parallel computing that measures the performance improvement of a system as more resources (like processors or GPUs) are added, while keeping the total problem size or workload constant. In other words, solve a fixed-size problem faster with more GPUs.
 
-We tested on 3 systems 300k, 1M and 10M atoms system. The number of gpus is increased from 1 to 56.
+We conducted tests on three distinct systems consisting of 300k, 1M, and 10M atoms respectively, and increased the number of GPUs from 1 to 56.
 
-To run the benchmark
+To execute the benchmark, use the following command:
 ```bash
 python submit_scaling.py data/water-200k.data.final
 ```
@@ -138,19 +126,23 @@ Here is the plot
 
 ![](resc/strong_scale.png)
 
-<!-- could you explain the strong scaling result here? -->
+For all system sizes, the performance increases as the number of GPUs increases, indicating that the problem scales well across multiple GPUs. This is expected in a strong scaling scenario, where we keep the problem size constant and increase the resources (GPUs, in this case).
 
+The performance gain seems to taper off as the number of GPUs increases, especially for the smaller system sizes (300k and 1M atoms). This could be due to increased communication overhead as more GPUs are used, or it might be that these smaller system sizes are not large enough to fully utilize the increased compute resources.
 
-For a comparison,
-ANI, 1M atoms (water), 48 GPUs, 112 timesteps/sec, (we are using FP32) 
-Allegro, 1M atoms(water), 2048 GPUs, 100 timesteps/sec, (they are using TF32!)
+For the largest system size (10M atoms), the performance keeps increasing even at the highest number of GPUs tested (56 GPUs). This suggests that this larger problem size is able to better utilize the additional GPUs, and it could potentially benefit from even more GPUs.
+
+For comparative purposes, consider the following:
+ANI, using FP32 precision with 48 GPUs for a 1M atoms (water) system, achieves 112 timesteps/sec. In contrast, Allegro, utilizing TF32 precision with 2048 GPUs for a similar 1M atoms (water) system, yields 100 timesteps/sec.
 
 ### 44M biosystem of capsid
+In this section, we will explore the performance of our benchmark run on a large biological system - a capsid with 44M atoms. The benchmark can be executed using the following command:
 
-To run the benchmark
 ```bash
 python submit_scaling.py data/capsid-aa/capsid5/capsid-pill-cleaned.data
 ```
+
+Below is the performance data collected from the benchmark runs:
 
 | atoms    | num_gpus | ns/day | timesteps/s | Matoms_step/s |
 |----------|----------|--------|-------------|---------------|
@@ -163,18 +155,18 @@ python submit_scaling.py data/capsid-aa/capsid5/capsid-pill-cleaned.data
 | 43911876 | 56       | 0.17   | 3.936       | 172.835       |
 | 43911876 | 64       | 0.192  | 4.445       | 195.173       |
 
-Here is the plot
-
 ![44M](resc/capsid.png)
+
+The results demonstrate an increasing performance trend as the number of GPUs are augmented. Despite the large size of the capsid system, the strong scaling performance continues to improve with more resources, suggesting good scalability of the algorithm in large systems.
 
 For a comparison:
 Our speed:
-3.9 timesteps/s on 56 GPUs. (FP32)
+- 3.9 timesteps/s on 56 GPUs. (FP32)
 Allegro:
-3.9 timesteps/s on 2048 GPUs
-8.7 timesteps/s on 5120 GPUs
+- 3.9 timesteps/s on 2048 GPUs
+- 8.7 timesteps/s on 5120 GPUs
 
-## saturation test on a single GPU
+## Single GPU Saturation Test
 The goal of this benchmarking is to determine the saturation point of a single GPU, beyond which increasing the system size does not yield further performance improvement.
 
 | atoms   | ns/day | timesteps/s | Matoms_step/s |
@@ -190,5 +182,4 @@ The goal of this benchmarking is to determine the saturation point of a single G
 | 800001  | 0.199  | 4.608       | 3.686         |
 | 900000  | 0.177  | 4.1         | 3.69          |
 
-We could see that the performance is saturated around 3.68 Matoms_step/s at 500k.
-We believe this could be improved by reducing memory reallocation, CPU syncronization, etc.
+The results indicate that the performance saturation point for the single GPU occurs around the system size of 500k atoms, at which point the performance plateaus at approximately 3.68 Matoms_step/s. With this information, we believe that performance can be enhanced further by optimizing certain factors like reducing memory reallocation and CPU synchronization. Future work should focus on these areas to exploit the full potential of single GPU performance using CUDA graph.

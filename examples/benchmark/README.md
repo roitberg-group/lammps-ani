@@ -187,3 +187,17 @@ The goal of this benchmarking is to determine the saturation point of a single G
 | 900000  | 0.177  | 4.1         | 3.69          |
 
 The results indicate that the performance saturation point for the single GPU occurs around the system size of 500k atoms, at which point the performance plateaus at approximately 3.68 Matoms_step/s. With this information, we believe that performance can be enhanced further by optimizing certain factors like reducing memory reallocation and CPU synchronization. Future work should focus on these areas to exploit the full potential of single GPU performance using CUDA graph.
+
+## Future works
+
+CUDA graph could potentially help us to improve the performance of the code by launching many kernels in a graph and execute them in a single launch. Relevant resources and ongoing work in this area are detailed in the following articles:
+- [A Guide to CUDA Graphs in GROMACS 2023 | NVIDIA Technical Blog](https://developer.nvidia.com/blog/a-guide-to-cuda-graphs-in-gromacs-2023/)
+- [Implement CUDA Graph functionality and perform associated refactoring (#4277) · Issues · GROMACS / GROMACS · GitLab](https://gitlab.com/gromacs/gromacs/-/issues/4277)
+
+However there are some challenges we need to adress. The main issue is that the tensor shapes should be fixed in the graph. But in our case, the tensor shapes are changing during the simulation. This is because the number of atoms and the number of pairs are changing during the simulation. By fixing the tensor shapes, we could also potentially avoid the memory reallocation overheads. 
+
+To give some number on the tensor size, consider a scenario with 600,000 atoms. The AEV would be 600,000 (number of atoms) multiplied by 1,000 (number of AEV), resulting in 600,000,000 floats, or 1.2GB. For a system with 1,000,000 atoms, the requirement would escalate to 1,000,000,000 floats, or 4GB.
+
+Turning to our neural network, if we have 333,000 hydrogen and 166,000 oxygen atoms, these quantities remain constant since they correspond to local atoms, which do not diminish or grow over time. The forces, however, do change as they take into account the forces on ghost atoms.
+
+The number of pairs is another factor that primarily influences AEV calculations. Although not large, it stands at 74,000,000 integers or 296MB. Addressing this fluctuation demands a fundamental change in cuaev in terms of how neighbors are stored, which is a time-consuming and challenging task.

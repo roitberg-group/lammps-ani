@@ -13,7 +13,7 @@ def human_format(num):
     return '%.0f%s' % (num, ['', 'K', 'M', 'B', 'T', 'P'][magnitude])
 
 # Load the strong scaling data from the CSV file
-df_strong_scaling = pd.read_csv('../all.csv')  # update this with the path to your CSV file
+df_strong_scaling = pd.read_csv('all.csv')  # update this with the path to your CSV file
 
 # Get all unique atom counts
 atom_counts = df_strong_scaling['atoms'].unique()

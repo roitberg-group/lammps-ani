@@ -158,16 +158,15 @@ python submit_scaling.py data/capsid-aa/capsid5/capsid-pill-cleaned.data
 
 Below is the performance data collected from the benchmark runs:
 
-| atoms    | num_gpus | ns/day | timesteps/s | Matoms_step/s |
-|----------|----------|--------|-------------|---------------|
-| 43911876 | 24       | 0.072  | 1.667       | 73.215        |
-| 43911876 | 24       | 0.072  | 1.666       | 73.148        |
-| 43911876 | 32       | 0.098  | 2.276       | 99.946        |
-| 43911876 | 32       | 0.098  | 2.271       | 99.712        |
-| 43911876 | 40       | 0.121  | 2.807       | 123.262       |
-| 43911876 | 48       | 0.146  | 3.37        | 147.964       |
-| 43911876 | 56       | 0.17   | 3.936       | 172.835       |
-| 43911876 | 64       | 0.192  | 4.445       | 195.173       |
+| atoms    | num_gpus | ns/day | timesteps/s | Matom_step/s |
+|----------|----------|--------|-------------|--------------|
+| 43911876 | 24       | 0.072  | 1.667       | 73.215       |
+| 43911876 | 32       | 0.098  | 2.276       | 99.946       |
+| 43911876 | 48       | 0.146  | 3.37        | 147.964      |
+| 43911876 | 64       | 0.192  | 4.445       | 195.173      |
+| 43911876 | 96       | 0.281  | 6.515       | 286.102      |
+| 43911876 | 128      | 0.369  | 8.542       | 375.111      |
+
 
 <p align="center">
     <img height="400" src="resc/capsid.png">
@@ -176,11 +175,13 @@ Below is the performance data collected from the benchmark runs:
 The results demonstrate an increasing performance trend as the number of GPUs are augmented. Despite the large size of the capsid system, the strong scaling performance continues to improve with more resources, suggesting good scalability of the algorithm in large systems.
 
 For a comparison:
-Our speed:
-- 3.9 timesteps/s on 56 GPUs. (FP32)
-Allegro:
-- 3.9 timesteps/s on 2048 GPUs
-- 8.7 timesteps/s on 5120 GPUs
+
+| Name    | # of Atoms | System | # of GPUs | Speed (timesteps/sec) | Precision |
+|---------|------------|--------|-----------|-----------------------|-----------|
+| ANI     | 44M        | Capsid | 56        | 3.9                   | FP32      |
+| Allegro | 44M        | Capsid | 2048      | 3.9                   | TF32      |
+| ANI     | 44M        | Capsid | 128       | 8.5                   | FP32      |
+| Allegro | 44M        | Capsid | 5120      | 8.7                   | TF32      |
 
 ## Single GPU Saturation Test
 The goal of this benchmarking is to determine the saturation point of a single GPU, beyond which increasing the system size does not yield further performance improvement.

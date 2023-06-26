@@ -24,6 +24,7 @@ if len(atom_counts) > 10:
 
 # Define a list of 10 colors
 colors = ['red', 'blue', 'green', 'purple', 'orange', 'brown', 'pink', 'gray', 'olive', 'cyan']
+markers = ['o', 's', '^', 'D', 'v', 'P', 'X', 'h', 'd', '*']
 
 fig, axs = plt.subplots(2, 1, figsize=(5.5, 6), dpi=150)
 
@@ -33,10 +34,10 @@ for i, atom_count in enumerate(atom_counts):
     df_atom = df_strong_scaling[df_strong_scaling['atoms'] == atom_count]
 
     # Plot the Timesteps/s vs Number of GPUs
-    axs[0].plot(df_atom['num_gpus'], df_atom['timesteps/s'], 'o-', color=colors[i], label=f'{human_format(atom_count)} atoms')
+    axs[0].plot(df_atom['num_gpus'], df_atom['timesteps/s'], marker=markers[i], color=colors[i], label=f'{human_format(atom_count)} atoms')
 
     # Plot the Matom_step/s vs Number of GPUs
-    axs[1].plot(df_atom['num_gpus'], df_atom['Matom_step/s'], 'o-', color=colors[i], label=f'{human_format(atom_count)} atoms')
+    axs[1].plot(df_atom['num_gpus'], df_atom['Matom_step/s'], marker=markers[i], color=colors[i], label=f'{human_format(atom_count)} atoms')
 
 
 # Specify the range of your x-axis (modify as needed)

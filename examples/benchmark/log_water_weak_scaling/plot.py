@@ -1,5 +1,6 @@
 # Complete code
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import scienceplots
 import matplotlib.ticker as ticker
@@ -30,12 +31,19 @@ for i, atoms_per_gpu in enumerate(sorted(df['atoms_per_gpu'].unique())):
     subset = df[df['atoms_per_gpu'] == atoms_per_gpu]
     plt.plot(subset['num_gpus'], subset['timesteps/s'], marker=markers[i], color=colors[i], label=f'Atoms per GPU: {format_atoms_per_gpu(atoms_per_gpu)}')
 
+# Specify the range of your x-axis (modify as needed)
+x_min = 0
+x_max = int(np.log2(df['num_gpus'].max()))
+# Generate the ticks
+x_ticks = np.logspace(x_min, x_max, base=2, num=x_max-x_min+1)
+
 plt.xlabel('Number of GPUs')
 plt.ylabel('Speed (Timesteps/s)')
 plt.gca().set_xscale('log', base=2)
 plt.gca().get_xaxis().set_major_formatter(ticker.FuncFormatter(lambda x, _: '{:.0f}'.format(x)))
 plt.title('Water Weak Scaling')
 plt.grid(True)
+plt.gca().set_xticks(x_ticks)
 plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 plt.tight_layout()
 plt.subplots_adjust(right=0.65)

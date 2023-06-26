@@ -33,7 +33,7 @@ def extract_data_from_log(filename):
             in_a_block = False
 
     # Convert the list to DataFrame
-    df = pd.DataFrame(data, columns=['steps', 'atoms', 'num_gpus', 'ns/day', 'timesteps/s', 'Matoms_step/s'])
+    df = pd.DataFrame(data, columns=['steps', 'atoms', 'num_gpus', 'ns/day', 'timesteps/s', 'Matom_step/s'])
 
     return df
 
@@ -93,6 +93,7 @@ else:
     exit()
 
 # Process each log file
+csv_files = []
 for full_path in files_to_process:
     filename = os.path.basename(full_path)
     print(f"Processing {filename}...")
@@ -105,8 +106,30 @@ for full_path in files_to_process:
     csv_file = log_path.parent / f"{log_path.stem}.csv"
     df.to_csv(csv_file, index=False)
     print(f"Csv saved to {csv_file}")
+    csv_files.append(csv_file)
 
     if args.plot:
         plot(df)
 
 print("Finished processing all files.")
+
+# Readall csv files and extract the last row from each csv and merge to a single csv
+data = []
+# Iterate over all the CSV files
+for csv_file in csv_files:
+    # Read the CSV file
+    df = pd.read_csv(csv_file)
+    # Get the last row
+    last_row = df.iloc[-1]
+    # Add the last row to the data list
+    data.append(last_row)
+
+# Convert the list into a DataFrame
+df_final = pd.DataFrame(data).reset_index(drop=True)
+df_final.sort_values(by=['atoms', 'num_gpus'], inplace=True)
+df_final.drop('steps', axis=1, inplace=True)
+final_csv_file = log_path.parent / f"all.csv"
+df_final.to_csv(final_csv_file, index=False)
+
+print(f"Saved all data to {final_csv_file}")
+print(df_final)

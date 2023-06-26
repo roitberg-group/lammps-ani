@@ -198,6 +198,11 @@ The goal of this benchmarking is to determine the saturation point of a single G
 | 700002  | 0.227  | 5.257       | 3.68          |
 | 800001  | 0.199  | 4.608       | 3.686         |
 | 900000  | 0.177  | 4.1         | 3.69          |
+|1000002.0| 0.159  | 3.679       | 3.679         |
+
+<p align="center">
+    <img height="400" src="resc/saturation.png">
+</p>
 
 The results indicate that the performance saturation point for the single GPU occurs around the system size of 500k atoms, at which point the performance plateaus at approximately 3.68 Matoms_step/s. With this information, we believe that performance can be enhanced further by optimizing certain factors like reducing memory reallocation and CPU synchronization. Future work should focus on these areas to exploit the full potential of single GPU performance using CUDA graph.
 

@@ -14,7 +14,8 @@ df = pd.read_csv('all.csv')
 df['atoms_per_gpu'] = df['atoms'] / df['num_gpus']
 
 # Sort the dataframe by 'num_gpus' and 'atoms_per_gpu'
-df = df.sort_values(['num_gpus', 'atoms_per_gpu'])
+df = df.sort_values(['atoms_per_gpu', 'num_gpus'])
+# df.to_csv("all.csv", index=False)
 
 # Define a function to format the atoms per GPU
 def format_atoms_per_gpu(x):

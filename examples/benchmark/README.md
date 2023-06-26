@@ -54,6 +54,7 @@ Here is the plot
 
 As the number of GPUs increases, the number of timesteps per second remains relatively constant for each group of atoms per GPU. This shows good weak scaling, as the problem size increases, the simulation is able to effectively utilize additional resources to maintain performance.
 
+<!-- TODO need to fix this -->
 For a comparison, our implementation achieved around 9 timesteps/second with 400k atoms per GPU using FP32 precision. In contrast, the Allegro system achieved approximately 8 timesteps/second with a lesser workload of 12.5k atoms per GPU, even though it uses a potentially more performant TF32 precision for matrix operations.
 
 ## Strong Scaling

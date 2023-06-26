@@ -97,29 +97,35 @@ To execute the benchmark, use the following command:
 python submit_scaling.py data/water-200k.data.final
 ```
 
-| atoms    | num_gpus | ns/day | timesteps/s | Matoms_step/s |
-|----------|----------|--------|-------------|---------------|
-| 300003   | 1        | 0.521  | 12.065      | 3.62          |
-| 300003   | 2        | 1.005  | 23.259      | 6.978         |
-| 300003   | 4        | 1.914  | 44.305      | 13.292        |
-| 300003   | 8        | 3.446  | 79.761      | 23.928        |
-| 300003   | 16       | 5.371  | 124.332     | 37.3          |
-| 300003   | 32       | 7.678  | 177.728     | 53.319        |
-| 300003   | 48       | 8.76   | 202.769     | 60.831        |
-| 300003   | 56       | 8.839  | 204.61      | 61.384        |
-| 1000002  | 1        | 0.159  | 3.684       | 3.684         |
-| 1000002  | 2        | 0.315  | 7.287       | 7.287         |
-| 1000002  | 4        | 0.615  | 14.24       | 14.24         |
-| 1000002  | 8        | 1.182  | 27.354      | 27.354        |
-| 1000002  | 16       | 2.118  | 49.038      | 49.038        |
-| 1000002  | 32       | 3.659  | 84.695      | 84.695        |
-| 1000002  | 48       | 4.823  | 111.634     | 111.634       |
-| 1000002  | 56       | 5.116  | 118.424     | 118.424       |
-| 10000002 | 8        | 0.126  | 2.927       | 29.267        |
-| 10000002 | 16       | 0.244  | 5.646       | 56.461        |
-| 10000002 | 32       | 0.474  | 10.976      | 109.76        |
-| 10000002 | 48       | 0.693  | 16.035      | 160.35        |
-| 10000002 | 56       | 0.797  | 18.443      | 184.431       |
+| atoms     | num_gpus | ns/day | timesteps/s | Matom_step/s |
+|-----------|----------|--------|-------------|--------------|
+| 100002    | 1        | 1.495  | 34.618      | 3.462        |
+| 100002    | 2        | 2.774  | 64.213      | 6.421        |
+| 100002    | 4        | 4.846  | 112.173     | 11.218       |
+| 100002    | 8        | 7.663  | 177.377     | 17.738       |
+| 100002    | 16       | 9.69   | 224.308     | 22.431       |
+| 100002    | 32       | 10.613 | 245.668     | 24.567       |
+| 100002    | 48       | 11.029 | 255.306     | 25.531       |
+| 100002    | 64       | 10.98  | 254.165     | 25.417       |
+| 100002    | 96       | 10.668 | 246.935     | 24.694       |
+| 100002    | 128      | 10.986 | 254.304     | 25.431       |
+| 1000002   | 2        | 0.315  | 7.287       | 7.287        |
+| 1000002   | 4        | 0.615  | 14.24       | 14.24        |
+| 1000002   | 32       | 3.659  | 84.695      | 84.695       |
+| 1000002   | 48       | 4.823  | 111.634     | 111.634      |
+| 1000002   | 64       | 5.643  | 130.633     | 130.633      |
+| 1000002   | 96       | 6.679  | 154.603     | 154.603      |
+| 1000002   | 128      | 7.259  | 168.026     | 168.026      |
+| 10000002  | 8        | 0.126  | 2.927       | 29.267       |
+| 10000002  | 16       | 0.244  | 5.646       | 56.461       |
+| 10000002  | 32       | 0.474  | 10.976      | 109.76       |
+| 10000002  | 48       | 0.693  | 16.035      | 160.35       |
+| 10000002  | 64       | 0.896  | 20.748      | 207.476      |
+| 10000002  | 96       | 1.28   | 29.627      | 296.267      |
+| 10000002  | 128      | 1.655  | 38.302      | 383.018      |
+| 100000002 | 80       | 0.119  | 2.753       | 275.299      |
+| 100000002 | 96       | 0.143  | 3.302       | 330.198      |
+| 100000002 | 128      | 0.188  | 4.355       | 435.457      |
 
 
 Here is the plot
@@ -135,7 +141,13 @@ The performance gain seems to taper off as the number of GPUs increases, especia
 For the largest system size (10M atoms), the performance keeps increasing even at the highest number of GPUs tested (56 GPUs). This suggests that this larger problem size is able to better utilize the additional GPUs, and it could potentially benefit from even more GPUs.
 
 For comparative purposes, consider the following:
-ANI, using FP32 precision with 48 GPUs for a 1M atoms (water) system, achieves 112 timesteps/sec. In contrast, Allegro, utilizing TF32 precision with 2048 GPUs for a similar 1M atoms (water) system, yields 100 timesteps/sec.
+
+| Name    | # of Atoms | System | # of GPUs | Speed (timesteps/sec) | Precision |
+|---------|------------|--------|-----------|-----------------------|-----------|
+| ANI     | 1M         | Water  | 48        | 112                   | FP32      |
+| Allegro | 1M         | Water  | 2048      | 100                   | TF32      |
+| ANI     | 100K       | Water  | 4         | 112                   | FP32      |
+| Allegro | 100K       | Water  | 256       | ~110                  | TF32      |
 
 ## 44M Bio-system of Capsid
 In this section, we will explore the performance of our benchmark run on a large biological system - a capsid with 44M atoms. The benchmark can be executed using the following command:

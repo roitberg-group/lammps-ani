@@ -9,7 +9,7 @@ df = pd.read_csv('all.csv')
 plt.figure(figsize=(5.5, 4), dpi=150)
 
 # Plot Timesteps/s vs Number of GPUs for the 44M atom system
-plt.plot(df['atoms'], df['Matom_step/s'], 'o-')
+plt.plot(df['atoms'], df['Matom_step/s'], 'o-', color="blue")
 
 plt.xlabel('Number of Atoms')
 plt.ylabel('Throughput (Matom_step/s)')

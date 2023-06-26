@@ -33,7 +33,7 @@ def setup_and_run_job(num_gpus, data_file, submit=False):
         ntasks_per_node=ntasks_per_node,
         cpus_per_task=1,
         partition="hpg-ai",
-        reservation="roitberg",
+        reservation="roitberg2",
         qos="roitberg",
         account="roitberg",
         gres=gres,
@@ -64,7 +64,7 @@ def setup_and_run_job(num_gpus, data_file, submit=False):
         # run the job commands
         # "python run_one.py --help",
         # --allow_tf32
-        f"python run_one.py {data_file} --kokkos --num_gpus={num_gpus} --run_steps=5000 --run_name='run' --log_dir=log_capsid --run"
+        f"python run_one.py {data_file} --kokkos --num_gpus={num_gpus} --run_steps=5000 --run_name='run' --log_dir=log_capsid_new --run"
     ]
     commands = "\n".join(commands)
     if submit:
@@ -83,7 +83,7 @@ def main():
     parser.add_argument('-y', action='store_true', help='If provided, the job will be submitted. If not, the job will only be prepared but not submitted.')
     args = parser.parse_args()
 
-    data_file = "capsid-aa/capsid5/capsid-pill-cleaned.data"
+    data_file = "data/capsid-aa/capsid5/capsid-pill-cleaned.data"
     setup_and_run_job(args.num_gpus, data_file=data_file, submit=args.y)
 
 

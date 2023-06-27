@@ -79,8 +79,11 @@ python submit_scaling.py data/water-200k.data.final
 | 100002    | 64       | 10.98  | 254.165     | 25.417       |
 | 100002    | 96       | 10.668 | 246.935     | 24.694       |
 | 100002    | 128      | 10.986 | 254.304     | 25.431       |
+| 1000002   | 1        | 0.159  | 3.684       | 3.684        |
 | 1000002   | 2        | 0.315  | 7.287       | 7.287        |
 | 1000002   | 4        | 0.615  | 14.24       | 14.24        |
+| 1000002   | 8        | 1.182  | 27.354      | 27.354       |
+| 1000002   | 16       | 2.118  | 49.038      | 49.038       |
 | 1000002   | 32       | 3.659  | 84.695      | 84.695       |
 | 1000002   | 48       | 4.823  | 111.634     | 111.634      |
 | 1000002   | 64       | 5.643  | 130.633     | 130.633      |
@@ -118,6 +121,9 @@ For comparative purposes, consider the following:
 | Allegro | 1M         | Water  | 2048      | 100                   | TF32      |
 | ANI     | 100K       | Water  | 4         | 112                   | FP32      |
 | Allegro | 100K       | Water  | 256       | ~110                  | TF32      |
+
+<!-- | ANI     | 1M         | Water  | 64        | 131                   | TF32      | -->
+<!-- | Allegro | 1M         | Water  | 64        | 6.5                   | TF32      | -->
 
 ## 44M Bio-system of Capsid
 In this section, we will explore the performance of our benchmark run on a large biological system - a capsid with 44M atoms. The benchmark can be executed using the following command:

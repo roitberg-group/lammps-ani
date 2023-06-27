@@ -39,9 +39,12 @@ Weak scaling benchmarks are used to evaluate the ability of a system to maintain
 
 The water system's weak scaling was conducted for four workload sizes per GPU (50k, 100k, 200k, 400k). The number of GPUs was increased from 1 to 48. The test configuration involved kokkos, single precision (FP32), a timestep of 0.5, and a single model. Benchmarking was conducted on Hipergator with 8 A100 GPUs per node.
 
-System scaling was achieved using the `replicate` command in LAMMPS. To run the benchmark, use the following command:
+System scaling was achieved using the `replicate` command in LAMMPS.
+
+To submit the benchmark jobs, use the following command for each workload size, for example: (You may need to take a look of the [submit_scaling.py](submit_scaling.py) script to adjust some slurm parameters)
 ```bash
-python submit_scaling.py data/water-200k.data.final
+# add -y flag to submit the jobs to slurm queue directly
+python submit_scaling.py data/water/water-200k.data.final --log_dir=log_water_weak_scaling --job_name=lammps_ani_water_weak_scaling --num_gpus=1,2,4,8,16,32,48,64,96,128 --weak_scaling
 ```
 
 Benchmark results are collected in the [csv](log_water_weak_scaling/all.csv) file.
@@ -62,9 +65,10 @@ Strong scaling, also known as scale-up, is a concept in parallel computing that 
 
 We conducted benchmarks on three systems consisting of 300k, 1M, and 10M atoms respectively, and increased the number of GPUs from 1 to 56.
 
-To execute the benchmark, use the following command:
+To submit the benchmark jobs, use the following command for each workload size, for example: (You may need to take a look of the [submit_scaling.py](submit_scaling.py) script to adjust some slurm parameters)
 ```bash
-python submit_scaling.py data/water-200k.data.final
+# add -y flag to submit the jobs to slurm queue directly
+python submit_scaling.py data/water/water-1M.data.final --log_dir=log_water_strong_scaling --job_name=lammps_ani_water_strong_scaling --num_gpus=1,2,4,8,16,32,48,64,96,128
 ```
 
 | atoms     | num_gpus | ns/day | timesteps/s | Matom_step/s |
@@ -129,7 +133,8 @@ For comparative purposes, consider the following:
 In this section, we will explore the performance of our benchmark run on a large biological system - a capsid with 44M atoms. The benchmark can be executed using the following command:
 
 ```bash
-python submit_scaling.py data/capsid-aa/capsid5/capsid-pill-cleaned.data
+# add -y flag to submit the jobs to slurm queue directly
+python submit_scaling.py data/capsid-aa/capsid5/capsid-pill-cleaned.data --log_dir=log_capsid --job_name=lammps_ani_capsid --num_gpus=24,32,48,64,96,128
 ```
 
 Below is the performance data collected from the benchmark runs:

@@ -86,45 +86,33 @@ def setup_and_run_job(num_gpus, data_file, job_name, submit=False, weak_scaling=
     else:
         print("Job will not be submitted. The following is the job script:")
         print(str(slurm) + commands)
+        print("")
+
+def parse_num_gpus(num_gpus):
+    # Split the string on commas and strip whitespace
+    num_gpus = num_gpus.split(',')
+    num_gpus = [int(x.strip()) for x in num_gpus]
+
+    return num_gpus
 
 
 def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Run LAMMPS-ANI benchmarks.")
-    # parser.add_argument("num_gpus", type=int, help="Number of GPUs to use for the job.")
     parser.add_argument("data_file", type=str, help="Path to the data file.")
-    parser.add_argument('-y', action='store_true', help='If provided, the job will be submitted. If not, the job will only be prepared but not submitted.')
+    parser.add_argument('-n', "--num_gpus", type=str, default="1,2,4,8,16,32,64,128", help="Create a job for each number of gpus")
     parser.add_argument('-w', '--weak_scaling', action='store_true', help='If provided, the job will be weak scaling. If not, the job will be strong scaling.')
+    parser.add_argument('-j', '--job_name', default="lammps_ani", help='The job name. Default is "lammps_ani".')
+    parser.add_argument('-y', action='store_true', help='If provided, the job will be submitted. If not, the job will only be prepared but not submitted.')
+    parser.add_argument('-l', '--log_dir', default="logs", help='The directory to store the log files. Default is "logs".')
     args = parser.parse_args()
 
-    # control weak or strong scaling
-    weak_scaling = args.weak_scaling
-    # run
-    if weak_scaling:
-        job_name = "lammps_ani_weak_scaling"
-        log_dir = "log_water_weak_scaling_new"
-    else:
-        job_name = "lammps_ani_strong_scaling"
-        log_dir = "log_water_strong_scaling_new"
-    print("weak_scaling:", weak_scaling)
-    setup_and_run_job(num_gpus=1, data_file=args.data_file, job_name=job_name, submit=args.y, weak_scaling=weak_scaling, log_dir=log_dir)
-    setup_and_run_job(num_gpus=2, data_file=args.data_file, job_name=job_name, submit=args.y, weak_scaling=weak_scaling, log_dir=log_dir)
-    setup_and_run_job(num_gpus=4, data_file=args.data_file, job_name=job_name, submit=args.y, weak_scaling=weak_scaling, log_dir=log_dir)
-    setup_and_run_job(num_gpus=8, data_file=args.data_file, job_name=job_name, submit=args.y, weak_scaling=weak_scaling, log_dir=log_dir)
-    setup_and_run_job(num_gpus=16, data_file=args.data_file, job_name=job_name, submit=args.y, weak_scaling=weak_scaling, log_dir=log_dir)
-    setup_and_run_job(num_gpus=32, data_file=args.data_file, job_name=job_name, submit=args.y, weak_scaling=weak_scaling, log_dir=log_dir)
-    setup_and_run_job(num_gpus=48, data_file=args.data_file, job_name=job_name, submit=args.y, weak_scaling=weak_scaling, log_dir=log_dir)
-    setup_and_run_job(num_gpus=56, data_file=args.data_file, job_name=job_name, submit=args.y, weak_scaling=weak_scaling, log_dir=log_dir)
-    setup_and_run_job(num_gpus=64, data_file=args.data_file, job_name=job_name, submit=args.y, weak_scaling=weak_scaling, log_dir=log_dir)
-    setup_and_run_job(num_gpus=72, data_file=args.data_file, job_name=job_name, submit=args.y, weak_scaling=weak_scaling, log_dir=log_dir)
-    setup_and_run_job(num_gpus=80, data_file=args.data_file, job_name=job_name, submit=args.y, weak_scaling=weak_scaling, log_dir=log_dir)
-    setup_and_run_job(num_gpus=88, data_file=args.data_file, job_name=job_name, submit=args.y, weak_scaling=weak_scaling, log_dir=log_dir)
-    setup_and_run_job(num_gpus=96, data_file=args.data_file, job_name=job_name, submit=args.y, weak_scaling=weak_scaling, log_dir=log_dir)
-    setup_and_run_job(num_gpus=104, data_file=args.data_file, job_name=job_name, submit=args.y, weak_scaling=weak_scaling, log_dir=log_dir)
-    setup_and_run_job(num_gpus=112, data_file=args.data_file, job_name=job_name, submit=args.y, weak_scaling=weak_scaling, log_dir=log_dir)
-    setup_and_run_job(num_gpus=120, data_file=args.data_file, job_name=job_name, submit=args.y, weak_scaling=weak_scaling, log_dir=log_dir)
-    setup_and_run_job(num_gpus=128, data_file=args.data_file, job_name=job_name, submit=args.y, weak_scaling=weak_scaling, log_dir=log_dir)
+    list_num_gpus =parse_num_gpus(args.num_gpus)
+    print("num_gpus:", list_num_gpus)
+    print("weak_scaling:", args.weak_scaling)
 
+    for num_gpus in list_num_gpus:
+        setup_and_run_job(num_gpus=num_gpus, data_file=args.data_file, job_name=args.job_name, submit=args.y, weak_scaling=args.weak_scaling, log_dir=args.log_dir)
 
 if __name__ == "__main__":
     main()

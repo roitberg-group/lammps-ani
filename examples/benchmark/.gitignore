@@ -1,3 +1,4 @@
 log*/
 log_capsid_data
 log_water_weak_scaling_data
+log_water_strong_scaling_data

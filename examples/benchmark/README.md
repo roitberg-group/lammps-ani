@@ -57,8 +57,10 @@ Here is the plot
 
 As the number of GPUs increases, the number of timesteps per second remains relatively constant for each group of atoms per GPU. This shows good weak scaling, as the problem size increases, the simulation is able to effectively utilize additional resources to maintain performance.
 
-<!-- TODO need to fix this -->
-For a comparison, our implementation achieved around 9 timesteps/second with 400k atoms per GPU using FP32 precision. In contrast, the Allegro system achieved approximately 8 timesteps/second with a lesser workload of 12.5k atoms per GPU, even though it uses a potentially more performant TF32 precision for matrix operations.
+For a comparison, let's consider the results we obtained with our implementation versus the Allegro system. Our model delivered performance from 117 timesteps per second with a single GPU to 93 timesteps per second using 128 GPUs. This performance was attained with a small system size of 25k, which doesn't fully saturate the GPU capabilities in the context of Lammps-ANI.
+In a contrast, the Allegro system, despite harnessing the potentially more efficient TF32 precision for matrix operations, could only manage between 5 and 4 timesteps per second.
+
+Focusing on the point where both systems perform around 8 or 9 timesteps per second. Our model handles a heavier workload of 400k atoms per GPU, using FP32 precision, and still maintains about 9 timesteps per second. In contrast, the Allegro system, working with a much smaller load of 12.5k atoms per GPU and using theoretically superior TF32 precision, only achieves roughly 8 timesteps per second.
 
 ## Strong Scaling
 Strong scaling, also known as scale-up, is a concept in parallel computing that measures the performance improvement of a system as more resources (like processors or GPUs) are added, while keeping the total problem size or workload constant. In other words, solve a fixed-size problem faster with more GPUs.

@@ -1,10 +1,16 @@
-# Complete code
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import scienceplots
 import matplotlib.ticker as ticker
+import argparse
 
+# Argument parser for command line arguments
+parser = argparse.ArgumentParser()
+parser.add_argument("-n", "--node", help="plot the x-axis in number of nodes instead of number of gpus", action="store_true")
+args = parser.parse_args()
+
+# gpus_per_node variable
+gpus_per_node = 4
 
 # plt.style.use(['science','no-latex'])
 
@@ -27,17 +33,31 @@ markers = ['D', 'o', 's', 'v', '^', 'P', 'X', 'h', 'd', '*']
 
 plt.figure(figsize=(6, 4), dpi=150)
 
+# Adjust the number of gpus by the number of gpus per node if the node flag is passed
+if args.node:
+    plt.xlabel('Number of Nodes')
+    image_name = "weak_scale_nodes.png"
+    df['num_gpus'] = df['num_gpus'] / gpus_per_node
+else:
+    plt.xlabel('Number of GPUs')
+    image_name = "weak_scale.png"
+
 for i, atoms_per_gpu in enumerate(sorted(df['atoms_per_gpu'].unique())):
     subset = df[df['atoms_per_gpu'] == atoms_per_gpu]
     plt.plot(subset['num_gpus'], subset['timesteps/s'], marker=markers[i], color=colors[i], label=f'Atoms per GPU: {format_atoms_per_gpu(atoms_per_gpu)}')
 
 # Specify the range of your x-axis (modify as needed)
 x_min = 0
-x_max = int(np.log2(df['num_gpus'].max()))
-# Generate the ticks
-x_ticks = np.logspace(x_min, x_max, base=2, num=x_max-x_min+1)
+if args.node:
+    x_max = 10
+    # Generate the ticks
+    x_ticks = np.logspace(x_min, x_max, base=2, num=int((x_max-x_min)/2)+1)
+    plt.xlim(0.9,)
+else:
+    x_max = int(np.log2(df['num_gpus'].max()))
+    # Generate the ticks
+    x_ticks = np.logspace(x_min, x_max, base=2, num=x_max-x_min+1)
 
-plt.xlabel('Number of GPUs')
 plt.ylabel('Speed (Timesteps/s)')
 plt.gca().set_xscale('log', base=2)
 plt.gca().get_xaxis().set_major_formatter(ticker.FuncFormatter(lambda x, _: '{:.0f}'.format(x)))
@@ -49,5 +69,4 @@ plt.tight_layout()
 plt.subplots_adjust(right=0.65)
 
 # Save the plot as a PNG file
-plt.savefig('weak_scale.png')
-
+plt.savefig(image_name)

@@ -123,10 +123,11 @@ For comparative purposes, consider the following:
 
 | Name    | # of Atoms | System | # of GPUs | Speed (timesteps/sec) | Precision |
 |---------|------------|--------|-----------|-----------------------|-----------|
+| ANI     | 100K       | Water  | 4         | 112                   | FP32      |
+| Allegro | 100K       | Water  | 4         | ~4                    | TF32      |
+| Allegro | 100K       | Water  | 256       | ~110                  | TF32      |
 | ANI     | 1M         | Water  | 48        | 112                   | FP32      |
 | Allegro | 1M         | Water  | 2048      | 100                   | TF32      |
-| ANI     | 100K       | Water  | 4         | 112                   | FP32      |
-| Allegro | 100K       | Water  | 256       | ~110                  | TF32      |
 
 <!-- | ANI     | 1M         | Water  | 64        | 131                   | TF32      | -->
 <!-- | Allegro | 1M         | Water  | 64        | 6.5                   | TF32      | -->
@@ -168,6 +169,12 @@ For a comparison:
 
 ## Single GPU Saturation Test
 The goal of this benchmarking is to determine the saturation point of a single GPU, beyond which increasing the system size does not yield further performance improvement.
+
+```bash
+# add -y flag to submit the jobs to slurm queue directly
+# you would need to submit one job for each system size
+python submit_scaling.py data/water/water-50k.data.final --log_dir=log_water_saturation/ --job_name=lammps_ani_water_saturation --num_gpus=1
+```
 
 | atoms   | ns/day | timesteps/s | Matoms_step/s |
 |---------|--------|-------------|---------------|

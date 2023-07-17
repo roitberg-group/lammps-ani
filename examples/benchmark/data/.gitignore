@@ -1,0 +1,5 @@
+*.data
+*.pdb
+*.final
+*.inp
+*.gz

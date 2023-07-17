@@ -1,0 +1,211 @@
+# variables
+variable       lammps_ani_root getenv LAMMPS_ANI_ROOT
+variable       log_dir         index  logs
+# kokkos needs newton_pair on for reverse communication between gpus
+variable       newton_pair     index  off
+variable       timestamp       index  timestamp
+# configuration
+variable       data_file       index  none
+variable       timestep        index  timestep
+variable       run_steps       index  1000
+# ani variables
+variable       ani_model_file  index  none
+variable       ani_device      index  cuda
+variable       ani_num_models  index  1
+variable       ani_aev         index  cuaev
+variable       ani_neighbor    index  full
+variable       ani_precision   index  single
+
+# Intialization
+units          real
+atom_style     atomic
+
+neighbor       2.0 bin
+# check yes = only build if at least one atom has moved half the skin distance or more
+neigh_modify   every 10 delay 0 check no
+newton         ${newton_pair} off
+
+# Atom Definition
+read_data      ${data_file}
+change_box     all boundary p p p
+
+# pair_style ani 5.1 model_file device num_models ani_aev ani_neighbor
+# 0. model_file               = path to the model file
+# 1. device                   = cuda/cpu
+# 2. num_models (Optional)    = number of models to use, default as -1 to use all models
+# 3. ani_aev (Optional)       = cuaev/pyaev, default as cuaev
+# 4. ani_neighbor (Optional)  = full/half, default as full nbrlist
+# 5. ani_precision (Optional) = single/double, default as single
+pair_style     ani 5.1 ${ani_model_file} ${ani_device} ${ani_num_models} ${ani_aev} ${ani_neighbor} ${ani_precision}
+pair_coeff     * *
+
+# Thermo
+thermo_style   custom step pe ke etotal temp press vol density
+thermo         100
+
+# Dump
+# dump           1 all custom 1000 logs/${timestamp}.lammpstrj id element x y z ix iy iz
+# dump_modify    1 element H C N O F S Cl
+# dump           2 all dcd 1000 logs/${timestamp}.dcd
+
+# Settings: temperature at 300 K
+velocity       all create 300.0 12345 rot yes mom yes dist gaussian
+timestep       ${timestep}
+
+# run nvt
+fix            1 all langevin 300.0 300.0 100.0 12345
+fix            2 all nve
+# warmup steps
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+
+
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+
+
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+
+
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+
+
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+
+
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+
+
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+
+
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+
+
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+
+
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+
+
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+run            10
+
+# run            1000
+
+# run            5000
+
+# run            5000
+# run            5000
+
+# run            5000
+# run            5000
+
+# run            5000
+# run            5000
+
+# run            5000
+# run            5000
+
+# production run
+# run            ${run_steps}
+
+
+# Write final state of simulation
+# write_data    ${log_dir}/${timestamp}.final

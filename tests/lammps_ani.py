@@ -156,6 +156,7 @@ class LammpsANI(LammpsModelBase):
 
         # prepare diff_vector for virial/stress calculations
         if self.use_fullnbr:  # although cuaev does not need this, repulsion needs to use this anyway
+            # TODO: this hurt performance when repulsion is not needed and cuavev is used
             ilist_unique, jlist, numneigh = para1, para2, para3
             ilist_unique = ilist_unique.long()
             jlist = jlist.long()
@@ -287,8 +288,6 @@ class LammpsANI(LammpsModelBase):
                 )
             assert aev is not None
         else:
-            # diff_vector, distances from lammps are always in double,
-            # we need to convert it to single precision if needed
             if self.use_fullnbr:
                 assert fullnbr_diff_vector is not None
                 atom_index12, diff_vector, distances = self.aev_computer._full_to_half_nbrlist(

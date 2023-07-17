@@ -89,3 +89,5 @@ The MD simulation result matches to this PES scan result. Our PES is also compar
 ### 7. Conclusion
 
 This document provides the necessary steps to run an MD simulation of the alanine dipeptide using LAMMPS, both with and without SHAKE constraints. The results can be analyzed to study the conformational dynamics of this model peptide system.
+
+Future work includes using umbrella sampling to generate a complete ramachandran plot for alanine dipeptide.

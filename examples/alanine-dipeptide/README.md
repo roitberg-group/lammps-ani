@@ -87,7 +87,7 @@ The 2D PES torsion scan (in Vacuum) is performed using the `torsion_scan.ipynb` 
 
 |       QM (b3lyp-d3bj/dzvp)        |       ANI (B973c/def2mTZVP)       |
 | :-------------------------------: | :-------------------------------: |
-| ![](resc/qm_2d_pes_torsion_scan.png) | ![](resc/ani_2d_pes_torsion_scan.png) |
+| <img src="resc/qm_2d_pes_torsion_scan.png" width="300"> | <img src="resc/ani_2d_pes_torsion_scan.png" width="300"> |
 
 The MD simulation result matches to this PES scan result. Our PES is also comparable to the QM one (b3lyp-d3bj/dzvp), although ANI is trained to another level of theory (B973c/def2mTZVP).
 

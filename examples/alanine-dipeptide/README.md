@@ -85,6 +85,8 @@ The 2D PES torsion scan (in Vacuum) is performed using the `torsion_scan.ipynb` 
 
 The MD simulation result matches to this PES scan result. Our PES is also comparable to the QM one (b3lyp-d3bj/dzvp), although ANI is trained to another level of theory (B973c/def2mTZVP).
 
+For another reference QM calculation on Alanine Dipeptide, please refer to the following paper:
+Wang, Z.; Duan, Y. Solvation Effects on Alanine Dipeptide: A MP2/cc-pVTZ//MP2/6-31G** Study of (Φ, Ψ) Energy Maps and Conformers in the Gas Phase, Ether, and Water. J. Comput. Chem. 2004, 25 (14), 1699–1716. https://doi.org/10.1002/jcc.20092.
 
 ### 7. Conclusion
 

@@ -64,14 +64,34 @@ python plot_ramachandran.py logs/traj.dcd alanine-dipeptide.pdb 0.1 -d 100
 ```
 
 The resulting plot is shown below:
-|                 |    Without Shake     |    With Shake     |
-| --------------- | :------------------: | :---------------: |
-| Timestep        |        0.1 fs        |       2 fs        |
-| Simulation time |   5 ns (76 hours)    | 100 ns (94 hours)  |
-|                 | ![](resc/ramachandran.png) | ![](resc/ramachandran.shake.png) |
+|                 |           Without Shake           |               With Shake                |
+| --------------- | :-------------------------------: | :-------------------------------------: |
+| Timestep        |              0.1 fs               |                  2 fs                   |
+| Simulation time |          5 ns (76 hours)          |            100 ns (94 hours)            |
+| In Water        |    ![](resc/ramachandran.png)     |    ![](resc/ramachandran.shake.png)     |
+| In Vacuum       | ![](resc/ramachandran.vacuum.png) | ![](resc/ramachandran.shake.vacuum.png) |
 
 It's important to note that the current model employs a repulsion model that missing the inclusion of dispersion interactions. The absence of these interactions could impact the result of the model, potentially influencing the distribution of conformational states observed.
 
-### 6. Conclusion
+
+### 6. 2D PES Torsion Scan (in Vacuum)
+
+The 2D PES torsion scan (in Vacuum) is performed using the `torsion_scan.ipynb` notebook. The notebook run ANI model on the QM relaxed 2D torsion scan structures from [OpenFF-Protein-Dipeptide-2D-TorsionDrive](https://github.com/openforcefield/qca-dataset-submission/tree/master/submissions/2021-11-18-OpenFF-Protein-Dipeptide-2D-TorsionDrive)
+
+
+<!-- <p align="center">
+  <a href="resc/2d_pes_torsion_scan.png">
+    <img src="resc/2d_pes_torsion_scan.png" width="300">
+  </a>
+</p> -->
+
+|       QM (b3lyp-d3bj/dzvp)        |       ANI (B973c/def2mTZVP)       |
+| :-------------------------------: | :-------------------------------: |
+| ![](resc/qm_2d_pes_torsion_scan.png) | ![](resc/ani_2d_pes_torsion_scan.png) |
+
+The MD simulation result matches to this PES scan result. Our PES is also comparable to the QM one (b3lyp-d3bj/dzvp), although ANI is trained to another level of theory (B973c/def2mTZVP).
+
+
+### 7. Conclusion
 
 This document provides the necessary steps to run an MD simulation of the alanine dipeptide using LAMMPS, both with and without SHAKE constraints. The results can be analyzed to study the conformational dynamics of this model peptide system.

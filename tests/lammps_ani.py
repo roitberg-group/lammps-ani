@@ -4,9 +4,10 @@ import torchani
 from typing import Tuple, Optional
 from torch import Tensor
 from torchani.nn import SpeciesEnergies
-from torchani.infer import BmmEnsemble2
+from torchani.infer import BmmEnsemble
 from torchani.models import Ensemble
-from torchani.repulsion import RepulsionXTB
+from torchani.neighbors import NeighborData
+from torchani.potentials.repulsion import RepulsionXTB
 
 # disable tensorfloat32
 torch.backends.cuda.matmul.allow_tf32 = False
@@ -110,7 +111,7 @@ class LammpsANI(LammpsModelBase):
         # TODO if the normal Ensemble needs to be supported to select_models in the future,
         # A ModuleList of Ensemble with different number of models could be prepared in advance
         # within the __init__ function.
-        self.neural_networks = BmmEnsemble2(model.neural_networks)
+        self.neural_networks = BmmEnsemble(model.neural_networks)
         self.energy_shifter = model.energy_shifter
         self.register_buffer("dummy_buffer", torch.empty(0))
         # self.nvfuser_enabled = torch._C._jit_nvfuser_enabled()
@@ -119,7 +120,7 @@ class LammpsANI(LammpsModelBase):
         for name, param in self.neural_networks.named_parameters():
             param.requires_grad_(False)
 
-        self.using_bmmensemble = isinstance(self.neural_networks, BmmEnsemble2)
+        self.using_bmmensemble = isinstance(self.neural_networks, BmmEnsemble)
 
     @torch.jit.export
     def init(self, use_cuaev: bool, use_fullnbr: bool):
@@ -328,8 +329,9 @@ class LammpsANI(LammpsModelBase):
         # we set diff_vector.requires_grad_(), the backpropogation will still work.
         # else:
         #     distances = diff_vector.norm(2, -1)
+        neighbors = NeighborData(atom_index12, distances, diff_vector)
         repulsion_energies = self.rep_calc(
-            species, atom_index12, distances, ghost_flags=ghost_flags
+            species, neighbors, ghost_flags=ghost_flags
         )
         return repulsion_energies
 
@@ -339,7 +341,7 @@ class LammpsANI(LammpsModelBase):
             self.neural_networks.select_models(use_num_models)
             self.use_num_models = self.neural_networks.use_num_models
         elif use_num_models is None or use_num_models == self.num_models:
-            # We don't need to do anything in this case, even if it is not using BmmEnsemble2.
+            # We don't need to do anything in this case, even if it is not using BmmEnsemble.
             pass
         else:
-            raise RuntimeError("select_models method only works for BmmEnsemble2")
+            raise RuntimeError("select_models method only works for BmmEnsemble")

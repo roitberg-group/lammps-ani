@@ -4,7 +4,7 @@ import warnings
 from torchani.nn import ANIModel
 from torchani.models import Ensemble
 from .lammps_ani import LammpsANI
-from torchani.repulsion import RepulsionXTB
+from torchani.potentials.repulsion import RepulsionXTB
 from ani2x_ext.custom_emsemble_ani2x_ext import CustomEnsemble
 
 
@@ -46,7 +46,7 @@ def ANI2x_Repulsion_Model():
         repulsion_kwargs={
             "symbols": elements,
             "cutoff": 5.1,
-            "cutoff_fn": torchani.aev.cutoffs.CutoffSmooth(order=2),
+            "cutoff_fn": torchani.cutoffs.CutoffSmooth(order=2),
         },
         periodic_table_index=True,
         model_index=None,

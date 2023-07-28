@@ -102,14 +102,19 @@ all_models_ = {
     "ani2x.pt": {"model": ANI2x_Model, "unittest": True},
     "ani2x_repulsion.pt": {"model": ANI2x_Repulsion_Model, "unittest": True},
     # Because ani2x_ext uses public torchani that has legacy aev code, we cannot run unittest for it.
-    "ani2x_ext0_repulsion.pt": {"model": ANI2xExt_Model, "unittest": False},
+    "ani2x_ext0_repulsion.pt": {"model": ANI2xExt_Model, "unittest": False, "kwargs": {"model_choice": 0}},
+    "ani2x_ext2_repulsion.pt": {"model": ANI2xExt_Model, "unittest": False, "kwargs": {"model_choice": 2}},
 }
 all_models = {}
 
 # Remove model that cannot be instantiated, e.g. ani2x_repulsion could only be downloaded within UF network
 for output_file, info in all_models_.items():
     try:
-        model = info["model"]()
+        if "kwargs" in info:
+            kwargs = info["kwargs"]
+        else:
+            kwargs = {}
+        model = info["model"](**kwargs)
         all_models[output_file] = info
     except Exception as e:
         warnings.warn(f"Failed to export {output_file}: {str(e)}")

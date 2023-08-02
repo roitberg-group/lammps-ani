@@ -7,3 +7,6 @@
 [submodule "external/ani_ext"]
 	path = external/ani_ext
 	url = git@github.com:plin1112/ani_ext.git
+[submodule "external/ani-1xnr"]
+	path = external/ani-1xnr
+	url = git@github.com:atomistic-ml/ani-1xnr.git

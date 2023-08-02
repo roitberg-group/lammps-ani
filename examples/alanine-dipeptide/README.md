@@ -79,7 +79,7 @@ It's important to note that the current model employs a repulsion model that mis
 The 2D PES torsion scan (in Vacuum) is performed using the `torsion_scan.ipynb` notebook. The notebook run ANI model on the QM relaxed 2D torsion scan structures from [OpenFF-Protein-Dipeptide-2D-TorsionDrive](https://github.com/openforcefield/qca-dataset-submission/tree/master/submissions/2021-11-18-OpenFF-Protein-Dipeptide-2D-TorsionDrive)
 
 
-|                           QM                            |               ANI (result on QM structure)               |
+|                           QM                            |               ANI2x (Fixed Scan on QM structures)               |
 | :-----------------------------------------------------: | :------------------------------------------------------: |
 | <img src="resc/qm_2d_pes_torsion_scan.png" width="300"> | <img src="resc/ani_2d_pes_torsion_scan.png" width="300"> |
 

@@ -10,14 +10,25 @@ ANI1x_NR[^2] model: https://github.com/atomistic-ml/ani-1xnr
 
 Following the simulation steps in Reference[^2]:
 
-- Packmol was utilized to randomly place 16 H2 , 14 H2 O, 14 CO, 14 NH3 and 14 CH4 in a cubic simulation box with edge lengths of 12.1 Å, resulting in a density of 1.067 g/cc.
+- Packmol was utilized to randomly place 16 H2 , 14 H2 O, 14 CO, 14 NH3 and 14 CH4 in a cubic simulation box with edge lengths of 12.1 Å, resulting in a density of 1.067 g/cc. (I will use the structure file found from [github.com/leeping/nanoreactor/example.md/start.xyz](https://github.com/leeping/nanoreactor/blob/e069fffb93692d3ed04cb73b9a7c6a8fa9bce3ca/example.md/start.xyz))
 - The simulation was run with Langevin dynamics for over 4 ns with a time step of 0.25 fs. 
-  - The temperature was linearly increased from 0 K to 300 K in the first 100 ps. 
+  - [Added] run NPT first for 10 ps. `python run_one.py start.data --kokkos --num_gpus=1 --input_file=in.npt.lammps --log_dir=logs --ani_model_file='ani1x_nr_repulsion.pt' --run_name=early_earth_npt --ani_num_models=1 --timestep=0.25 --run_steps=40000 --run`
+    - `ani1x_nr_repulsion.pt` model density went down from 1.04 g/cc to 0.4 g/cc after 5000 steps (1.25ps).
+    - this is not solvent, so maybe NPT is not necessary?
+  - The temperature was linearly increased from 0 K to 300 K in the first 100 ps. [400000 steps]
   - Then, the temperature was linearly increased from 300 K to 2500 K in the next 100 ps. 
   - The temperature was then maintained at 2500 K for 4000 ps. 
   - The system was then cooled from 2500 K to 300 K over the final 200 ps. 
   - Snapshots and properties were recorded every 12.5 fs (50 time steps)
 
+I used all the models in the ensemble for the simulation.
+```
+python run_one.py start.data --kokkos --num_gpus=1 --input_file=in.lammps --log_dir=logs --ani_model_file='ani1x_nr_repulsion.pt' --run_name=early_earth_ani1x_nr_repulsion --ani_num_models=-1 --timestep=0.25 --run
+
+python run_one.py start.data --kokkos --num_gpus=1 --input_file=in.lammps --log_dir=logs --ani_model_file='ani1x_nr.pt' --run_name=early_earth_ani1x_nr --ani_num_models=-1 --timestep=0.25 --run
+
+python run_one.py start.data --kokkos --num_gpus=1 --input_file=in.lammps --log_dir=logs --ani_model_file='ani2x_repulsion.pt' --run_name=early_earth_ani2x_repulsion --ani_num_models=-1 --timestep=0.25 --run
+```
 
 [^1]: Miller, S. L. A Production of Amino Acids Under Possible Primitive Earth Conditions. Science 1953, 117 (3046), 528–529. https://doi.org/10.1126/science.117.3046.528.
 [^2]: ZHANG, S.; Makoś, M.; Jadrich, R.; Kraka, E.; Barros, K.; Nebgen, B.; Tretiak, S.; Isayev, O.; Lubbers, N.; Messerly, R.; Smith, J. Exploring the Frontiers of Chemistry with a General Reactive Machine Learning Potential. 2022. https://doi.org/10.26434/chemrxiv-2022-15ct6-v2.

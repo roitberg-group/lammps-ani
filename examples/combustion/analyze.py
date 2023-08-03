@@ -37,9 +37,10 @@ def plot(df, save_to_file=None):
 
 def get_bond_data_table():
     # TODO assert error if bond is not here
-    bond_data = {"HH": 0.75, "HC": 1.09, "HO": 0.96, "CC": 1.54, "CO": 1.43, "OO": 1.48, "NH": 0.98}
+    # https://media.cheggcdn.com/media%2F5fa%2F5fad12c3-ee27-47fe-917a-f7919c871c63%2FphpEjZPua.png
+    bond_data = {"HH": 0.75, "HC": 1.09, "HN": 1.01, "HO": 0.96, "CC": 1.54, "CN": 1.43, "CO": 1.43, "NN":1.45, "NO":1.47, "OO": 1.48}
     # make bond length longer in case it is stretched
-    bond_data = {k: v + 0.2 for k, v in bond_data.items()}
+    bond_data = {k: v + 0.13 for k, v in bond_data.items()}
     bond_data_atomic_pairs = [[], []]
     for atom12 in bond_data.keys():
         atom12 = ase.symbols.symbols2numbers(atom12)
@@ -89,16 +90,18 @@ def fragment(traj_file, batch_size, timestep, dump_interval):
 
     file_type = Path(traj_file).suffix
     lmpindex_element_dict = {1: 1, 2: 6, 3: 7, 4: 8, 5: 16, 6: 9, 7: 17}
-    if file_type != ".xyz":
+    if file_type == ".xyz":
+        cell = None
+        pbc = None
+    else:
+        print(f"pbc box is {pbc.tolist()}, {cell.tolist()}")
+    # TODO if top file is provided, we can use it to get the species
+    if file_type != ".xyz" and file_type != ".lammpstrj":
         # We need to convert lammps internal element index into correct species.
         # Reverse is important, otherwise 2 -> 6 (C), 6 -> 9 (F), which is not what we want.
-        print(f"pbc box is {pbc.tolist()}")
         for lmpindex, element in reversed(lmpindex_element_dict.items()):
             mask = species == lmpindex
             species[mask] = element
-    else:
-        cell = None
-        pbc = None
 
     total_frames = species.shape[0]
     atoms_per_molecule = species.shape[1]

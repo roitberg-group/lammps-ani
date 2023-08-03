@@ -199,10 +199,12 @@ The results indicate that the performance saturation point for the single GPU oc
 ## Comparison with Allegro
 For the plotting data and scripts, please refer to [comparison_plot/](./comparison_plot/).
 
+Strong Scaling
 <p align="center">
     <img width="500" src="./comparison_plot/strong_scale.png">
 </p>
 
+Weak Scaling
 <p align="center">
     <img width="500" src="./comparison_plot/weak_scale_log.png">
 </p>

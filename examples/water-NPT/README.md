@@ -44,7 +44,7 @@ python plot_lammps.py lammps_logfile
 
 Run ase
 ```bash
-python run_ase.py
+python run_ase.py water-300_0.8.pdb
 # plot the volume, density, temperature and pressure
 python plot_ase.py ase_logfile
 ```

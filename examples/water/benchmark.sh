@@ -2,6 +2,8 @@
 set -e
 TIMESTAMP=`date +%F-%H%M`
 
+################################# Configure here #################################
+
 # choose ani2x.pt or ani2x_repulsion.pt
 MODEL_FILE=${LAMMPS_ANI_ROOT}/tests/ani2x.pt
 TIMESTEP=0.5
@@ -18,6 +20,11 @@ NUM_GPUS_OPTION=(1)
 # NUM_MODELS_OPTION=(1 8)
 # NUM_GPUS_OPTION=(1 2 4 8)
 
+#################################################################################
+
+# create log directory
+mkdir -p logs
+
 # 20k or 300k
 for RUN_KOKKOS in ${KOKKOS_OPTION[@]}; do
     for DIR in ${DIR_OPTION[@]}; do
@@ -32,16 +39,16 @@ for RUN_KOKKOS in ${KOKKOS_OPTION[@]}; do
                     LAMMPS_ANI_PROFILING=1 mpirun -np ${NUM_GPUS} ${LAMMPS_ROOT}/build/lmp_mpi \
                         -k on g ${NUM_GPUS} -sf kk -pk kokkos gpu/aware on \
                         -var newton_pair on -var num_models ${NUM_MODELS} -var datafile ${DIR}/water.data \
-                        -var modelfile ${MODEL_FILE} -var timestep ${TIMESTEP} \
-                        -log ${DIR}/${TIMESTAMP}-kokkos-models_${NUM_MODELS}-gpus_${NUM_GPUS}.log -in in.lammps
+                        -var modelfile ${MODEL_FILE} -var timestep ${TIMESTEP} -var timestamp ${TIMESTAMP} \
+                        -log logs/${TIMESTAMP}-kokkos-models_${NUM_MODELS}-gpus_${NUM_GPUS}.log -in in.lammps
                     )
                 else
                     # run without kokkos
                     (set -x;
                     mpirun -np ${NUM_GPUS} ${LAMMPS_ROOT}/build/lmp_mpi \
                         -var newton_pair off -var num_models ${NUM_MODELS} -var datafile ${DIR}/water.data \
-                        -var modelfile ${MODEL_FILE} -var timestep ${TIMESTEP} \
-                        -log ${DIR}/${TIMESTAMP}-models_${NUM_MODELS}-gpus_${NUM_GPUS}.log -in in.lammps
+                        -var modelfile ${MODEL_FILE} -var timestep ${TIMESTEP} -var timestamp ${TIMESTAMP} \
+                        -log logs/${TIMESTAMP}-models_${NUM_MODELS}-gpus_${NUM_GPUS}.log -in in.lammps
                     )
                 fi
             done

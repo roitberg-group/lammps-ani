@@ -226,7 +226,7 @@ After setting the environment variables correctly, you can navigate to the [exam
 
 ### Benchmark
 
-You can use the pre-built Docker container to run benchmarks for LAMMPS-ANI. Please note that the pre-built container supports Kokkos only for A100 GPUs.
+You can use the pre-built Docker container to run LAMMPS-ANI. Please note that the pre-built container only supports Kokkos for A100 GPUs.
 
 ```bash
 # Pull the Docker container

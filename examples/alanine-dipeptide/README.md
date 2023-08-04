@@ -68,8 +68,9 @@ The resulting plot is shown below:
 | --------------- | :-------------------------------: | :-------------------------------------: |
 | Timestep        |              0.1 fs               |                  2 fs                   |
 | Simulation time |          5 ns (76 hours)          |            100 ns (94 hours)            |
-| In Water        |    ![](resc/ramachandran.png)     |    ![](resc/ramachandran.shake.png)     |
-| In Vacuum       | ![](resc/ramachandran.vacuum.png) | ![](resc/ramachandran.shake.vacuum.png) |
+| In Vacuum       | ![](resc/2023-07-03-134521.newcmap.png) | ![](resc/2023-07-03-134558.newcmap.png) |
+| In Water        |    ![](resc/2023-06-07-100120.newcmap.png)     |    ![](resc/2023-06-07-100122.newcmap.png)     |
+| In Implicit Water[^1] | ![](resc/2023-08-02-021506.newcmap.png) | ![](resc/2023-08-02-021355.newcmap.png) |
 
 It's important to note that the current model employs a repulsion model that missing the inclusion of dispersion interactions. The absence of these interactions could impact the result of the model, potentially influencing the distribution of conformational states observed.
 
@@ -81,15 +82,18 @@ The 2D PES torsion scan (in Vacuum) is performed using the `torsion_scan.ipynb` 
 
 |                           QM                            |               ANI2x (Fixed Scan on QM structures)               |
 | :-----------------------------------------------------: | :------------------------------------------------------: |
-| <img src="resc/qm_2d_pes_torsion_scan.png" width="300"> | <img src="resc/ani_2d_pes_torsion_scan.png" width="300"> |
+| <img src="resc/qm_2d_pes_torsion_scan_heatmap.png" width="300"> | <img src="resc/ani_2d_pes_torsion_scan_heatmap.png" width="300"> |
+| <img src="resc/qm_2d_pes_torsion_scan_3d.png" width="300"> | <img src="resc/ani_2d_pes_torsion_scan_3d.png" width="300"> |
 
 The MD simulation result matches to this PES scan result. Our PES is also comparable to the QM one (b3lyp-d3bj/dzvp), although ANI is trained to another level of theory (B973c/def2mTZVP).
 
-For another reference QM calculation on Alanine Dipeptide, please refer to the following paper:
-Wang, Z.; Duan, Y. Solvation Effects on Alanine Dipeptide: A MP2/cc-pVTZ//MP2/6-31G** Study of (Φ, Ψ) Energy Maps and Conformers in the Gas Phase, Ether, and Water. J. Comput. Chem. 2004, 25 (14), 1699–1716. https://doi.org/10.1002/jcc.20092.
+For another reference QM calculation on Alanine Dipeptide, please refer to the paper [^2].
 
 ### 7. Conclusion
 
 This document provides the necessary steps to run an MD simulation of the alanine dipeptide using LAMMPS, both with and without SHAKE constraints. The results can be analyzed to study the conformational dynamics of this model peptide system.
 
 Future work includes using umbrella sampling to generate a complete ramachandran plot for alanine dipeptide.
+
+[^1]: Implicit water model from [ani_ext](https://github.com/plin1112/ani_ext/)
+[^2]: Wang, Z.; Duan, Y. Solvation Effects on Alanine Dipeptide: A MP2/cc-pVTZ//MP2/6-31G** Study of (Φ, Ψ) Energy Maps and Conformers in the Gas Phase, Ether, and Water. J. Comput. Chem. 2004, 25 (14), 1699–1716. https://doi.org/10.1002/jcc.20092.

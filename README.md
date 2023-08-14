@@ -226,7 +226,7 @@ After setting the environment variables correctly, you can navigate to the [exam
 
 ### Benchmark
 
-You can use the pre-built Docker container to run benchmarks for LAMMPS-ANI. Please note that the pre-built container supports Kokkos only for A100 GPUs.
+You can use the pre-built Docker container to run LAMMPS-ANI. Please note that the pre-built container only supports Kokkos for A100 GPUs.
 
 ```bash
 # Pull the Docker container
@@ -235,8 +235,8 @@ docker pull ghcr.io/roitberg-group/lammps-ani:master
 docker run --gpus all -it ghcr.io/roitberg-group/lammps-ani:master
 # Go to the water example directory
 cd /lammps-ani/examples/water/
-# Run the benchmark script (Note: For this container, Kokkos is only available for A100 GPUs)
-bash benchmark.sh
+# Run a simulation (Note: For this pre-built container, Kokkos only works for A100 GPUs)
+bash run.sh
 ```
 
 ### Submit Singularity Slurm Job

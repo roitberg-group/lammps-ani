@@ -44,16 +44,17 @@ python plot_lammps.py lammps_logfile
 
 Run ase
 ```bash
-python run_ase.py
+python run_ase.py water-300_0.8.pdb
 # plot the volume, density, temperature and pressure
 python plot_ase.py ase_logfile
 ```
 
 The generated plots for the LAMMPS and ASE simulations are shown below:
 
-| LAMMPS Simulation | ASE Simulation |
-|:-----------------:|:--------------:|
-| ![](resc/lammps.png) | ![](resc/ase.png) |
+|                   | LAMMPS Simulation | ASE Simulation |
+|:-----------------:|:-----------------:|:--------------:|
+| Simulation Time   | 53 min            |      386 min   |
+| NPT simulation of 100 water molecules using LAMMPS-ANI and ASE, performed on A100 GPUs with a 0.1 fs timestep | ![](resc/lammps.png) | ![](resc/ase.png) |
 
 The results obtained from both simulations are in close agreement, indicating that the NPT simulations using the LAMMPS-ANI interface and ASE yield comparable results. The simulations were performed on A100 GPUs. In this setting, the ASE simulation took a substantial amount of time, finishing in 386 minutes, whereas the LAMMPS simulation completed in 53 minutes, which is more than 7 times faster than the ASE simulation.
 

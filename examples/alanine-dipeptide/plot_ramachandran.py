@@ -22,8 +22,9 @@ def plot_ramachandran(traj_file, top_file, timestep, dump_interval):
     plt.figure()
 
     # Add the histogram using a more pleasing color map and the 2D histogram of angles
+    # TBH, I think "RdYlBu_r" is a better color map...
     hist, xedges, yedges, img = plt.hist2d(
-        angles[:, 0], angles[:, 1], bins=100, density=True, cmap="RdYlBu_r"
+        angles[:, 0], angles[:, 1], bins=100, density=True, cmap="OrRd"
     )
 
     # Add a color bar to the right of the plot
@@ -52,7 +53,8 @@ def plot_ramachandran(traj_file, top_file, timestep, dump_interval):
     plt.show()
 
     # Generate the filename including the timestep value (converted to ns)
-    filename = traj_file.rsplit(".", 1)[0] + ".png"
+    filename = traj_file.rsplit(".", 1)[0] + ".newcmap" + ".png"
+    print("Saving figure to {}".format(filename))
 
     # Save the figure
     plt.savefig(filename)

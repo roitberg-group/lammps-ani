@@ -196,6 +196,19 @@ python submit_scaling.py data/water/water-50k.data.final --log_dir=log_water_sat
 
 The results indicate that the performance saturation point for the single GPU occurs around the system size of 500k atoms, at which point the performance plateaus at approximately 3.68 Matoms_step/s. With this information, we believe that performance can be enhanced further by optimizing certain factors like reducing memory reallocation and CPU synchronization. Future work should focus on these areas to exploit the full potential of single GPU performance using CUDA graph.
 
+## Comparison with Allegro
+For the plotting data and scripts, please refer to [comparison_plot/](./comparison_plot/).
+
+Strong Scaling
+<p align="center">
+    <img width="500" src="./comparison_plot/strong_scale.png">
+</p>
+
+Weak Scaling
+<p align="center">
+    <img width="500" src="./comparison_plot/weak_scale_log.png">
+</p>
+
 ## Future works
 
 CUDA graph could potentially help us to improve the performance of the code by launching many kernels in a graph and execute them in a single launch. Relevant resources and ongoing work in this area are detailed in the following articles:

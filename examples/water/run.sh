@@ -5,9 +5,9 @@ set -ex
 TIMESTAMP=`date +%F-%H%M%S`
 
 
-################################# Configure here ################################# 
+################################# Configure here #################################
 
-RUN_KOKKOS=yes
+RUN_KOKKOS=no
 NUM_GPUS=1
 NUM_MODELS=1
 DATA_FILE=20k/water.data
@@ -17,6 +17,8 @@ MODEL_FILE=${LAMMPS_ANI_ROOT}/tests/ani2x.pt
 
 #################################################################################
 
+# create log directory
+mkdir -p logs
 
 if  [[ $RUN_KOKKOS == "yes" ]]; then
     # run with kokkos
@@ -24,10 +26,10 @@ if  [[ $RUN_KOKKOS == "yes" ]]; then
     LAMMPS_ANI_PROFILING=1 mpirun -np ${NUM_GPUS} ${LAMMPS_ROOT}/build/lmp_mpi \
         -k on g ${NUM_GPUS} -sf kk -pk kokkos gpu/aware on \
         -var newton_pair on -var num_models ${NUM_MODELS} -var datafile ${DATA_FILE} -var timestamp ${TIMESTAMP} -var modelfile ${MODEL_FILE} -var timestep ${TIMESTEP}\
-        -log ${TIMESTAMP}-kokkos-models_${NUM_MODELS}-gpus_${NUM_GPUS}.log -in in.lammps
+        -log logs/${TIMESTAMP}-kokkos-models_${NUM_MODELS}-gpus_${NUM_GPUS}.log -in in.lammps
 else
     # run without kokkos
     mpirun -np ${NUM_GPUS} ${LAMMPS_ROOT}/build/lmp_mpi \
         -var newton_pair off -var num_models ${NUM_MODELS} -var datafile ${DATA_FILE} -var timestamp ${TIMESTAMP} -var modelfile ${MODEL_FILE} -var timestep ${TIMESTEP}\
-        -log ${TIMESTAMP}-models_${NUM_MODELS}-gpus_${NUM_GPUS}.log -in in.lammps
+        -log logs/${TIMESTAMP}-models_${NUM_MODELS}-gpus_${NUM_GPUS}.log -in in.lammps
 fi

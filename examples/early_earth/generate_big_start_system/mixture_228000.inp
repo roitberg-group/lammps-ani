@@ -1,0 +1,29 @@
+tolerance 2.0
+output mixture_228000.pdb
+filetype pdb 
+
+structure H2.pdb
+  number 16000
+    inside box 1.0 1.0 1.0 120.0 120.0 120.0
+end structure
+
+structure H2O.pdb
+  number 14000
+    inside box 1.0 1.0 1.0 120.0 120.0 120.0
+end structure
+
+structure CO.pdb
+  number 14000
+    inside box 1.0 1.0 1.0 120.0 120.0 120.0
+end structure
+
+structure NH3.pdb
+  number 14000
+    inside box 1.0 1.0 1.0 120.0 120.0 120.0
+end structure
+
+structure CH4.pdb
+  number 14000
+    inside box 1.0 1.0 1.0 120.0 120.0 120.0
+end structure
+

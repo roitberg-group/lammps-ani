@@ -4,7 +4,7 @@ import warnings
 from torchani.nn import ANIModel
 from torchani.models import Ensemble
 from .lammps_ani import LammpsANI
-from torchani.repulsion import RepulsionXTB
+from torchani.potentials.repulsion import RepulsionXTB
 from ani2x_ext.custom_emsemble_ani2x_ext import CustomEnsemble
 
 
@@ -43,10 +43,11 @@ def ANI2x_Repulsion_Model():
         atomic_maker=dispersion_atomics,
         ensemble_size=7,
         repulsion=True,
+        # The repulsion cutoff is set to 5.1, but ANIdr model actually uses a cutoff of 5.3
         repulsion_kwargs={
             "symbols": elements,
             "cutoff": 5.1,
-            "cutoff_fn": torchani.aev.cutoffs.CutoffSmooth(order=2),
+            "cutoff_fn": torchani.cutoffs.CutoffSmooth(order=2),
         },
         periodic_table_index=True,
         model_index=None,
@@ -98,18 +99,35 @@ class ANI2xExt_Model(CustomEnsemble):
         raise RuntimeError("forward is not suppported")
 
 
+def ANI2x_Solvated_Alanine_Dipeptide_Model():
+    try:
+        import ani_engine.utils
+    except ImportError:
+        raise RuntimeError("ani_engine is not installed, cannot export ANI2x_Solvated_Alanine_Dipeptide_Model")
+    engine = ani_engine.utils.load_engine("../external/ani_engine_models/20230828_134151-k9kllka2-2x_alanine-dipeptide-water-orca")
+    model = engine.model.to_builtins(engine.self_energies, use_cuaev_interface=True)
+    model.rep_calc = None
+    return model
+
+
 all_models_ = {
     "ani2x.pt": {"model": ANI2x_Model, "unittest": True},
     "ani2x_repulsion.pt": {"model": ANI2x_Repulsion_Model, "unittest": True},
+    "ani2x_solvated_alanine_dipeptide.pt": {"model": ANI2x_Solvated_Alanine_Dipeptide_Model, "unittest": True},
     # Because ani2x_ext uses public torchani that has legacy aev code, we cannot run unittest for it.
-    "ani2x_ext0_repulsion.pt": {"model": ANI2xExt_Model, "unittest": False},
+    "ani2x_ext0_repulsion.pt": {"model": ANI2xExt_Model, "unittest": False, "kwargs": {"model_choice": 0}},
+    "ani2x_ext2_repulsion.pt": {"model": ANI2xExt_Model, "unittest": False, "kwargs": {"model_choice": 2}},
 }
 all_models = {}
 
 # Remove model that cannot be instantiated, e.g. ani2x_repulsion could only be downloaded within UF network
 for output_file, info in all_models_.items():
     try:
-        model = info["model"]()
+        if "kwargs" in info:
+            kwargs = info["kwargs"]
+        else:
+            kwargs = {}
+        model = info["model"](**kwargs)
         all_models[output_file] = info
     except Exception as e:
         warnings.warn(f"Failed to export {output_file}: {str(e)}")
@@ -117,6 +135,11 @@ for output_file, info in all_models_.items():
 def save_models():
     for output_file, info in all_models.items():
         print(f"saving model: {output_file}")
-        ani2x = LammpsANI(info["model"]())
+        if "kwargs" in info:
+            kwargs = info["kwargs"]
+        else:
+            kwargs = {}
+        model = info["model"](**kwargs)
+        ani2x = LammpsANI(model)
         script_module = torch.jit.script(ani2x)
         script_module.save(output_file)

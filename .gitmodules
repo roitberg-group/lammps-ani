@@ -10,3 +10,7 @@
 [submodule "external/ani-1xnr"]
 	path = external/ani-1xnr
 	url = git@github.com:atomistic-ml/ani-1xnr.git
+[submodule "external/ani_engine"]
+	path = external/ani_engine
+	url = git@github.com:roitberg-group/ani_engine.git
+

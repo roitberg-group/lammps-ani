@@ -145,11 +145,23 @@ class ANI2xExt_Model(CustomEnsemble):
         raise RuntimeError("forward is not suppported")
 
 
+def ANI2x_Solvated_Alanine_Dipeptide_Model():
+    try:
+        import ani_engine.utils
+    except ImportError:
+        raise RuntimeError("ani_engine is not installed, cannot export ANI2x_Solvated_Alanine_Dipeptide_Model")
+    engine = ani_engine.utils.load_engine("../external/ani_engine_models/20230828_134151-k9kllka2-2x_alanine-dipeptide-water-orca")
+    model = engine.model.to_builtins(engine.self_energies, use_cuaev_interface=True)
+    model.rep_calc = None
+    return model
+
+
 all_models_ = {
     "ani2x.pt": {"model": ANI2x_Model, "unittest": True},
     "ani2x_repulsion.pt": {"model": ANI2x_Repulsion_Model, "unittest": True},
     "ani1x_nr.pt": {"model": ANI1x_NR_Model, "unittest": True, "kwargs": {"use_repulsion": False}},
     "ani1x_nr_repulsion.pt": {"model": ANI1x_NR_Model, "unittest": False, "kwargs": {"use_repulsion": True}},
+    "ani2x_solvated_alanine_dipeptide.pt": {"model": ANI2x_Solvated_Alanine_Dipeptide_Model, "unittest": True},
     # Because ani2x_ext uses public torchani that has legacy aev code, we cannot run unittest for it.
     "ani2x_ext0_repulsion.pt": {"model": ANI2xExt_Model, "unittest": False, "kwargs": {"model_choice": 0}},
     "ani2x_ext2_repulsion.pt": {"model": ANI2xExt_Model, "unittest": False, "kwargs": {"model_choice": 2}},

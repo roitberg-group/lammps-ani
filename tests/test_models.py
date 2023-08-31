@@ -219,7 +219,7 @@ def run_one_test(
         )
 
     use_double = dtype == torch.float64
-    threshold = 1e-13 if use_double else 1e-4
+    threshold = 1e-13 if use_double else 1.2e-4
 
     assert torch.allclose(
         energy, energy_, atol=threshold

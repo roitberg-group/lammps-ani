@@ -35,6 +35,11 @@ cd external/ani_ext
 python setup.py develop $install_option
 cd ../../
 
+# install ani_engine
+cd external/ani_engine
+pip install -e . $install_option 
+cd ../../
+
 # save model
 cd tests/
 pytest test_models.py -s -v

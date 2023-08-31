@@ -1,0 +1,84 @@
+general:
+  log_base_dir: logs/
+  seed: 12345
+  name: 2x_alanine-dipeptide-water-orca
+  notes:
+  mode: run    # debug, test or run
+  project: ani
+
+data:
+  train:
+    batch_size: 3000
+    data_files: []
+    data_dirs:
+    - datasets/ANI2x-wb97x-631gd
+    - datasets/alanine-dipeptide-water-wb97x-631gd
+    data_dirs_ext: h5
+    cache: false
+    train_split: 0.8
+    num_workers: 1
+  test:
+    batch_size: 300
+    data_files: []
+    data_dirs:
+    - datasets/COMP6v2-wb97x-631gd
+    data_dirs_ext: h5
+  info:
+    elements: [H, C, N, O, S, F, Cl]
+    self_energies: [-0.4993212, -37.8338334, -54.5732825, -75.0424519, -398.081416857,
+      -99.6949007172, -460.116700576]
+
+engine:
+  type: ani_engine.engines.energy.EnergyEngine
+  args:
+    verbose: true
+    train_force: true
+    force_coefficient: 0.1
+    use_tensorboard: true
+    use_wandb: true
+    additional_properties: []
+
+model:
+  type: ani_engine.models.energy.ANI
+  args:
+    version: ani2x
+    cutoff_fn: cosine
+    use_cuda_extension: true
+    last_layer_bias: true
+    use_mtl_loss: false
+
+resume:
+  from_dir:
+  file_name: best_model.pt
+  reset_lr: false
+
+train:
+  num_epochs: 15000
+  optimizer:
+    type: torch.optim.Adam
+    args:
+      lr: 0.00014
+  lr_scheduler:
+    type: torch.optim.lr_scheduler.ReduceLROnPlateau
+    args:
+      factor: 0.85
+      patience: 100
+      verbose: true
+      threshold: 0.0001
+      threshold_mode: rel
+  early_stop_lr: 1e-5
+
+auto:
+  _id: k9kllka2
+  _name: 2x_alanine-dipeptide-water-orca
+  date: '20230828_134151'
+  log_dir: logs/run/20230828_134151-k9kllka2-2x_alanine-dipeptide-water-orca/
+  tb_log_dir: logs/run/20230828_134151-k9kllka2-2x_alanine-dipeptide-water-orca/
+  resume_file:
+  checkpoint_file: logs/run/20230828_134151-k9kllka2-2x_alanine-dipeptide-water-orca/checkpoint.pt
+  best_model_file: logs/run/20230828_134151-k9kllka2-2x_alanine-dipeptide-water-orca/best_model.pt
+  config_file: logs/run/20230828_134151-k9kllka2-2x_alanine-dipeptide-water-orca/config.yaml
+  ensemble:
+    index:
+    num:
+    group:

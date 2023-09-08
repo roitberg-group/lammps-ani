@@ -166,7 +166,7 @@ def run_one_test(
         mol.set_pbc([False, False, False])
     pbc = torch.tensor(mol.pbc, device=device)
 
-    atom_index12, distances, diff_vector, _ = model_ref.aev_computer.neighborlist(species, coordinates, cell, pbc)
+    atom_index12, distances, diff_vector = model_ref.aev_computer.neighborlist(species, coordinates, cell, pbc)
 
     if use_fullnbr:
         ilist_unique, jlist, numneigh = model_ref.aev_computer._half_to_full_nbrlist(

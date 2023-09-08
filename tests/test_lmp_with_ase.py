@@ -75,7 +75,7 @@ class AseRunner:
         atoms = read(input_file)
 
         print(len(atoms), "atoms in the cell")
-        atoms.set_calculator(calculator)
+        atoms.calc = calculator
         if not pbc:
             atoms.set_pbc([False, False, False])
 

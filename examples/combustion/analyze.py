@@ -37,7 +37,7 @@ def plot(df, save_to_file=None):
 
 def get_bond_data_table():
     # TODO assert error if bond is not here
-    bond_data = {"HH": 0.75, "HC": 1.09, "HO": 0.96, "CC": 1.54, "CO": 1.43, "OO": 1.48}
+    bond_data = {"HH": 0.75, "HC": 1.09, "HO": 0.96, "CC": 1.54, "CO": 1.43, "OO": 1.48, "NH": 0.98}
     # make bond length longer in case it is stretched
     bond_data = {k: v + 0.2 for k, v in bond_data.items()}
     bond_data_atomic_pairs = [[], []]
@@ -84,7 +84,7 @@ def fragment(traj_file, batch_size, timestep, dump_interval):
         [torch.from_numpy(mol.get_atomic_numbers()).unsqueeze(0) for mol in molecules],
         dim=0,
     ).to(device)
-    cell = torch.tensor(molecules[0].cell, device=device)
+    cell = torch.tensor(molecules[0].cell.array, device=device)
     pbc = torch.tensor(molecules[0].pbc, device=device)
 
     file_type = Path(traj_file).suffix

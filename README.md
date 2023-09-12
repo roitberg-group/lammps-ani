@@ -14,7 +14,7 @@ To run an interactive session on HiPerGator and load the necessary modules, use 
 srun --qos=roitberg --account=roitberg --nodes=1 --ntasks=1 --cpus-per-task=2 --mem=80gb --gres=gpu:1 --partition=hpg-ai -t 3:00:00 --pty /bin/bash -i
 
 # Load modules
-module load cuda/11.4.3 gcc/9.3.0 openmpi/4.0.5 cmake/3.21.3 git/2.30.1 singularity
+module load cuda/11.4.3 gcc/9.3.0 openmpi/4.1.5 cmake/3.21.3 git/2.30.1 singularity
 ```
 
 #### For Expanse Users
@@ -35,12 +35,12 @@ module load gpu/0.15.4 openmpi/4.0.4 cuda11.7/toolkit/11.7.1 cmake/3.19.8 singul
 Requirements
 - OpenMPI
 - CUDA >= 11.1
-- PyTorch >= 1.12.1
+- PyTorch >= 1.13.1
 
 Install PyTorch and cuDNN using Conda.
 ```bash
-conda install pytorch==1.12.1 torchvision==0.13.1 torchaudio==0.12.1 cudatoolkit=11.6 -c pytorch -c conda-forge
-conda install -c conda-forge cudnn=8.3.2
+conda install pytorch==1.13.1 torchvision==0.14.1 torchaudio==0.13.1 pytorch-cuda=11.6 -c pytorch -c nvidia
+conda install --no-deps -c conda-forge cudnn=8.3.2
 ```
 
 You can build LAMMPS-ANI from source using the following commands:

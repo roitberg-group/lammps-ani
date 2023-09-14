@@ -253,7 +253,13 @@ def test_lmp_with_ase(
         return model
 
     # setup ase calculator
-    ref_model = all_models[modelfile]["model"]()
+    model_info = all_models[modelfile]
+    if "kwargs" in model_info:
+        kwargs = model_info["kwargs"]
+    else:
+        kwargs = {}
+    ref_model = model_info["model"](**kwargs)
+
     ref_model = set_ref_cuda_aev(ref_model, use_cuaev)
     # When using half nbrlist, we have to set the cutoff as 7.1 to match lammps nbr cutoff.
     # When using full nbrlist with nocuaev, it is actually still using half_nbr, we also need 7.1 cutoff.

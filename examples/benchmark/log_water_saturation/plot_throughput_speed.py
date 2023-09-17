@@ -2,6 +2,11 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+import matplotlib as mpl
+
+# Set the font to Times New Roman
+mpl.rcParams['font.family'] = 'serif'
+mpl.rcParams['font.size'] = 12
 
 # Load the strong scaling data from the CSV file
 df = pd.read_csv('all.csv')

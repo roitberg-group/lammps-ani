@@ -17,8 +17,11 @@ neighbor       2.0 bin
 neigh_modify   every 10 delay 0 check yes
 newton         ${newton_pair} off
 
+# Per-atom mass definition
+fix            Hmrmass all property/atom rmass ghost yes
 # Atom Definition
-read_data      ${datafile}
+read_data      ${datafile} fix Hmrmass NULL Hmrmass
+
 # replicate      3 3 3
 change_box     all boundary p p p
 

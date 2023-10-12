@@ -13,7 +13,7 @@ RUN_KOKKOS=no
 NUM_GPUS=1
 NUM_MODELS=1
 DATA_FILE=alanine-dipeptide.vacuum.hmr.data
-TIMESTEP=2
+TIMESTEP=2.5
 # choose ani2x.pt or ani2x_repulsion.pt
 MODEL_FILE=${LAMMPS_ANI_ROOT}/tests/ani2x_solvated_alanine_dipeptide.pt
 

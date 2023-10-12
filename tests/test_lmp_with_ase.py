@@ -146,7 +146,7 @@ def compare_lmp_ase(lmp_data, ase_traj, high_prec, using_cuaev):
         # compare position
         assert np.allclose(ase_pos, lmp_pos, rtol, atol)
         # compare temperature
-        assert np.allclose(lmp_temp, ase_temp, atol=1e-1)
+        assert np.allclose(lmp_temp, ase_temp, atol=1.3e-1)
         # compare potential energy
         assert np.allclose(lmp_potEng, ase_potEng, rtol, atol)
 

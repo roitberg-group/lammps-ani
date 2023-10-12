@@ -62,3 +62,16 @@ python ../combustion/analyze.py start.pdb logs/2023-08-02-035928.488223.dcd --fr
 python ../combustion/analyze.py start.pdb logs/2023-08-02-035928.488223.dcd --frame=190000 --frame-end=190200
 ```
 
+Run for the larger system (228000 atoms)
+
+```bash
+python run_one.py mixture_228000.data --kokkos --num_gpus=8 --input_file=in.big.lammps --log_dir=logs-big --ani_model_file='ani1x_nr.pt' --run_name=scale_early_earth_ani1x_nr --ani_num_models=-1 --timestep=0.25 --run
+# 46,14440,C2H5NO2,9,0.1805
+
+# extract a single frame
+python ../combustion/analyze.py mixture_228000.pdb logs/2023-08-28-022042.908705.dcd --frame=14440
+# extract a single frame
+python ../combustion/analyze.py mixture_228000.pdb logs/2023-08-28-022042.908705.dcd --frame=14440 --frame_end=14450
+# identify glycines from all C2H5NO2 molecules
+python ../combustion/analyze.py mixture_228000.pdb logs-big/2023-08-28-022042.908705.dcd --csv_file=analyze/2023-08-28-022042.908705.csv
+```

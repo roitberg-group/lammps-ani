@@ -11,7 +11,7 @@ mpl.rcParams['font.size'] = 12
 # Load the strong scaling data from the CSV file
 df = pd.read_csv('all.csv')
 
-fig, axs = plt.subplots(2, 1, figsize=(5.5, 8), dpi=150)
+fig, axs = plt.subplots(2, 1, figsize=(5.5, 6), dpi=150)
 
 # Plot Timesteps/s vs Number of GPUs for the 44M atom system
 axs[0].plot(df['atoms'], df['Matom_step/s'], 'o-', color="blue")
@@ -30,6 +30,7 @@ axs[1].set_ylabel('Speed (timesteps/s)')
 axs[1].set_title('Single GPU Speed (timesteps/s)')
 axs[1].xaxis.set_major_formatter(formatter)
 axs[1].xaxis.set_major_locator(ticker.MultipleLocator(base=200000))
+axs[1].yaxis.set_major_locator(ticker.MultipleLocator(base=10))
 axs[1].grid(True)
 
 plt.tight_layout()

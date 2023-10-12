@@ -9,7 +9,7 @@ def apply_hmr(input_pdb, output_mass_file, hydrogen_mass_value):
     pdb = omm_app.PDBFile(input_pdb)
 
     forcefield = omm_app.ForceField("amber14-all.xml", "amber14/tip3pfb.xml")
-    system = forcefield.createSystem(pdb.topology, nonbondedMethod=omm_app.NoCutoff, constraints=omm_app.HBonds, hydrogenMass=hydrogenMass)
+    system = forcefield.createSystem(pdb.topology, nonbondedMethod=omm_app.NoCutoff, hydrogenMass=hydrogenMass, rigidWater=False)
 
     print("\nFirst 20 atoms - Masses before and after HMR:")
 

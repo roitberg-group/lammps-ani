@@ -150,7 +150,7 @@ def ANI2x_Solvated_Alanine_Dipeptide_Model():
         import ani_engine.utils
     except ImportError:
         raise RuntimeError("ani_engine is not installed, cannot export ANI2x_Solvated_Alanine_Dipeptide_Model")
-    engine = ani_engine.utils.load_engine("../external/ani_engine_models/20230828_134151-k9kllka2-2x_alanine-dipeptide-water-orca")
+    engine = ani_engine.utils.load_engine("../external/ani_engine_models/20230913_131808-zdy6gco1-2x-with-solvated-alanine-dipeptide-b973c-def2-mtzvp")
     model = engine.model.to_builtins(engine.self_energies, use_cuaev_interface=True)
     model.rep_calc = None
     return model

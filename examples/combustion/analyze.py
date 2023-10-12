@@ -5,6 +5,7 @@ import time
 import pkbar
 import cudf
 import cupy
+import tempfile
 import warnings
 import argparse
 import cugraph as cnx
@@ -20,7 +21,7 @@ PERIODIC_TABLE_LENGTH = 118
 species_dict = {1: "H", 6: "C", 7: "N", 8: "O", 9: "F", 16: "S", 17: "Cl"}
 # https://media.cheggcdn.com/media%2F5fa%2F5fad12c3-ee27-47fe-917a-f7919c871c63%2FphpEjZPua.png
 bond_data = {"HH": 0.75, "HC": 1.09, "HN": 1.01, "HO": 0.96, "CC": 1.54, "CN": 1.43, "CO": 1.43, "NN":1.45, "NO":1.47, "OO": 1.48}
-
+use_cell_list = True
 
 def plot(df, save_to_file=None):
     fig, ax = plt.subplots(figsize=(8, 4), dpi=150)
@@ -95,6 +96,7 @@ def neighborlist_to_fragment(atom_index12, species):
 
     # build cugraph from cudf edges
     # https://docs.rapids.ai/api/cugraph/stable/api_docs/api/cugraph.graph.from_cudf_edgelist#cugraph.Graph.from_cudf_edgelist
+    # start = time.time()
     df_edges = cudf.DataFrame(
         {
             "source": cupy.from_dlpack(torch.to_dlpack(atom_index12[0])),
@@ -116,32 +118,62 @@ def neighborlist_to_fragment(atom_index12, species):
     # rename "vertex" to "atom_index"
     df = df.rename(columns={"vertex": "atom_index"})
 
-    # convert cudf to pandas
-    df = df.to_pandas()
+    # print(f"\nfinish neighborlist_to_fragment 1, time: {time.time() - start:.2f} s")
 
     # Grouping by labels and collecting symbols
-    df_per_frag = df.groupby('labels')['symbols'].apply(list).reset_index(name='collected_symbols')
+    # df_per_frag = df.groupby('labels')['symbols'].apply(list).reset_index(name='collected_symbols')  # 1s
+    df_per_frag = df.groupby('labels').agg({'symbols': list}).reset_index()
+    df_per_frag.columns = ['labels', 'collected_symbols']
+    # print(f"finish neighborlist_to_fragment 2, time: {time.time() - start:.2f} s")
 
-    # Assuming you have ase.Atoms installed and available, you can get the chemical formula:
-    df_per_frag['formula'] = df_per_frag['collected_symbols'].apply(lambda x: ase.Atoms(x).get_chemical_formula())
+    if True:
+        # using ase to get formula
+        # Assuming you have ase.Atoms installed and available, you can get the chemical formula:
+        df_per_frag['formula'] = cudf.from_pandas(df_per_frag.to_pandas()['collected_symbols'].apply(lambda x: ase.Atoms(x).get_chemical_formula()))  # 2s
+    else:
+        # Sort and concatenate symbols to create a pseudo-formula (without using ASE)
+        # df_per_frag['formula'] = df_per_frag['collected_symbols'].apply(lambda x: ''.join(sorted(x)))
+        df_per_frag['collected_symbols'] = df_per_frag['collected_symbols'].list.sort_values(ascending=True, na_position="last")
+        df_per_frag['formula'] = cudf.from_pandas(df_per_frag.to_pandas()['collected_symbols'].apply(lambda x: ''.join(sorted(x))))
+    # print(f"finish neighborlist_to_fragment 3, time: {time.time() - start:.2f} s")
 
-    # Grouping by labels and collecting atom_index
-    df_per_frag['atom_indices'] = df.groupby('labels')['atom_index'].apply(list).reset_index(name='collected_atom_index')['collected_atom_index']
+    # Grouping by labels and collecting atom_index using cuDF
+    df_per_frag['atom_indices'] = df.groupby('labels').agg({'atom_index': list}).reset_index()['atom_index']
+    # print(f"finish neighborlist_to_fragment 4, time: {time.time() - start:.2f} s")
 
-    # Merging with the original dataframe
+    # Merging with the original dataframe using cuDF
     df_per_atom = df.merge(df_per_frag[['labels', 'formula']], on='labels', how='left')
+    # print(f"finish neighborlist_to_fragment 5, time: {time.time() - start:.2f} s")
 
-    return df_per_atom, df_per_frag
+    return df_per_atom.to_pandas(), df_per_frag.to_pandas()
 
 
 def analyze_all_frames(top_file, traj_file, batch_size, timestep, dump_interval):
-    start = time.time()
-    trajectory = md.load(traj_file, top=top_file)
-    trajectory = trajectory[:100]
-    print(
-        f"finish reading '{traj_file}', total loading time: {time.time() - start:.2f} s"
-    )
+    # Get the file size to decide whether to load the entire trajectory or iterate through it
+    file_size = os.path.getsize(traj_file)  # File size in bytes
+    max_size = 30e9  # 30 GB as the threshold size
+    frame_offset = 0  # Initialize the frame offset
 
+    if file_size < max_size:
+        # Load the entire trajectory if the file size is below the threshold
+        start = time.time()
+        trajectory = md.load(traj_file, top=top_file)
+        stride = 1
+        print(
+            f"finish reading '{traj_file}', total loading time: {time.time() - start:.2f} s"
+        )
+        analyze_all_frames_for_a_chunk(trajectory, top_file, traj_file, batch_size, timestep, dump_interval, frame_offset, stride)
+    else:
+        # Iterate through trajectory in chunks if the file size is above the threshold
+        stride = 5  # The stride parameter
+        chunk_index = 0
+        for chunk in md.iterload(traj_file, top=top_file, chunk=1000, stride=stride):
+            print(f"=== chunk {chunk_index} ===")
+            frame_offset = analyze_all_frames_for_a_chunk(chunk, top_file, traj_file, batch_size, timestep, dump_interval, frame_offset, stride)
+            chunk_index += 1
+
+
+def analyze_all_frames_for_a_chunk(trajectory, top_file, traj_file, batch_size, timestep, dump_interval, frame_offset, stride):
     assert torch.cuda.is_available(), "CUDA is required to run analysis"
     device = "cuda"
 
@@ -173,9 +205,11 @@ def analyze_all_frames(top_file, traj_file, batch_size, timestep, dump_interval)
         if batch_size > 1:
             neighborlist = _parse_neighborlist("full_pairwise", cutoff=2).to(device)
         else:
-            neighborlist = _parse_neighborlist("full_pairwise", cutoff=2).to(device)
-            # TODO switch to cell_list when the system is large
-            # neighborlist = _parse_neighborlist("cell_list", cutoff=2).to(device)
+            if use_cell_list:
+                neighborlist = _parse_neighborlist("cell_list", cutoff=2).to(device)
+            else:
+                neighborlist = _parse_neighborlist("full_pairwise", cutoff=2).to(device)
+
         atom_index12, distances, diff_vector, _ = neighborlist(
             spe, coord, cell=cell, pbc=pbc
         )
@@ -199,7 +233,7 @@ def analyze_all_frames(top_file, traj_file, batch_size, timestep, dump_interval)
 
         df_per_frag["frame"] = df_per_frag["atom_indices"].apply(lambda x: x[0]) // atoms_per_molecule
         # adjust frame by the offset
-        df_per_frag["frame"] = df_per_frag["frame"] + i * batch_size
+        df_per_frag["frame"] = (df_per_frag["frame"] + i * batch_size) * stride + frame_offset
 
         # The colmns for df_per_frag are: frame, formula, counts
         df_per_frame = df_per_frag.groupby("frame")["formula"].value_counts().to_frame("counts").reset_index()
@@ -214,10 +248,18 @@ def analyze_all_frames(top_file, traj_file, batch_size, timestep, dump_interval)
             df_per_frame_list_export["time"] = (
                 df_per_frame_list_export["frame"] * timestep * dump_interval * 1e-6
             )  # ns
-            df_per_frame_list_export.to_csv(f"{output_directory}/{Path(traj_file).stem}.csv")
+            # df_per_frame_list_export.to_csv(f"{output_directory}/{Path(traj_file).stem}.csv")
+    # TODO: current solution is to appending csv for every chunk, however if we didn't split chunks and the program crashes, we will lose all the data
+    # Append to the existing CSV file instead of overwriting it
+    write_mode = "a" if frame_offset != 0 else "w"
+    df_per_frame_list_export.to_csv(f"{output_directory}/{Path(traj_file).stem}.csv", mode=write_mode, header=(frame_offset == 0))
+
 
     # plot(all_formula_counts_export, f"{output_directory}/{Path(traj_file).stem}.png")
     print(f"Analysis complete and exported to {output_directory}/{Path(traj_file).stem}.csv")
+    new_frame_offset = frame_offset + (len(trajectory) * stride)
+    return new_frame_offset
+
 
 
 def identify_glycine(mol, target_smiles):
@@ -228,12 +270,16 @@ def identify_glycine(mol, target_smiles):
     fragment_copy = Chem.Mol(mol)
     fragment_noH = Chem.RemoveHs(fragment_copy)
     fragment_canonical_smiles = Chem.MolToSmiles(fragment_noH, canonical=True)
-    print(target_canonical_smiles, fragment_canonical_smiles)
+    print(f"{target_canonical_smiles},  {fragment_canonical_smiles}")
 
-    return target_canonical_smiles, fragment_canonical_smiles
+    if target_canonical_smiles == fragment_canonical_smiles:
+        # print found glycine using green color
+        print("\033[92m" + "Found glycine!!!" + "\033[0m")
+
+    return target_canonical_smiles == fragment_canonical_smiles
 
 
-def generate_topology_from_frame(top_file, traj_file, frame_number):
+def count_glycine_for_a_frame_and_set_GLY_resname(top_file, traj_file, frame_number):
     # Load a single frame from trajectory
     traj = md.load_frame(traj_file, index=frame_number, top=top_file)
     assert torch.cuda.is_available(), "CUDA is required to run analysis"
@@ -245,8 +291,11 @@ def generate_topology_from_frame(top_file, traj_file, frame_number):
     pbc = torch.tensor([True, True, True], device=device)
     print(f"pbc box is {pbc.tolist()}, {cell.tolist()}")
 
-    neighborlist = _parse_neighborlist("full_pairwise", cutoff=2).to(device)
-    # breakpoint()
+    if use_cell_list:
+        neighborlist = _parse_neighborlist("cell_list", cutoff=2).to(device)
+    else:
+        neighborlist = _parse_neighborlist("full_pairwise", cutoff=2).to(device)
+
     atom_index12, distances, _, _ = neighborlist(species, coordinates, cell=cell, pbc=pbc)
 
     bond_length_table = get_bond_data_table().to(device)
@@ -261,30 +310,45 @@ def generate_topology_from_frame(top_file, traj_file, frame_number):
     # # traj.topology = traj.topology.from_dataframe(traj.topology.to_dataframe()[0], bonds)
 
     df_per_atom, df_per_frag = neighborlist_to_fragment(atom_index12, species)
-    interesting_formula = {"C2H5NO2": {"smiles": "NCC(O)O", "resname": "GLY"}}
+    interesting_formula = {"C2H5NO2": {"smiles": "NCC(=O)O", "resname": "GLY"}}
 
     df_per_frag_filtered = df_per_frag[df_per_frag['formula'].isin(interesting_formula.keys())]
     # breakpoint()
     # Convert topology to DataFrame
     atoms_df, bonds_df = traj.topology.to_dataframe()
     num_filtered_fragments = df_per_frag_filtered.shape[0]
+    glycine_count = 0
     for idx in range(num_filtered_fragments):
         fragment = df_per_frag_filtered.iloc[idx]
         # TODO we could resemble the molecule and check if it has the same smiles
-        # identify_glycine(resembled_rdkit_mol, interesting_formula[fragment["formula"]]["smiles"])
+        sliced_atoms = traj.atom_slice(fragment.atom_indices)
+        # Save the sliced atoms to a temporary xyz file and read it with RDKit
+        with tempfile.NamedTemporaryFile(suffix='.xyz', delete=True, mode='r+') as tmp:
+            sliced_atoms.save_xyz(tmp.name)
+            tmp.seek(0)
+            xyz_data = tmp.read()
+        # identify and count glycine using RDKit
+        from rdkit.Chem import rdDetermineBonds, AllChem
+        rdkit_mol = AllChem.MolFromXYZBlock(xyz_data)
+        try:
+            rdDetermineBonds.DetermineBonds(rdkit_mol, charge=0)
+            is_glycine = identify_glycine(rdkit_mol, interesting_formula[fragment["formula"]]["smiles"])
+            if is_glycine:
+                glycine_count += 1
+        except Exception as e:
+            print("Failed to determine bonds, error:", e)
         global_atom_indices = fragment["atom_indices"]
         # Change residue name of these atom indices
         atoms_df.loc[global_atom_indices, 'resName'] = interesting_formula[fragment["formula"]]["resname"]
 
-    # Reconstruct topology from DataFrame
-    new_top = md.Topology.from_dataframe(atoms_df, bonds_df)
-    traj.topology = new_top
-    return traj
+    return atoms_df, bonds_df, glycine_count
 
 
 def extract_multiple_frames_with_new_top(top_file, traj_file, frame_number, frame_end=None):
     # Generate the new topology from the first frame
-    new_topology = generate_topology_from_frame(top_file, traj_file, frame_number)
+    atoms_df, bonds_df, _ = count_glycine_for_a_frame_and_set_GLY_resname(top_file, traj_file, frame_number)
+    # Reconstruct topology from DataFrame
+    new_topology = md.Topology.from_dataframe(atoms_df, bonds_df)
 
     # Save the first frame as a PDB file
     pdb_output_file = f"{output_directory}/{Path(traj_file).stem}.frame_{frame_number}.pdb"
@@ -294,17 +358,52 @@ def extract_multiple_frames_with_new_top(top_file, traj_file, frame_number, fram
 
     # If frame_end is specified, save the frames as a DCD file
     if frame_end is not None:
-        assert frame_end > frame_number, "frame_end must be larger than frame_number"
         dcd_output_file = f"{output_directory}/{Path(traj_file).stem}.frames_{frame_number}_to_{frame_end}.dcd"
-        # Load the entire DCD trajectory with the new topology
-        traj = md.load(traj_file, top=new_topology)
-        traj[frame_number:frame_end+1].save(dcd_output_file)
+
+        import pytraj as pt
+        # Load the topology
+        top = pt.load_topology(top_file)
+
+        # Load the trajectory slice without loading the entire trajectory into memory
+        traj_slice = pt.iterload(traj_file, top=top, frame_slice=(frame_number, frame_end+1))
+
+        # Write out the sliced trajectory
+        pt.write_traj(dcd_output_file, traj=traj_slice, overwrite=True)
         print(f"Frames {frame_number} to {frame_end} saved as DCD to {dcd_output_file}")
+
+
+
+def count_glycine(top_file, traj_file, csv_file):
+    # Generate the new topology from the first frame
+    df = pd.read_csv(csv_file)
+    df_C2H5NO2 = df[df['formula'] == 'C2H5NO2']
+
+    total_glycine_count = 0
+    glycine_counts = []  # List to store glycine counts for each row
+    for index, row in df_C2H5NO2.iterrows():
+        count_number = row['counts']
+        frame_number = row['frame']
+        _, _, glycine_count = count_glycine_for_a_frame_and_set_GLY_resname(top_file, traj_file, frame_number)
+        total_glycine_count += glycine_count
+        glycine_counts.append(glycine_count)  # Append the count to the list
+        import sys
+        print("frame_number: ", frame_number, ", Total C2H5NO2 count: ", count_number, ", Total so far: ", total_glycine_count)
+        sys.stdout.flush()
+
+    # Add the glycine_counts list as a new column to the DataFrame
+    df_C2H5NO2['glycine_count'] = glycine_counts
+
+    # Save the modified DataFrame to a new CSV file
+    new_csv_name = Path(csv_file).with_name(Path(csv_file).stem + "_glycine_count.csv")
+    df_C2H5NO2.to_csv(new_csv_name, index=False)
+
+    print("total glycine count", total_glycine_count)
 
 
 if __name__ == "__main__":
     # adding usage examples into the parser help
     # python analyze.py start.pdb traj.dcd --frame=2000 --frame-end=2060
+    # python analyze.py start.pdb traj.dcd --csv=fragments.csv
     parser = argparse.ArgumentParser(description="Analyze trajectory", formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                      epilog="Usage examples:\n1. python analyze.py start.pdb traj.dcd --frame=2000 --frame-end=2060"
                                      "\n2. python analyze.py start.pdb traj.dcd --timestep 0.5 --dump_interval 100 --batch_size 1")
@@ -313,6 +412,7 @@ if __name__ == "__main__":
     parser.add_argument("-t", "--timestep", type=float, help="timestep used in the simulation (fs)", default=0.5)
     parser.add_argument("-i", "--dump_interval", type=int, help="how many timesteps it dump once", default=100)
     parser.add_argument("-b", "--batch_size", type=int, help="batch size", default=1)
+    parser.add_argument("--csv_file", type=str, help="csv file that contains the fragments information to count glycine for molecules has formula of C2H5NO2", default=None)
     parser.add_argument("--frame", type=int, help="Frame number to extract with bonds", default=None)
     parser.add_argument("--frame-end", type=int, help="If defined, will extract all frames from frame to frame-end", default=None)
     parser.add_argument("--output_directory", type=str, help="Output directory", default="analyze")
@@ -330,6 +430,8 @@ if __name__ == "__main__":
     if args.frame is not None:
         # Extract multiple frames with new topology
         extract_multiple_frames_with_new_top(args.start_top_file, args.traj_file, args.frame, args.frame_end)
+    elif args.csv_file is not None:
+        count_glycine(args.start_top_file, args.traj_file, args.csv_file)
     else:
         # Analyze the entire trajectory
         analyze_all_frames(args.start_top_file,

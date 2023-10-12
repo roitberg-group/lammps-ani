@@ -9,7 +9,7 @@ TIMESTAMP=`date +%F-%H%M%S`
 
 RUN_NAME=run_hmr
 LAMMPS_INPUT=in.hmr.lammps
-RUN_KOKKOS=no
+RUN_KOKKOS=yes
 NUM_GPUS=1
 NUM_MODELS=1
 DATA_FILE=alanine-dipeptide.vacuum.hmr.data

@@ -167,8 +167,14 @@ def analyze_all_frames(top_file, traj_file, batch_size, timestep, dump_interval)
         # Iterate through trajectory in chunks if the file size is above the threshold
         stride = 5  # The stride parameter
         chunk_index = 0
-        for chunk in md.iterload(traj_file, top=top_file, chunk=1000, stride=stride):
-            print(f"=== chunk {chunk_index} ===")
+        import pytraj as pt
+        traj_iterator = pt.iterload(traj_file, top=top_file)
+        total_frames = len(traj_iterator)
+        print(f"total frames: {total_frames}, stride: {stride}")
+        chunk_size = 1000
+        total_chunks = total_frames // stride // chunk_size
+        for chunk in md.iterload(traj_file, top=top_file, chunk=chunk_size, stride=stride):
+            print(f"=== chunk {chunk_index}/{total_chunks} ===")
             frame_offset = analyze_all_frames_for_a_chunk(chunk, top_file, traj_file, batch_size, timestep, dump_interval, frame_offset, stride)
             chunk_index += 1
 

@@ -100,7 +100,7 @@ class LammpsANI(LammpsModelBase):
         if self.use_repulsion:
             self.rep_calc = model.rep_calc
         else:
-            # We need to create a useless repulsion model because the `compute_repulsion()`
+            # We need to create a dummy repulsion model because the `compute_repulsion()`
             # method needs the repulsion forward functions are exposed.
             self.rep_calc = RepulsionXTB()
 

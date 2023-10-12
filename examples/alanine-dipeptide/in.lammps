@@ -53,6 +53,9 @@ timestep       ${timestep}
 # run nvt
 fix            1 all langevin 300.0 300.0 100.0 12345
 fix            2 all nve
+# Keep the system's center-of-mass at the box center every timestep.
+# fix            3 all recenter 0.5 0.5 0.5
+
 run            50000000
 
 # Write final state of simulation

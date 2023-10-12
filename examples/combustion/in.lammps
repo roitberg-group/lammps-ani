@@ -1,11 +1,21 @@
 # variables
 variable       lammps_ani_root getenv LAMMPS_ANI_ROOT
+variable       log_dir         index  logs
 # kokkos needs newton_pair on for reverse communication between gpus
 variable       newton_pair     index  off
-variable       num_models      index  1
-variable       datafile        index  water.data
-variable       modelfile       index  none 
 variable       timestamp       index  timestamp
+# configuration
+variable       data_file       index  none
+variable       timestep        index  timestep
+variable       run_steps       index  1000
+variable       replicate       index  "1 1 1"
+# ani variables
+variable       ani_model_file  index  none
+variable       ani_device      index  cuda
+variable       ani_num_models  index  1
+variable       ani_aev         index  cuaev
+variable       ani_neighbor    index  full
+variable       ani_precision   index  single
 
 # Intialization
 units          real
@@ -17,31 +27,38 @@ neigh_modify   every 10 delay 0 check yes
 newton         ${newton_pair} off
 
 # Atom Definition
-# read_data      ${datafile}
-# read_data      combustion-very-small-point-7-density.solvated.cell.data
-read_data      prepare_system/combustion-density_0.25-atoms_3600.data 
-# read_data      combustion-300k-point-7-density.solvated.cell.data
-# replicate      3 3 3
+read_data      ${data_file}
+replicate      ${replicate}
 change_box     all boundary p p p
 
-pair_style     ani 5.1 ${modelfile} cuda ${num_models} cuaev full single
+# pair_style ani 5.1 model_file device num_models ani_aev ani_neighbor
+# 0. model_file               = path to the model file
+# 1. device                   = cuda/cpu
+# 2. num_models (Optional)    = number of models to use, default as -1 to use all models
+# 3. ani_aev (Optional)       = cuaev/pyaev, default as cuaev
+# 4. ani_neighbor (Optional)  = full/half, default as full nbrlist
+# 5. ani_precision (Optional) = single/double, default as single
+pair_style     ani 5.1 ${ani_model_file} ${ani_device} ${ani_num_models} ${ani_aev} ${ani_neighbor} ${ani_precision}
 pair_coeff     * *
 
-# Settings: temperature at 300 K, timestep (0.5 fs)
-velocity       all create 2500.0 12345 rot yes mom yes dist gaussian
-fix            1 all langevin 2500.0 2500.0 50.0 12345
-fix            2 all nve
-timestep       0.5  # 0.1
-
-# Output: 
-dump           1 all custom 100 logs/${timestamp}.lammpstrj id element x y z ix iy iz
-dump_modify    1 element H C N O F S Cl
-dump           2 all dcd 100 logs/${timestamp}.dcd
+# Thermo
 thermo_style   custom step pe ke etotal temp press vol density
 thermo         100
 
-# Run the simulation: first run (1 ns)
-run            2000000  # 10000000
+# Dump
+# dump           1 all custom 50 ${log_dir}/${timestamp}.lammpstrj id element x y z ix iy iz
+# dump_modify    1 element H C N O F S Cl
+dump           2 all dcd 100 ${log_dir}/${timestamp}.dcd
 
-# write final state of simulation
-write_data    logs/${timestamp}.final
+# Settings: temperature at 2500 K
+velocity       all create 2500.0 12345 rot yes mom yes dist gaussian
+fix            1 all langevin 2500.0 2500.0 50.0 12345
+fix            2 all nve
+timestep       ${timestep}
+
+
+# Run the simulation: first run (1 ns)
+run            ${run_steps}  # 10000000
+
+# Write final state of simulation
+write_data    ${log_dir}/${timestamp}.final

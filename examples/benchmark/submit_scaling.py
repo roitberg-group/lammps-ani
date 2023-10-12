@@ -45,7 +45,7 @@ def setup_and_run_job(num_gpus, data_file, job_name, submit=False, weak_scaling=
         ntasks_per_node=ntasks_per_node,
         cpus_per_task=1,
         partition="hpg-ai",
-        reservation="roitberg2",
+        # reservation="roitberg2",
         qos="roitberg",
         account="roitberg",
         gres=gres,

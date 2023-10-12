@@ -137,11 +137,11 @@ def generate_atoms_data(mol, bond_types):
     positions = mol.get_positions()
     symbols = mol.get_chemical_symbols()
     numbers = mol.get_atomic_numbers()
-    residuenumbers = mol.get_array("residuenumbers")
     types = [NUMBERS_TO_LMP_TYPES[i] for i in numbers]
     for i in range(num_atoms):
         position = positions[i]
         if bond_types:
+            residuenumbers = mol.get_array("residuenumbers")
             line = f"{i+1}\t{residuenumbers[i]}\t{types[i]}\t{position[0]}\t{position[1]}\t{position[2]}\t# {symbols[i]}\n"
         else:
             line = f"{i+1}\t{types[i]}\t{position[0]}\t{position[1]}\t{position[2]}\t# {symbols[i]}\n"

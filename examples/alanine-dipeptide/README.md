@@ -52,6 +52,25 @@ The LAMMPS input file for the SHAKE simulation is `in.shake.lammps`. Here are th
 
 The SHAKE algorithm allows for a larger timestep (e.g., 2 fs) without compromising stability. Without SHAKE, the simulation may fail quickly due to high-frequency bond vibrations.
 
+
+### 5. Run Simulation with HMR
+HMR: Hydrogen Mass Repartitioning allows a larger timestep with very easy setup
+
+Apply HMR using openmm and generate per atom mass data file.
+```
+python ../apply_hmr.py alanine-dipeptide.vacuum.pdb alanine-dipeptide.vacuum.hmr_mass.data 
+```
+Then copy the content of the output file into the lammps data file, `Hmrmass` section provides the per atom mass. 
+
+Without HMR, when using a timestep of 2.3 fs in vacuum, the structure break very quickly within 100 steps.
+With HMR, it runs normally even at 2.5fs.
+
+In the input file, recenter command is very useful, otherwise the protein in vacuum will shift a lot and not easy to visulize.
+```
+# Keep the system's center-of-mass at the box center every timestep.
+fix            3 all recenter 0.5 0.5 0.5
+```
+
 ### 5. Ramachandran Plot
 Generate a Ramachandran plot to visualize the distribution of the backbone dihedral angles (phi and psi) and assess the conformational states visited by the alanine dipeptide.
 You could run `plot_ramachandran.py` to generate the plot. The script will read the trajectory files and plot the dihedral angles over time.

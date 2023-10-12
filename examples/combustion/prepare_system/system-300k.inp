@@ -1,0 +1,15 @@
+
+tolerance 2.0
+filetype pdb
+output combustion-0.25-300k.pdb
+
+# box size is 260.71502305824237.
+structure methane.pdb
+  number 33334
+  inside box 1. 1. 1. 259.71502305824237 259.71502305824237 259.71502305824237
+end structure
+
+structure O2.pdb
+  number 66668
+  inside box 1. 1. 1. 259.71502305824237 259.71502305824237 259.71502305824237
+end structure

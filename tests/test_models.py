@@ -105,7 +105,12 @@ def test_models(runpbc, device, use_double, use_cuaev, use_fullnbr, modelfile, v
             )
         return newmodel
 
-    model_ref_all_models = all_models[modelfile]["model"]().to(dtype).to(device)
+    model_info = all_models[modelfile]
+    if "kwargs" in model_info:
+        kwargs = model_info["kwargs"]
+    else:
+        kwargs = {}
+    model_ref_all_models = model_info["model"](**kwargs).to(dtype).to(device)
     model_ref_all_models = set_ref_cuda_aev(model_ref_all_models, use_cuaev)
 
     if virial_flag and not isinstance(model_ref_all_models, torchani.models.BuiltinModel):

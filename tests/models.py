@@ -20,6 +20,52 @@ def ANI2x_Model():
     return model
 
 
+def ANI1x_NR_Model(use_repulsion):
+    from torchani.models import BuiltinModel, _load_ani_model
+    from pathlib import Path
+
+    def ANI1x_NR(**kwargs) -> BuiltinModel:
+        """
+        Machine learning interatomic potential for condensed-phase reactive chemistry
+
+        From: https://github.com/atomistic-ml/ani-1xnr
+
+        Reference:
+        ZHANG, S.; Makoś, M.; Jadrich, R.; Kraka, E.; Barros, K.; Nebgen, B.; Tretiak,
+        S.; Isayev, O.; Lubbers, N.; Messerly, R.; Smith, J. Exploring the Frontiers
+        of Chemistry with a General Reactive Machine Learning Potential. 2022.
+        https://doi.org/10.26434/chemrxiv-2022-15ct6-v2.
+        """
+        info_file = Path('../external/ani-1xnr/model/ani-1xnr.info').absolute()
+        state_dict_file = None
+        return _load_ani_model(state_dict_file, info_file, use_neurochem_source=True, **kwargs)
+
+    model = ANI1x_NR(
+        periodic_table_index=True,
+        model_index=None,
+        cell_list=False,
+        use_cuaev_interface=True,
+        use_cuda_extension=True,
+        # [TODO] we would need to set repulsion if we need to run ANI1x_NR with ASE calculator
+        # pretrained=False,
+        # repulsion=use_repulsion,
+        # # The repulsion cutoff is set to 5.1, but ANIdr model actually uses a cutoff of 5.3
+        # repulsion_kwargs={
+        #     "symbols": ("H", "C", "N", "O"),
+        #     "cutoff": 5.1,
+        #     "cutoff_fn": "smooth2",
+        # },
+    )
+
+    # The ANI1x_NR model does not have repulsion calculator, so the repulsion calculator here is
+    # an external potential added on top of the ANI1x_NR model to prevent atoms from collapsing.
+    if use_repulsion:
+        model.rep_calc = RepulsionXTB(cutoff=5.1, symbols=("H", "C", "N", "O"), cutoff_fn="smooth2")
+    else:
+        model.rep_calc = None
+    return model
+
+
 def ANI2x_Repulsion_Model():
     elements = ("H", "C", "N", "O", "S", "F", "Cl")
 
@@ -104,7 +150,7 @@ def ANI2x_Solvated_Alanine_Dipeptide_Model():
         import ani_engine.utils
     except ImportError:
         raise RuntimeError("ani_engine is not installed, cannot export ANI2x_Solvated_Alanine_Dipeptide_Model")
-    engine = ani_engine.utils.load_engine("../external/ani_engine_models/20230828_134151-k9kllka2-2x_alanine-dipeptide-water-orca")
+    engine = ani_engine.utils.load_engine("../external/ani_engine_models/20230913_131808-zdy6gco1-2x-with-solvated-alanine-dipeptide-b973c-def2-mtzvp")
     model = engine.model.to_builtins(engine.self_energies, use_cuaev_interface=True)
     model.rep_calc = None
     return model
@@ -113,6 +159,7 @@ def ANI2x_Solvated_Alanine_Dipeptide_Model():
 all_models_ = {
     "ani2x.pt": {"model": ANI2x_Model, "unittest": True},
     "ani2x_repulsion.pt": {"model": ANI2x_Repulsion_Model, "unittest": True},
+    "ani1x_nr.pt": {"model": ANI1x_NR_Model, "unittest": True, "kwargs": {"use_repulsion": False}},
     "ani2x_solvated_alanine_dipeptide.pt": {"model": ANI2x_Solvated_Alanine_Dipeptide_Model, "unittest": True},
     # Because ani2x_ext uses public torchani that has legacy aev code, we cannot run unittest for it.
     "ani2x_ext0_repulsion.pt": {"model": ANI2xExt_Model, "unittest": False, "kwargs": {"model_choice": 0}},

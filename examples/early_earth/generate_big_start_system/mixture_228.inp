@@ -1,0 +1,29 @@
+tolerance 2.0
+output mixture_228.xyz
+filetype xyz
+
+structure H2.xyz
+  number 16
+  inside box 1.0 1.0 1.0 11.1 11.1 11.1
+end structure
+
+structure H2O.xyz
+  number 14
+  inside box 1.0 1.0 1.0 11.1 11.1 11.1
+end structure
+
+structure CO.xyz
+  number 14
+  inside box 1.0 1.0 1.0 11.1 11.1 11.1
+end structure
+
+structure NH3.xyz
+  number 14
+  inside box 1.0 1.0 1.0 11.1 11.1 11.1
+end structure
+
+structure CH4.xyz
+  number 14
+  inside box 1.0 1.0 1.0 11.1 11.1 11.1
+end structure
+

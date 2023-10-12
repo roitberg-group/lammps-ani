@@ -160,7 +160,6 @@ all_models_ = {
     "ani2x.pt": {"model": ANI2x_Model, "unittest": True},
     "ani2x_repulsion.pt": {"model": ANI2x_Repulsion_Model, "unittest": True},
     "ani1x_nr.pt": {"model": ANI1x_NR_Model, "unittest": True, "kwargs": {"use_repulsion": False}},
-    "ani1x_nr_repulsion.pt": {"model": ANI1x_NR_Model, "unittest": False, "kwargs": {"use_repulsion": True}},
     "ani2x_solvated_alanine_dipeptide.pt": {"model": ANI2x_Solvated_Alanine_Dipeptide_Model, "unittest": True},
     # Because ani2x_ext uses public torchani that has legacy aev code, we cannot run unittest for it.
     "ani2x_ext0_repulsion.pt": {"model": ANI2xExt_Model, "unittest": False, "kwargs": {"model_choice": 0}},

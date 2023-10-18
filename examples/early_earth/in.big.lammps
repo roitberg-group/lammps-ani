@@ -55,7 +55,7 @@ velocity       all create 0.0 12345 rot yes mom yes dist gaussian
 timestep       ${timestep}
 
 # Generate restart files every 100000 steps
-restart        100000 ${log_dir}/${timestamp}.restart.0 ${log_dir}/${timestamp}.restart.1
+# restart        100000 ${log_dir}/${timestamp}.restart.0 ${log_dir}/${timestamp}.restart.1
 
 # 0 K to 300 K in the first 100 ps
 fix            1 all langevin 0.0 300.0 100.0 12345

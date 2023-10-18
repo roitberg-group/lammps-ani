@@ -43,7 +43,7 @@ conda install pytorch==1.13.1 torchvision==0.14.1 torchaudio==0.13.1 pytorch-cud
 conda install --no-deps -c conda-forge cudnn=8.3.2
 # lapack and blas are needed for plumed
 conda install -c conda-forge lapack
-conda install -c conda-forge gsl
+conda install --no-deps -c conda-forge gsl
 ```
 
 You can build LAMMPS-ANI from source using the following commands:

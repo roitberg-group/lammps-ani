@@ -37,8 +37,8 @@ ENV OVERRIDE_KOKKOS_ARCH=${OVERRIDE_KOKKOS_ARCH}
 SHELL ["/bin/bash", "-cu"]
 
 # install some packages
-# RUN apt-get update && \
-#     apt-get install -y libnetcdf-dev
+RUN apt-get update && \
+    apt-get install -y libgsl-dev
 
 # Copy files into container
 COPY . $LAMMPS_ANI_ROOT

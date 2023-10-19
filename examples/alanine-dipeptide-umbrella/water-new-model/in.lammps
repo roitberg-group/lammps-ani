@@ -67,6 +67,7 @@ minimize       1.0e-8 1.0e-8 1000 10000
 # run nvt
 # fix            1 all langevin 300.0 300.0 100.0 12345
 # fix            2 all nve
+fix            4 all plumed plumedfile ${log_dir}/${label}.plumed.dat outfile ${log_dir}/${label}.plumed.log
 fix            0 all npt temp 300.0 300.0 100.0 iso 1.0 1.0 500.0
 # Keep the system's center-of-mass at the box center every timestep.
 fix            3 all recenter 0.5 0.5 0.5
@@ -79,7 +80,6 @@ run           20000
 undump         2
 reset_timestep 0
 dump           2 all dcd 100 ${log_dir}/${label}.prod.dcd
-fix            4 all plumed plumedfile ${log_dir}/${label}.plumed.dat outfile ${log_dir}/${label}.plumed.log
 
 # Run the simulation: (100 ps)
 run            200000

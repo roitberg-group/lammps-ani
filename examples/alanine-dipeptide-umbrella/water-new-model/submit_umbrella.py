@@ -23,7 +23,7 @@ for i, phi in enumerate(phi_values):
 
         command = f"python run_one.py alanine-dipeptide.npt.data --kokkos --num_gpus=1 --input_file=in.lammps --log_dir={log_dir} --ani_model_file='ani2x_solvated_alanine_dipeptide.pt' --run_name=umbrella --ani_num_models=1 --timestep=0.5 --label={label} --run"
         # read slurm template file
-        with open('submit.lmp.blue.template.sh', 'r') as file:
+        with open('submit.lmp.expanse.template.sh', 'r') as file:
             slurm_template = file.read()
         # add command to template
         slurm_template += '\n' + command + '\n'

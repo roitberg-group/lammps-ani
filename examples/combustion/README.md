@@ -17,6 +17,10 @@ python analyze.py prepare_system/combustion-0.25-300k.pdb logs/2023-09-25-125628
 
 
 Result:
+```
+python plot.py
+```
+
 ![](analyze/2023-09-25-125628.988569.png)
 
 ![](CombustionSystem.png)

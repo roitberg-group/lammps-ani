@@ -126,7 +126,7 @@ def neighborlist_to_fragment(atom_index12, species):
     df_per_frag.columns = ['labels', 'collected_symbols']
     # print(f"finish neighborlist_to_fragment 2, time: {time.time() - start:.2f} s")
 
-    if True:
+    if False:
         # using ase to get formula
         # Assuming you have ase.Atoms installed and available, you can get the chemical formula:
         df_per_frag['formula'] = cudf.from_pandas(df_per_frag.to_pandas()['collected_symbols'].apply(lambda x: ase.Atoms(x).get_chemical_formula()))  # 2s
@@ -148,38 +148,40 @@ def neighborlist_to_fragment(atom_index12, species):
     return df_per_atom.to_pandas(), df_per_frag.to_pandas()
 
 
-def analyze_all_frames(top_file, traj_file, batch_size, timestep, dump_interval):
+def analyze_all_frames(top_file, traj_file, batch_size, timestep, dump_interval, stride, skip=0):
     # Get the file size to decide whether to load the entire trajectory or iterate through it
     file_size = os.path.getsize(traj_file)  # File size in bytes
     max_size = 30e9  # 30 GB as the threshold size
-    frame_offset = 0  # Initialize the frame offset
+    frame_offset = skip  # Initialize the frame offset
 
     if file_size < max_size:
         # Load the entire trajectory if the file size is below the threshold
         start = time.time()
         trajectory = md.load(traj_file, top=top_file)
+        if skip != 0 or stride != 1:
+            warnings.warn(f"Stride={stride} and skip={skip} parameters are ignored when the entire trajectory is small and loaded into memory")
         stride = 1
+        frame_offset = 0
         print(
             f"finish reading '{traj_file}', total loading time: {time.time() - start:.2f} s"
         )
         analyze_all_frames_for_a_chunk(trajectory, top_file, traj_file, batch_size, timestep, dump_interval, frame_offset, stride)
     else:
         # Iterate through trajectory in chunks if the file size is above the threshold
-        stride = 5  # The stride parameter
         chunk_index = 0
         import pytraj as pt
         traj_iterator = pt.iterload(traj_file, top=top_file)
         total_frames = len(traj_iterator)
-        print(f"total frames: {total_frames}, stride: {stride}")
-        chunk_size = 1000
+        print(f"total frames: {total_frames}, stride: {stride}, skip: {skip}")
+        chunk_size = 100
         total_chunks = total_frames // stride // chunk_size
-        for chunk in md.iterload(traj_file, top=top_file, chunk=chunk_size, stride=stride):
+        for chunk in md.iterload(traj_file, top=top_file, chunk=chunk_size, stride=stride, skip=skip):
             print(f"=== chunk {chunk_index}/{total_chunks} ===")
-            frame_offset = analyze_all_frames_for_a_chunk(chunk, top_file, traj_file, batch_size, timestep, dump_interval, frame_offset, stride)
+            frame_offset = analyze_all_frames_for_a_chunk(chunk, top_file, traj_file, batch_size, timestep, dump_interval, frame_offset, stride, skip)
             chunk_index += 1
 
 
-def analyze_all_frames_for_a_chunk(trajectory, top_file, traj_file, batch_size, timestep, dump_interval, frame_offset, stride):
+def analyze_all_frames_for_a_chunk(trajectory, top_file, traj_file, batch_size, timestep, dump_interval, frame_offset, stride, skip):
     assert torch.cuda.is_available(), "CUDA is required to run analysis"
     device = "cuda"
 
@@ -258,11 +260,12 @@ def analyze_all_frames_for_a_chunk(trajectory, top_file, traj_file, batch_size, 
     # TODO: current solution is to appending csv for every chunk, however if we didn't split chunks and the program crashes, we will lose all the data
     # Append to the existing CSV file instead of overwriting it
     write_mode = "a" if frame_offset != 0 else "w"
-    df_per_frame_list_export.to_csv(f"{output_directory}/{Path(traj_file).stem}.csv", mode=write_mode, header=(frame_offset == 0))
+    csv_file = f"{output_directory}/{Path(traj_file).stem}.{skip}.{stride}.csv"
+    df_per_frame_list_export.to_csv(csv_file, mode=write_mode, header=(frame_offset == 0))
 
 
     # plot(all_formula_counts_export, f"{output_directory}/{Path(traj_file).stem}.png")
-    print(f"Analysis complete and exported to {output_directory}/{Path(traj_file).stem}.csv")
+    print(f"Analysis complete and exported to {csv_file}")
     new_frame_offset = frame_offset + (len(trajectory) * stride)
     return new_frame_offset
 
@@ -407,9 +410,24 @@ def count_glycine(top_file, traj_file, csv_file):
 
 
 if __name__ == "__main__":
-    # adding usage examples into the parser help
-    # python analyze.py start.pdb traj.dcd --frame=2000 --frame-end=2060
-    # python analyze.py start.pdb traj.dcd --csv=fragments.csv
+    """
+    # extract a single frame as pdb
+    python analyze.py mixture_228000.pdb logs/2023-08-28-022042.908705.dcd --frame=14440
+    # extract a slice of trajectory
+    python analyze.py mixture_228000.pdb logs/2023-08-28-022042.908705.dcd --frame=14440 --frame_end=14450
+
+    # analyze the fragments of the whole trajectory and save as a csv file
+    python analyze.py mixture_228000.pdb logs-big/2023-08-28-022042.908705.dcd -t 0.25 -i 50 -b 1
+
+    # analyze parallely
+    python analyze.py mixture_228000.pdb logs-big/2023-08-28-022042.908705.dcd -t 0.25 -i 50 -b 1 --stride=4 --skip=0
+    python analyze.py mixture_228000.pdb logs-big/2023-08-28-022042.908705.dcd -t 0.25 -i 50 -b 1 --stride=4 --skip=1
+    python analyze.py mixture_228000.pdb logs-big/2023-08-28-022042.908705.dcd -t 0.25 -i 50 -b 1 --stride=4 --skip=2
+    python analyze.py mixture_228000.pdb logs-big/2023-08-28-022042.908705.dcd -t 0.25 -i 50 -b 1 --stride=4 --skip=3
+
+    # identify glycines from all C2H5NO2 molecules
+    python analyze.py mixture_228000.pdb logs-big/2023-08-28-022042.908705.dcd --csv_file=analyze/2023-08-28-022042.908705.csv
+    """
     parser = argparse.ArgumentParser(description="Analyze trajectory", formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                      epilog="Usage examples:\n1. python analyze.py start.pdb traj.dcd --frame=2000 --frame-end=2060"
                                      "\n2. python analyze.py start.pdb traj.dcd --timestep 0.5 --dump_interval 100 --batch_size 1")
@@ -418,6 +436,8 @@ if __name__ == "__main__":
     parser.add_argument("-t", "--timestep", type=float, help="timestep used in the simulation (fs)", default=0.5)
     parser.add_argument("-i", "--dump_interval", type=int, help="how many timesteps it dump once", default=100)
     parser.add_argument("-b", "--batch_size", type=int, help="batch size", default=1)
+    parser.add_argument("--stride", type=int, help="stride that will be used when analyzing all the trajectory fragments", default=1)
+    parser.add_argument("--skip", type=int, help="Skip first n frames, combined with stride, we could divide the trajectory into groups to analyze parallelly", default=0)
     parser.add_argument("--csv_file", type=str, help="csv file that contains the fragments information to count glycine for molecules has formula of C2H5NO2", default=None)
     parser.add_argument("--frame", type=int, help="Frame number to extract with bonds", default=None)
     parser.add_argument("--frame-end", type=int, help="If defined, will extract all frames from frame to frame-end", default=None)
@@ -444,4 +464,7 @@ if __name__ == "__main__":
         args.traj_file,
         batch_size=args.batch_size,
         timestep=args.timestep,
-        dump_interval=args.dump_interval)
+        dump_interval=args.dump_interval,
+        stride=args.stride,
+        skip=args.skip,
+        )

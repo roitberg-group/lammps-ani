@@ -72,6 +72,16 @@ python run_one.py mixture_228000.data --kokkos --num_gpus=8 --input_file=in.big.
 python ../combustion/analyze.py mixture_228000.pdb logs/2023-08-28-022042.908705.dcd --frame=14440
 # extract a single frame
 python ../combustion/analyze.py mixture_228000.pdb logs/2023-08-28-022042.908705.dcd --frame=14440 --frame_end=14450
+
+# analyze the fragments of the whole trajectory and save as a csv file
+python ../combustion/analyze.py mixture_228000.pdb logs-big/2023-08-28-022042.908705.dcd -t 0.25 -i 50 -b 1
+
+# analyze parallely
+python ../combustion/analyze.py mixture_228000.pdb logs-big/2023-08-28-022042.908705.dcd -t 0.25 -i 50 -b 1 --stride=4 --skip=0
+python ../combustion/analyze.py mixture_228000.pdb logs-big/2023-08-28-022042.908705.dcd -t 0.25 -i 50 -b 1 --stride=4 --skip=1
+python ../combustion/analyze.py mixture_228000.pdb logs-big/2023-08-28-022042.908705.dcd -t 0.25 -i 50 -b 1 --stride=4 --skip=2
+python ../combustion/analyze.py mixture_228000.pdb logs-big/2023-08-28-022042.908705.dcd -t 0.25 -i 50 -b 1 --stride=4 --skip=3
+
 # identify glycines from all C2H5NO2 molecules
 python ../combustion/analyze.py mixture_228000.pdb logs-big/2023-08-28-022042.908705.dcd --csv_file=analyze/2023-08-28-022042.908705.csv
 ```

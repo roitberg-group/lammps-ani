@@ -9,8 +9,8 @@ from pathlib import Path
 
 log_dir = "logs-umbrella"
 plot_file = f"PMF_fast_mbar.png"
-pdb = "alanine-dipeptide.vacuum.pdb"
-topology = mdtraj.load_pdb(pdb)
+# pdb = "alanine-dipeptide.vacuum.pdb"
+# topology = mdtraj.load_pdb(pdb)
 
 # psi_indices = [6, 8, 14, 16]
 # phi_indices = [4, 6, 8, 14]
@@ -117,6 +117,7 @@ data_PMF = PMF.reshape((l_PMF, l_PMF))
 flipped_data_PMF = np.flipud(data_PMF)
 
 # imshow
+flipped_data_PMF = flipped_data_PMF - flipped_data_PMF.min()
 im = plt.imshow(flipped_data_PMF, extent = (-180, 180, -180, 180), cmap='RdYlBu_r')
 
 # contour

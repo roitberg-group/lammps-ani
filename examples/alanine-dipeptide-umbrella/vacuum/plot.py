@@ -117,6 +117,7 @@ data_PMF = PMF.reshape((l_PMF, l_PMF))
 flipped_data_PMF = np.flipud(data_PMF)
 
 # imshow
+flipped_data_PMF = flipped_data_PMF - flipped_data_PMF.min()
 im = plt.imshow(flipped_data_PMF, extent = (-180, 180, -180, 180), cmap='RdYlBu_r')
 
 # contour

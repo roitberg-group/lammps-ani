@@ -82,4 +82,4 @@ fix            2 all nve
 run            800000
 
 # Write final state of simulation
-write_data    ${log_dir}/${timestamp}.final
+# write_data    ${log_dir}/${timestamp}.final

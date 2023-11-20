@@ -168,6 +168,8 @@ def analyze_all_frames(top_file, traj_file, batch_size, timestep, dump_interval,
         analyze_all_frames_for_a_chunk(trajectory, top_file, traj_file, batch_size, timestep, dump_interval, frame_offset, stride)
     else:
         # Iterate through trajectory in chunks if the file size is above the threshold
+        stride = 2  # The stride parameter
+        warnings.warn("Using stride=2 for large trajectory files")
         chunk_index = 0
         import pytraj as pt
         traj_iterator = pt.iterload(traj_file, top=top_file)
@@ -320,6 +322,12 @@ def count_glycine_for_a_frame_and_set_GLY_resname(top_file, traj_file, frame_num
 
     df_per_atom, df_per_frag = neighborlist_to_fragment(atom_index12, species)
     interesting_formula = {"C2H5NO2": {"smiles": "NCC(=O)O", "resname": "GLY"}}
+    # interesting_formula = {"C2H5NO2": {"smiles": "NCC(=O)O", "resname": "GLY"}, "C21H32N3O3": {"smiles": "NCC(=O)O", "resname": "C21"}, "C4H8N2O3": {"smiles": "C(C(=O)NCC(=O)O)N", "resname": "GLY"},
+    #                        "C6H12N2O2": {"smiles": "CC(C(=O)NC)NC(=O)C", "resname": "ALA"} }
+
+    # interesting_formula = {"C21H32N3O3": {"smiles": "NCC(=O)O", "resname": "C21"}, "C4H8N2O3": {"smiles": "C(C(=O)NCC(=O)O)N", "resname": "GLY"},
+    #                        "C6H12N2O2": {"smiles": "CC(C(=O)NC)NC(=O)C", "resname": "ALA"} }
+    # interesting_formula = {"C3H7NO2": {"smiles": "CC(C(=O)O)N", "resname": "ALA"} }
 
     df_per_frag_filtered = df_per_frag[df_per_frag['formula'].isin(interesting_formula.keys())]
     # breakpoint()
@@ -327,8 +335,10 @@ def count_glycine_for_a_frame_and_set_GLY_resname(top_file, traj_file, frame_num
     atoms_df, bonds_df = traj.topology.to_dataframe()
     num_filtered_fragments = df_per_frag_filtered.shape[0]
     glycine_count = 0
+
     for idx in range(num_filtered_fragments):
         fragment = df_per_frag_filtered.iloc[idx]
+        print(idx, fragment.formula, fragment.atom_indices)
         # TODO we could resemble the molecule and check if it has the same smiles
         sliced_atoms = traj.atom_slice(fragment.atom_indices)
         # Save the sliced atoms to a temporary xyz file and read it with RDKit
@@ -389,15 +399,22 @@ def count_glycine(top_file, traj_file, csv_file):
 
     total_glycine_count = 0
     glycine_counts = []  # List to store glycine counts for each row
-    for index, row in df_C2H5NO2.iterrows():
-        count_number = row['counts']
-        frame_number = row['frame']
+    print("total frames", len(df_C2H5NO2))
+    for index, row in enumerate(df_C2H5NO2.itertuples()):
+        count_number = row.counts
+        frame_number = row.frame
         _, _, glycine_count = count_glycine_for_a_frame_and_set_GLY_resname(top_file, traj_file, frame_number)
         total_glycine_count += glycine_count
         glycine_counts.append(glycine_count)  # Append the count to the list
         import sys
-        print("frame_number: ", frame_number, ", Total C2H5NO2 count: ", count_number, ", Total so far: ", total_glycine_count)
+        print("frame_number: ", frame_number, ", formula: ", row.formula,", Total C2H5NO2 count: ", count_number, ", Total so far: ", total_glycine_count)
         sys.stdout.flush()
+
+        # Save the DataFrame to a CSV file every 1000 frames for robustness.
+        if index % 1000 == 0:
+            df_C2H5NO2.loc[df_C2H5NO2.index[:index+1], 'glycine_count'] = glycine_counts[:index+1]
+            temp_csv_name = Path(csv_file).with_name(f"{Path(csv_file).stem}_glycine_count_temp.csv")
+            df_C2H5NO2.to_csv(temp_csv_name, index=False)
 
     # Add the glycine_counts list as a new column to the DataFrame
     df_C2H5NO2['glycine_count'] = glycine_counts

@@ -59,7 +59,13 @@ HMR: Hydrogen Mass Repartitioning allows a larger timestep with very easy setup
 Apply HMR using openmm and generate per atom mass data file.
 ```
 python ../apply_hmr.py alanine-dipeptide.vacuum.pdb alanine-dipeptide.vacuum.hmr_mass.data 
+
+
+python ../apply_hmr.py alanine-dipeptide.pdb alanine-dipeptide.water.hmr_mass.data
+echo "" >> alanine-dipeptide.water.hmr.npt.data
+cat alanine-dipeptide.water.hmr_mass.data >> alanine-dipeptide.water.hmr.npt.data
 ```
+
 Then copy the content of the output file into the lammps data file, `Hmrmass` section provides the per atom mass. 
 
 Without HMR, when using a timestep of 2.3 fs in vacuum, the structure break very quickly within 100 steps.

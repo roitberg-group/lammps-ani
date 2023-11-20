@@ -42,8 +42,8 @@ Install PyTorch and cuDNN using Conda.
 conda install pytorch==1.13.1 torchvision==0.14.1 torchaudio==0.13.1 pytorch-cuda=11.6 -c pytorch -c nvidia
 conda install --no-deps -c conda-forge cudnn=8.3.2
 # lapack and blas are needed for plumed
-conda install -c conda-forge lapack
-conda install --no-deps -c conda-forge gsl
+conda install -c conda-forge lapack=3.9.0
+conda install --no-deps -c conda-forge gsl=2.7.1
 ```
 
 You can build LAMMPS-ANI from source using the following commands:

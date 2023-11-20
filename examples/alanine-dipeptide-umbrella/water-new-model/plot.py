@@ -9,8 +9,6 @@ from pathlib import Path
 
 log_dir = "logs-umbrella"
 plot_file = f"PMF_fast_mbar.png"
-# pdb = "alanine-dipeptide.npt.pdb"
-# topology = mdtraj.load_pdb(pdb)
 
 # psi_indices = [6, 8, 14, 16]
 # phi_indices = [4, 6, 8, 14]

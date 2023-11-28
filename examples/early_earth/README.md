@@ -40,7 +40,7 @@ python run_one.py mixture_228000.data --kokkos --num_gpus=1 --input_file=in.lamm
 
 
 ### Generate starting geometries
-Please check folder [generate_big_start_system](generate_big_start_system/).
+Please check folder [data/generate_big_start_system](data/generate_big_start_system/).
 
 Some note to keep in mind: althought the box size is 12.1 Å, we need to set it as 11.1 Å at packmol to make some buffer space for the periodic boundary condition.
 ```

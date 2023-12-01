@@ -1,0 +1,30 @@
+# sqrt(100000, 3) * 12 = 557
+tolerance 2.0
+output mixture_22800000.pdb
+filetype pdb 
+
+structure H2.pdb
+  number 1600000
+    inside box 1.0 1.0 1.0 556.0 556.0 556.0
+end structure
+
+structure H2O.pdb
+  number 1400000
+    inside box 1.0 1.0 1.0 556.0 556.0 556.0
+end structure
+
+structure CO.pdb
+  number 1400000
+    inside box 1.0 1.0 1.0 556.0 556.0 556.0
+end structure
+
+structure NH3.pdb
+  number 1400000
+    inside box 1.0 1.0 1.0 556.0 556.0 556.0
+end structure
+
+structure CH4.pdb
+  number 1400000
+    inside box 1.0 1.0 1.0 556.0 556.0 556.0
+end structure
+

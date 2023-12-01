@@ -64,7 +64,7 @@ def setup_and_run_job(num_gpus, data_file, job_name, submit=False, weak_scaling=
         'echo "Number of Tasks Allocated      = $SLURM_NTASKS"',
         'echo "Number of Cores/Task Allocated = $SLURM_CPUS_PER_TASK"',
         # module load and setup environment variables
-        "module load cuda/11.4.3 gcc/9.3.0 openmpi/4.0.5 cmake/3.21.3 git/2.30.1",
+        "module load cuda/11.4.3 gcc/9.3.0 openmpi/4.1.5 cmake/3.21.3 git/2.30.1",
         'export LAMMPS_ANI_ROOT="/blue/roitberg/apps/lammps-ani"',
         "export LAMMPS_ROOT=${LAMMPS_ANI_ROOT}/external/lammps/",
         "export LAMMPS_PLUGIN_PATH=${LAMMPS_ANI_ROOT}/build/",

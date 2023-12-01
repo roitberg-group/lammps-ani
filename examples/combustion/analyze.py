@@ -147,7 +147,7 @@ def neighborlist_to_fragment(atom_index12, species):
 
     return df_per_atom.to_pandas(), df_per_frag.to_pandas()
 
-
+@torch.inference_mode()
 def analyze_all_frames(top_file, traj_file, batch_size, timestep, dump_interval, stride, skip=0):
     # Get the file size to decide whether to load the entire trajectory or iterate through it
     file_size = os.path.getsize(traj_file)  # File size in bytes
@@ -165,7 +165,7 @@ def analyze_all_frames(top_file, traj_file, batch_size, timestep, dump_interval,
         print(
             f"finish reading '{traj_file}', total loading time: {time.time() - start:.2f} s"
         )
-        analyze_all_frames_for_a_chunk(trajectory, top_file, traj_file, batch_size, timestep, dump_interval, frame_offset, stride)
+        analyze_all_frames_for_a_chunk(trajectory, top_file, traj_file, batch_size, timestep, dump_interval, frame_offset, stride, skip=skip)
     else:
         # Iterate through trajectory in chunks if the file size is above the threshold
         stride = 2  # The stride parameter

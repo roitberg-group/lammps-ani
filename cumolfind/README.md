@@ -6,7 +6,7 @@ Purpose: This package is designed to analyze extensive trajectory data and ident
 
 - Users can define the molecules of interest in a custom database.
 - The program searches for these molecules in each frame of the trajectory. This is done by initially fragmenting the data to identify subgraphs, and then determining if these subgraphs match any molecules in the user's database.
-- The identified molecule information is saved in a dataframe for easy post-analysis. The dataframe includes the following headers: frame, local_frame, hash, formula, smiles, name, atom_indices, time.
+- The identified molecule information is saved in a dataframe for easy post-analysis.
 
 ## Environment Setup:
 
@@ -42,7 +42,7 @@ This utility builds a molecule database using the PubChemPy library. The databas
 cumolfind-molfind --traj_file [path/to/traj_file] --top_file [path/to/top_file] [other arguments]
 ```
 
-Use this command to analyze trajectory files and find molecules. It export wwo files:
+Use this command to analyze trajectory files and find molecules. It exports two files:
 
 - `{traj_file}_formula.pq`: Database with "frame, local_frame, formula, count, time".
 - `{traj_file}_molecule.pq`: Database with "frame, local_frame, hash, formula, smiles, name, atom_indices, time".

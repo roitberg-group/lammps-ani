@@ -49,7 +49,7 @@ def setup_and_run_job(num_gpus, data_file, job_name, submit=False, weak_scaling=
         qos="roitberg",
         account="roitberg",
         gres=gres,
-        mem_per_cpu="100gb",
+        mem_per_cpu="30gb",
         time="120:00:00",
         output=output_filename,
     )
@@ -64,7 +64,7 @@ def setup_and_run_job(num_gpus, data_file, job_name, submit=False, weak_scaling=
         'echo "Number of Tasks Allocated      = $SLURM_NTASKS"',
         'echo "Number of Cores/Task Allocated = $SLURM_CPUS_PER_TASK"',
         # module load and setup environment variables
-        "module load cuda/11.4.3 gcc/9.3.0 openmpi/4.0.5 cmake/3.21.3 git/2.30.1",
+        "module load cuda/11.4.3 gcc/9.3.0 openmpi/4.1.5 cmake/3.21.3 git/2.30.1",
         'export LAMMPS_ANI_ROOT="/blue/roitberg/apps/lammps-ani"',
         "export LAMMPS_ROOT=${LAMMPS_ANI_ROOT}/external/lammps/",
         "export LAMMPS_PLUGIN_PATH=${LAMMPS_ANI_ROOT}/build/",
@@ -76,7 +76,7 @@ def setup_and_run_job(num_gpus, data_file, job_name, submit=False, weak_scaling=
         # run the job commands
         # "python run_one.py --help",
         # --allow_tf32
-        f"python run_one.py {data_file} --input_file=in.lammps --replicate='{replicate}' --kokkos --num_gpus={num_gpus} --run_steps=5000 --run_name='run' --log_dir={log_dir} --run"
+        f"python run_one.py {data_file} --input_file=in.lammps --replicate='{replicate}' --kokkos --num_gpus={num_gpus} --run_steps=5000 --run_name='run' --log_dir={log_dir} --ani_num_models=8 --run"
     ]
     commands = "\n".join(commands)
     if submit:

@@ -7,6 +7,7 @@ import warnings
 import networkx as nx
 import pandas as pd
 from ase.io import read
+from ase.data import chemical_symbols
 from cumolfind.fragment import get_netx_graph
 
 
@@ -42,13 +43,27 @@ interested_mol = [
 ]
 
 # DataFrame to store molecule data
-mol_data = pd.DataFrame(columns=["graph", "formula", "smiles", "name"])
+mol_data = pd.DataFrame(columns=["graph", "formula", "smiles", "name", "flatten_formula"])
 
 
 def is_CHNO_only(formula):
     # Regular expression to match non-CHNO elements
     non_CHNO = re.compile(r"[^CHNO0-9]")
     return not non_CHNO.search(formula)
+
+
+def generate_flatten_formula(atomic_numbers):
+    """
+    Generates a flattened formula from a list of atomic numbers using ASE's chemical data.
+
+    Parameters:
+    atomic_numbers (list): List of atomic numbers.
+
+    Returns:
+    str: A string representing the flattened formula.
+    """
+    element_symbols = [chemical_symbols[num] for num in atomic_numbers]
+    return ''.join(sorted(element_symbols))
 
 
 def create_graph_from_compound(compound):
@@ -99,8 +114,11 @@ def process_molecule(mol_name):
         pubchempy.download("SDF", temp.name, pubchem_mol.cid, record_type="3d", overwrite=True)
         ase_mol = read(temp.name)
 
+    atomic_nums = ase_mol.get_atomic_numbers()
     species = torch.tensor(ase_mol.get_atomic_numbers(), device=device).unsqueeze(0)
     positions = torch.tensor(ase_mol.get_positions(), dtype=torch.float32, device=device).unsqueeze(0)
+
+    # Create NetworkX graph
     netx_graph = get_netx_graph(species, positions, use_cell_list=False)
     verify_graph(pubchem_mol, netx_graph)
 
@@ -113,12 +131,13 @@ def process_molecule(mol_name):
         ase_mol.get_chemical_formula(),
         pubchem_mol.canonical_smiles,
         mol_name,
+        generate_flatten_formula(atomic_nums),
     ]
-
 
 # Process each molecule
 for mol in interested_mol:
     process_molecule(mol)
 
 # Save the DataFrame
+print(mol_data)
 mol_data.to_parquet("molecule_data.pq")

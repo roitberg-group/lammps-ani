@@ -13,7 +13,11 @@ Purpose: This package is designed to analyze extensive trajectory data and ident
 ```bash
 mamba create -n rapids-23.10 -c rapidsai -c conda-forge -c nvidia \
 cudf=23.10 cugraph=23.10 python=3.10 cuda-version=11.8 \
-pytorch jupyterlab
+pytorch jupyterlab \
+pubchempy ase mdtraj tqdm ambertools
+
+cd /path/to/torchani_sandbox
+python setup.py install --ext
 ```
 
 RAPIDS version 23.02 or later is required. This enables configuring PyTorch to use RAPIDS Memory Manager (RMM) for GPU memory allocation, facilitating effective memory sharing between RAPIDS and PyTorch.
@@ -40,6 +44,12 @@ This utility builds a molecule database using the PubChemPy library. The databas
 
 ```bash
 cumolfind-molfind --traj_file [path/to/traj_file] --top_file [path/to/top_file] [other arguments]
+```
+
+Example
+
+```bash
+cumolfind-molfind logs-big/2023-10-13-163952.474802.dcd_split/2023-10-13-163952.474802_0.9ns.dcd data/mixture_228000.pdb ../../cumolfind/data/small_molecule_data.pq --dump_interval=50 --timestep=0.25 --output_dir=test_analyze1 --num_segments=10 --segment_index=2 --time_offset=x
 ```
 
 Use this command to analyze trajectory files and find molecules. It exports two files:

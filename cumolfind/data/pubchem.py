@@ -8,15 +8,8 @@ import networkx as nx
 import pandas as pd
 from ase.io import read
 from ase.data import chemical_symbols
-from cumolfind.fragment import get_netx_graph
+from cumolfind.fragment import build_netx_graph_from_ase
 
-
-# Check if CUDA is available
-if not torch.cuda.is_available():
-    raise SystemError("CUDA is required to run this analysis. Please ensure a CUDA-capable GPU is available.")
-
-# Set device to CUDA
-device = "cuda"
 
 # List of molecules of interest
 interested_mol = [
@@ -114,18 +107,15 @@ def process_molecule(mol_name):
         pubchempy.download("SDF", temp.name, pubchem_mol.cid, record_type="3d", overwrite=True)
         ase_mol = read(temp.name)
 
-    atomic_nums = ase_mol.get_atomic_numbers()
-    species = torch.tensor(ase_mol.get_atomic_numbers(), device=device).unsqueeze(0)
-    positions = torch.tensor(ase_mol.get_positions(), dtype=torch.float32, device=device).unsqueeze(0)
-
     # Create NetworkX graph
-    netx_graph = get_netx_graph(species, positions, use_cell_list=False)
+    netx_graph = build_netx_graph_from_ase(ase_mol, use_cell_list=False)
     verify_graph(pubchem_mol, netx_graph)
 
     # Serialize netx_graph with pickle
     pickled_netx_graph = pickle.dumps(netx_graph)
 
     # Add data to the DataFrame
+    atomic_nums = ase_mol.get_atomic_numbers()
     mol_data.loc[len(mol_data)] = [
         pickled_netx_graph,
         ase_mol.get_chemical_formula(),

@@ -35,6 +35,8 @@ interested_mol = [
     "Valine",
 ]
 
+# interested_mol = ["Alanine", "Glycine"]
+
 # DataFrame to store molecule data
 mol_data = pd.DataFrame(columns=["graph", "formula", "smiles", "name", "flatten_formula"])
 
@@ -130,4 +132,5 @@ for mol in interested_mol:
 
 # Save the DataFrame
 print(mol_data)
-mol_data.to_parquet("molecule_data.pq")
+# mol_data.to_parquet("small_molecule_data.pq")
+mol_data.to_parquet("animal_acid.pq")

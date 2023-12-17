@@ -35,21 +35,43 @@ pip install -e .
 **Generating Molecule Database:**
 
 ```bash
-cumolfind-pubchem
+cd data
+python pubchem.py
 ```
 
-This utility builds a molecule database using the PubChemPy library. The database includes columns such as "fragment object, hash, formula, smiles, name".
+This utility builds a molecule database using the PubChemPy library. The database includes columns such as "graph, formula, smiles, name, flatten_formula".
 
 **Finding Molecules in Trajectory:**
 
 ```bash
-cumolfind-molfind --traj_file [path/to/traj_file] --top_file [path/to/top_file] [other arguments]
+cumolfind-molfind --help
+
+Analyze trajectory
+
+positional arguments:
+  traj_file             Trajectory file to be analyzed
+  top_file              Topology file to be analyzed
+  mol_pq                Molecule database file
+
+options:
+  -h, --help            show this help message and exit
+  --time_offset TIME_OFFSET
+                        Time offset for the trajectory
+  --dump_interval DUMP_INTERVAL
+                        How many timesteps between frame dumps
+  --timestep TIMESTEP   Timestep used in the simulation (fs)
+  --output_dir OUTPUT_DIR
+                        Output directory
+  --num_segments NUM_SEGMENTS
+                        Number of segments to divide the trajectory into
+  --segment_index SEGMENT_INDEX
+                        Index of the segment to analyze
 ```
 
 Example
 
 ```bash
-cumolfind-molfind logs-big/2023-10-13-163952.474802.dcd_split/2023-10-13-163952.474802_0.9ns.dcd data/mixture_228000.pdb ../../cumolfind/data/small_molecule_data.pq --dump_interval=50 --timestep=0.25 --output_dir=test_analyze1 --num_segments=10 --segment_index=2 --time_offset=x
+cumolfind-molfind logs-big/2023-10-13-163952.474802.dcd_split/2023-10-13-163952.474802_0.9ns.dcd data/mixture_228000.pdb ../../cumolfind/data/small_molecule_data.pq --time_offset=x --dump_interval=50 --timestep=0.25 --output_dir=test_analyze1 --num_segments=10 --segment_index=2
 ```
 
 Use this command to analyze trajectory files and find molecules. It exports two files:
@@ -73,3 +95,21 @@ cumolfind-split_traj --traj_file [path/to/traj_file] [other arguments]
 
 This command splits a large trajectory file into smaller segments, naming each segment with the suffix `traj_name_x.xns.dcd`, where `x.x` represents the time offset for the start of each segment.
 
+**Submit analysis job parallaly:**
+```bash
+python /blue/roitberg/apps/lammps-ani/cumolfind/submit_analysis.py --help
+usage: submit_analysis.py [-h] [-y] num_segments traj_dir top_file mol_pq
+
+Parallelize cumolfind analysis.
+
+positional arguments:
+  num_segments  Number of segments for each trajectory.
+  traj_dir      Directory containing trajectory files.
+  top_file      Topology file.
+  mol_pq        Molecule database file
+```
+
+Example
+```
+python /blue/roitberg/apps/lammps-ani/cumolfind/submit_analysis.py 2 /red/roitberg/22M_20231216_testrun/ /blue/roitberg/apps/lammps-ani/examples/early_earth/data/mixture_22800000.pdb /blue/roitberg/apps/lammps-ani/cumolfind/data/animal_acid.pq
+```

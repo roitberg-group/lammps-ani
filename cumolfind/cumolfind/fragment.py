@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 
 # TODO: use RMM allocator for pytorch
 
-timing = False
+timing = True
 PERIODIC_TABLE_LENGTH = 118
 species_dict = {1: "H", 6: "C", 7: "N", 8: "O"}
 # https://media.cheggcdn.com/media%2F5fa%2F5fad12c3-ee27-47fe-917a-f7919c871c63%2FphpEjZPua.png

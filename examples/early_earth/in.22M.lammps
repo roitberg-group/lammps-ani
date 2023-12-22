@@ -1,0 +1,338 @@
+# variables
+variable       lammps_ani_root getenv LAMMPS_ANI_ROOT
+variable       log_dir         index  logs
+# kokkos needs newton_pair on for reverse communication between gpus
+variable       newton_pair     index  off
+variable       timestamp       index  timestamp
+# configuration
+variable       data_file       index  none
+variable       timestep        index  timestep
+variable       run_steps       index  1000
+variable       replicate       index  "1 1 1"
+# ani variables
+variable       ani_model_file  index  none
+variable       ani_device      index  cuda
+variable       ani_num_models  index  1
+variable       ani_aev         index  cuaev
+variable       ani_neighbor    index  full
+variable       ani_precision   index  single
+
+# Intialization
+units          real
+atom_style     atomic
+
+neighbor       2.0 bin
+# check yes = only build if at least one atom has moved half the skin distance or more
+neigh_modify   every 10 delay 0 check yes
+newton         ${newton_pair} off
+
+# Atom Definition
+read_data      ${data_file}
+replicate      ${replicate}
+change_box     all boundary p p p
+
+# pair_style ani 5.1 model_file device num_models ani_aev ani_neighbor
+# 0. model_file               = path to the model file
+# 1. device                   = cuda/cpu
+# 2. num_models (Optional)    = number of models to use, default as -1 to use all models
+# 3. ani_aev (Optional)       = cuaev/pyaev, default as cuaev
+# 4. ani_neighbor (Optional)  = full/half, default as full nbrlist
+# 5. ani_precision (Optional) = single/double, default as single
+pair_style     ani 5.1 ${ani_model_file} ${ani_device} ${ani_num_models} ${ani_aev} ${ani_neighbor} ${ani_precision}
+pair_coeff     * *
+
+# Thermo
+thermo_style   custom step pe ke etotal temp press vol density
+thermo         50
+
+# Settings: temperature at 0 K
+velocity       all create 0.0 12345 rot yes mom yes dist gaussian
+timestep       ${timestep}
+
+# Generate restart files every 100000 steps
+# restart        100000 ${log_dir}/${timestamp}.restart.0 ${log_dir}/${timestamp}.restart.1
+
+# 0 K to 300 K in the first 100 ps
+fix            1 all langevin 0.0 300.0 100.0 12345
+fix            2 all nve
+# assume timestep is 0.25 fs, and run 100 ps, 100 * 1000 / 0.25 = 400000
+dump           2 all dcd 50 ${log_dir}/${timestamp}_0.0ns.dcd
+write_data     ${log_dir}/${timestamp}_0.0ns.final
+write_restart  ${log_dir}/${timestamp}_0.0ns.restart
+run            400000
+undump         2
+
+# 300 K to 2500 K in the next 100 ps
+fix            1 all langevin 300.0 2500.0 100.0 12345
+fix            2 all nve
+# assume timestep is 0.25 fs, and run 100 ps, 100 * 1000 / 0.25 = 400000
+dump           2 all dcd 50 ${log_dir}/${timestamp}_0.1ns.dcd
+write_data     ${log_dir}/${timestamp}_0.1ns.final
+write_restart  ${log_dir}/${timestamp}_0.1ns.restart
+run            400000
+undump         2
+
+# maintained at 2500 K for 4000 ps
+fix            1 all langevin 2500.0 2500.0 100.0 12345
+fix            2 all nve
+# assume timestep is 0.25 fs, and run 4000 ps, 4000 * 1000 / 0.25 = 16000000
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_0.2ns.dcd
+write_data     ${log_dir}/${timestamp}_0.2ns.final
+write_restart  ${log_dir}/${timestamp}_0.2ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_0.3ns.dcd
+write_data     ${log_dir}/${timestamp}_0.3ns.final
+write_restart  ${log_dir}/${timestamp}_0.3ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_0.4ns.dcd
+write_data     ${log_dir}/${timestamp}_0.4ns.final
+write_restart  ${log_dir}/${timestamp}_0.4ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_0.5ns.dcd
+write_data     ${log_dir}/${timestamp}_0.5ns.final
+write_restart  ${log_dir}/${timestamp}_0.5ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_0.6ns.dcd
+write_data     ${log_dir}/${timestamp}_0.6ns.final
+write_restart  ${log_dir}/${timestamp}_0.6ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_0.7ns.dcd
+write_data     ${log_dir}/${timestamp}_0.7ns.final
+write_restart  ${log_dir}/${timestamp}_0.7ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_0.8ns.dcd
+write_data     ${log_dir}/${timestamp}_0.8ns.final
+write_restart  ${log_dir}/${timestamp}_0.8ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_0.9ns.dcd
+write_data     ${log_dir}/${timestamp}_0.9ns.final
+write_restart  ${log_dir}/${timestamp}_0.9ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_1.0ns.dcd
+write_data     ${log_dir}/${timestamp}_1.0ns.final
+write_restart  ${log_dir}/${timestamp}_1.0ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_1.1ns.dcd
+write_data     ${log_dir}/${timestamp}_1.1ns.final
+write_restart  ${log_dir}/${timestamp}_1.1ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_1.2ns.dcd
+write_data     ${log_dir}/${timestamp}_1.2ns.final
+write_restart  ${log_dir}/${timestamp}_1.2ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_1.3ns.dcd
+write_data     ${log_dir}/${timestamp}_1.3ns.final
+write_restart  ${log_dir}/${timestamp}_1.3ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_1.4ns.dcd
+write_data     ${log_dir}/${timestamp}_1.4ns.final
+write_restart  ${log_dir}/${timestamp}_1.4ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_1.5ns.dcd
+write_data     ${log_dir}/${timestamp}_1.5ns.final
+write_restart  ${log_dir}/${timestamp}_1.5ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_1.6ns.dcd
+write_data     ${log_dir}/${timestamp}_1.6ns.final
+write_restart  ${log_dir}/${timestamp}_1.6ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_1.7ns.dcd
+write_data     ${log_dir}/${timestamp}_1.7ns.final
+write_restart  ${log_dir}/${timestamp}_1.7ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_1.8ns.dcd
+write_data     ${log_dir}/${timestamp}_1.8ns.final
+write_restart  ${log_dir}/${timestamp}_1.8ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_1.9ns.dcd
+write_data     ${log_dir}/${timestamp}_1.9ns.final
+write_restart  ${log_dir}/${timestamp}_1.9ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_2.0ns.dcd
+write_data     ${log_dir}/${timestamp}_2.0ns.final
+write_restart  ${log_dir}/${timestamp}_2.0ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_2.1ns.dcd
+write_data     ${log_dir}/${timestamp}_2.1ns.final
+write_restart  ${log_dir}/${timestamp}_2.1ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_2.2ns.dcd
+write_data     ${log_dir}/${timestamp}_2.2ns.final
+write_restart  ${log_dir}/${timestamp}_2.2ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_2.3ns.dcd
+write_data     ${log_dir}/${timestamp}_2.3ns.final
+write_restart  ${log_dir}/${timestamp}_2.3ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_2.4ns.dcd
+write_data     ${log_dir}/${timestamp}_2.4ns.final
+write_restart  ${log_dir}/${timestamp}_2.4ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_2.5ns.dcd
+write_data     ${log_dir}/${timestamp}_2.5ns.final
+write_restart  ${log_dir}/${timestamp}_2.5ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_2.6ns.dcd
+write_data     ${log_dir}/${timestamp}_2.6ns.final
+write_restart  ${log_dir}/${timestamp}_2.6ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_2.7ns.dcd
+write_data     ${log_dir}/${timestamp}_2.7ns.final
+write_restart  ${log_dir}/${timestamp}_2.7ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_2.8ns.dcd
+write_data     ${log_dir}/${timestamp}_2.8ns.final
+write_restart  ${log_dir}/${timestamp}_2.8ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_2.9ns.dcd
+write_data     ${log_dir}/${timestamp}_2.9ns.final
+write_restart  ${log_dir}/${timestamp}_2.9ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_3.0ns.dcd
+write_data     ${log_dir}/${timestamp}_3.0ns.final
+write_restart  ${log_dir}/${timestamp}_3.0ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_3.1ns.dcd
+write_data     ${log_dir}/${timestamp}_3.1ns.final
+write_restart  ${log_dir}/${timestamp}_3.1ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_3.2ns.dcd
+write_data     ${log_dir}/${timestamp}_3.2ns.final
+write_restart  ${log_dir}/${timestamp}_3.2ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_3.3ns.dcd
+write_data     ${log_dir}/${timestamp}_3.3ns.final
+write_restart  ${log_dir}/${timestamp}_3.3ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_3.4ns.dcd
+write_data     ${log_dir}/${timestamp}_3.4ns.final
+write_restart  ${log_dir}/${timestamp}_3.4ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_3.5ns.dcd
+write_data     ${log_dir}/${timestamp}_3.5ns.final
+write_restart  ${log_dir}/${timestamp}_3.5ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_3.6ns.dcd
+write_data     ${log_dir}/${timestamp}_3.6ns.final
+write_restart  ${log_dir}/${timestamp}_3.6ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_3.7ns.dcd
+write_data     ${log_dir}/${timestamp}_3.7ns.final
+write_restart  ${log_dir}/${timestamp}_3.7ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_3.8ns.dcd
+write_data     ${log_dir}/${timestamp}_3.8ns.final
+write_restart  ${log_dir}/${timestamp}_3.8ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_3.9ns.dcd
+write_data     ${log_dir}/${timestamp}_3.9ns.final
+write_restart  ${log_dir}/${timestamp}_3.9ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_4.0ns.dcd
+write_data     ${log_dir}/${timestamp}_4.0ns.final
+write_restart  ${log_dir}/${timestamp}_4.0ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_4.1ns.dcd
+write_data     ${log_dir}/${timestamp}_4.1ns.final
+write_restart  ${log_dir}/${timestamp}_4.1ns.restart
+run            400000
+undump         2
+
+# cooled from 2500 K to 300 K over the final 200 ps
+fix            1 all langevin 2500.0 300.0 100.0 12345
+fix            2 all nve
+# assume timestep is 0.25 fs, and run 200 ps, 200 * 1000 / 0.25 = 800000
+dump           2 all dcd 50 ${log_dir}/${timestamp}_4.2ns.dcd
+write_data     ${log_dir}/${timestamp}_4.2ns.final
+write_restart  ${log_dir}/${timestamp}_4.2ns.restart
+run            400000
+undump         2
+
+dump           2 all dcd 50 ${log_dir}/${timestamp}_4.3ns.dcd
+write_data     ${log_dir}/${timestamp}_4.3ns.final
+write_restart  ${log_dir}/${timestamp}_4.3ns.restart
+run            400000
+undump         2
+
+# Write final state of simulation
+# write_data    ${log_dir}/${timestamp}.final
+# write_restart   ${log_dir}/${timestamp}.restart

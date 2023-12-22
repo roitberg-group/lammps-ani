@@ -46,3 +46,21 @@ Using `benchmark.sh`
 | no     | 300k               | 8           | 2         | 0.209                |
 | no     | 300k               | 8           | 4         | 0.421                |
 | no     | 300k               | 8           | 8         | 0.813                |
+
+
+## note about restart
+Use the `write_restart` to write restart file.
+When load the restart file, we need to remove the read_data change_box pair_style commands. Also after the read_restart command, we need to respecify pair_coeff.
+
+Example
+```
+# read_data      ${datafile}
+# change_box     all boundary p p p
+
+# pair_style     ani 5.1 ${modelfile} cuda ${num_models} cuaev full single
+# pair_coeff     * *
+
+read_restart   logs/2023-12-22-092948.restart
+pair_coeff * *
+
+``` 

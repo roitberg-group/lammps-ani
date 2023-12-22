@@ -104,7 +104,7 @@ def analyze_all_frames(
             print(f"Error analyzing frame {frame_num}: {e}")
 
         frame_num += 1
-        if frame_num >= total_frames_in_segment:
+        if frame_num >= end_frame:
             break
 
     save_data(formula_dfs, output_dir, f"{output_filename}_formula.pq")

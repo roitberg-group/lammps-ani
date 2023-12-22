@@ -56,7 +56,7 @@ def submit_job(traj_file, top_file, mol_pq, time_offset, num_segments, segment_i
     if submit:
         slurm.sbatch(commands, convert=False)
         # prevent submitting too fast that results in the same timestamp
-        time.sleep(1)
+        time.sleep(0.2)
     else:
         print("Job will not be submitted. The following is the job script:")
         print(str(slurm) + commands)

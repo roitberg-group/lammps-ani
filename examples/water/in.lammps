@@ -46,5 +46,9 @@ timestep       ${timestep}
 # run nvt
 fix            1 all langevin 300.0 300.0 100.0 12345
 fix            2 all nve
+
+run            10
+write_restart  logs/${timestamp}.restart
+
 run            2000
 

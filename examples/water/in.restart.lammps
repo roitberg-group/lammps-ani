@@ -35,8 +35,6 @@ newton         ${newton_pair} off
 read_restart   logs/2023-12-22-092948.restart
 pair_coeff * *
 
-info coeffs
-
 
 # Output: dump atom positions every 0.5 ps and log info every 0.5 ps
 dump           1 all custom 100 logs/${timestamp}.lammpstrj id element x y z ix iy iz

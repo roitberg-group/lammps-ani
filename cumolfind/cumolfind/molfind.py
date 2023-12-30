@@ -1,7 +1,21 @@
 # Set RMM allocator to be used by PyTorch
 import torch
+import traceback
+import rmm.mr as mr
 from rmm.allocators.torch import rmm_torch_allocator
+
+# Configure PyTorch to use RAPIDS Memory Manager (RMM) for GPU memory management.
 torch.cuda.memory.change_current_allocator(rmm_torch_allocator)
+
+# Initialize a PoolMemoryResource with ManagedMemoryResource. This approach uses
+# CUDA's unified memory, potentially helping with GPU OOM issues by allowing
+# memory spillover to the system memory.
+pool = mr.PoolMemoryResource(
+    mr.ManagedMemoryResource(),
+)
+
+# Set the pool as the current memory resource for RMM.
+mr.set_current_device_resource(pool)
 
 import argparse
 import os
@@ -102,6 +116,8 @@ def analyze_all_frames(
                 save_data(molecule_dfs, output_dir, f"{output_filename}_molecule.pq")
         except Exception as e:
             print(f"Error analyzing frame {frame_num}: {e}")
+            # This will print the line number and other traceback details
+            traceback.print_exc()
 
         frame_num += 1
         if frame_num >= end_frame:

@@ -98,18 +98,23 @@ This command splits a large trajectory file into smaller segments, naming each s
 **Submit analysis job parallaly:**
 ```bash
 python /blue/roitberg/apps/lammps-ani/cumolfind/submit_analysis.py --help
-usage: submit_analysis.py [-h] [-y] num_segments traj_dir top_file mol_pq
+usage: submit_analysis.py [-h] --traj TRAJ --top TOP --num_segments NUM_SEGMENTS --mol_pq MOL_PQ [--output_dir OUTPUT_DIR] [-y]
 
 Parallelize cumolfind analysis.
 
-positional arguments:
-  num_segments  Number of segments for each trajectory.
-  traj_dir      Directory containing trajectory files.
-  top_file      Topology file.
-  mol_pq        Molecule database file
+optional arguments:
+  -h, --help            show this help message and exit
+  --traj TRAJ           Directory containing trajectory files or a single trajectory file.
+  --top TOP             Topology file.
+  --num_segments NUM_SEGMENTS
+                        Number of segments for each trajectory.
+  --mol_pq MOL_PQ       Molecule database file
+  --output_dir OUTPUT_DIR
+                        Output directory
+  -y                    If provided, the job will be submitted. If not, the job will only be prepared but not submitted.
 ```
 
 Example
 ```
-python /blue/roitberg/apps/lammps-ani/cumolfind/submit_analysis.py 2 /red/roitberg/22M_20231216_testrun/ /blue/roitberg/apps/lammps-ani/examples/early_earth/data/mixture_22800000.pdb /blue/roitberg/apps/lammps-ani/cumolfind/data/animal_acid.pq
+python /blue/roitberg/apps/lammps-ani/cumolfind/submit_analysis.py --traj=/red/roitberg/22M_20231216_testrun/ --top=/blue/roitberg/apps/lammps-ani/examples/early_earth/data/mixture_22800000.pdb --num_segments=2 --mol_pq=/blue/roitberg/apps/lammps-ani/cumolfind/data/animal_acid.pq
 ```

@@ -6,7 +6,7 @@ from simple_slurm import Slurm
 
 
 def submit_job(traj_file, top_file, mol_pq, time_offset, num_segments, segment_index, output_dir, submit=False):
-    job_name = f"cumolfind_{os.path.splitext(os.path.basename(traj_file))[0]}_segment_{segment_index}_of_{num_segments}"
+    job_name = f"cumolfind_{os.path.splitext(os.path.basename(traj_file))[0]}_segment_{segment_index:0{len(str(num_segments))}d}_of_{num_segments}"
     output_filename = f"logs/{job_name}_%j.log"
     os.makedirs(os.path.dirname(output_filename), exist_ok=True)
     num_gpus = 1
@@ -20,7 +20,7 @@ def submit_job(traj_file, top_file, mol_pq, time_offset, num_segments, segment_i
         ntasks_per_node=ntasks_per_node,
         cpus_per_task=1,
         partition="hpg-ai",
-        reservation="roitberg-phase1",
+        reservation="roitberg-phase2",
         qos="roitberg",
         account="roitberg",
         gres=gres,
@@ -65,27 +65,35 @@ def submit_job(traj_file, top_file, mol_pq, time_offset, num_segments, segment_i
 
 def main():
     parser = argparse.ArgumentParser(description="Parallelize cumolfind analysis.")
-    parser.add_argument("num_segments", type=int, help="Number of segments for each trajectory.")
-    parser.add_argument("traj_dir", type=str, help="Directory containing trajectory files.")
-    parser.add_argument("top_file", type=str, help="Topology file.")
-    parser.add_argument("mol_pq", type=str, help="Molecule database file")
+    parser.add_argument("--traj", type=str, required=True, help="Directory containing trajectory files or a single trajectory file.")
+    parser.add_argument("--top", type=str, required=True, help="Topology file.")
+    parser.add_argument("--num_segments", type=int, required=True, help="Number of segments for each trajectory.")
+    parser.add_argument("--mol_pq", type=str, required=True, help="Molecule database file")
     parser.add_argument("--output_dir", type=str, help="Output directory", default="test_analyze")
     parser.add_argument('-y', action='store_true', help='If provided, the job will be submitted. If not, the job will only be prepared but not submitted.')
     args = parser.parse_args()
 
-    # Read and sort trajectory files
-    traj_files = sorted([f for f in os.listdir(args.traj_dir) if f.endswith('.dcd')])
+    # Check if traj is a file or a directory
+    if os.path.isfile(args.traj):
+        # If it's a file, use it as the only element in traj_files
+        traj_files = [args.traj]
+    else:
+        # If it's a directory, read and sort trajectory files with full path
+        traj_files = sorted([os.path.join(args.traj, f) for f in os.listdir(args.traj) if f.endswith('.dcd')])
+
 
     for traj_file in traj_files:
+        traj_filename = os.path.basename(traj_file)
+
         # Extract time_offset from the filename
-        match = re.search(r'_(\d+\.\d+)ns\.dcd$', traj_file)
+        match = re.search(r'_(\d+\.\d+)ns\.dcd$', traj_filename)
         if match:
             time_offset = match.group(1)
-            print(f"Submitting job for {traj_file}, time_offset={time_offset}")
+            print(f"Submitting job for {traj_filename}, time_offset={time_offset}")
             for segment_index in range(args.num_segments):
                 submit_job(
-                    traj_file=os.path.join(args.traj_dir, traj_file),
-                    top_file=args.top_file,
+                    traj_file=traj_file,  # Use traj_file which will be the full path
+                    top_file=args.top,
                     mol_pq=args.mol_pq,
                     time_offset=time_offset,
                     num_segments=args.num_segments,

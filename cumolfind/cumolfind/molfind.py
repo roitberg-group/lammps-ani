@@ -12,6 +12,7 @@ torch.cuda.memory.change_current_allocator(rmm_torch_allocator)
 # memory spillover to the system memory.
 pool = mr.PoolMemoryResource(
     mr.ManagedMemoryResource(),
+    maximum_pool_size=450 * 1024 * 1024 * 1024,  # 450GB TODO, make this configurable
 )
 
 # Set the pool as the current memory resource for RMM.

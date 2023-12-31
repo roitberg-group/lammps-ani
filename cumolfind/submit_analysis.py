@@ -24,7 +24,7 @@ def submit_job(traj_file, top_file, mol_pq, time_offset, num_segments, segment_i
         qos="roitberg",
         account="roitberg",
         gres=gres,
-        mem_per_cpu="100gb",
+        mem_per_cpu="500gb",
         time="20:00:00",
         output=output_filename,
         exclude="c0900a-s23",

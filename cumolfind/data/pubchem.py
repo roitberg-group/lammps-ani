@@ -10,16 +10,38 @@ from ase.io import read
 from ase.data import chemical_symbols
 from cumolfind.fragment import build_netx_graph_from_ase
 
+nucleobases = [
+    "Adenine",
+    "Guanine",
+    "Cytosine",
+    "Thymine",
+    "Uracil"
+]
 
-# List of molecules of interest
-interested_mol = [
+simple_sugars = [
+    "Glucose",
+    "Fructose",
+    "Ribose",
+    "Deoxyribose",
+    "Galactose"
+]
+
+fatty_acids = [
+    "Caprylic acid",
+    "Capric acid",
+    "Lauric acid",
+    "Myristic acid",
+    "Palmitic acid"
+]
+
+amino_acids = [
     "Alanine",
     "Arginine",
     "Asparagine",
-    "Aspartic acid",
+    "Aspartic Acid",
     "Cysteine",
     "Glutamine",
-    "Glutamic acid",
+    "Glutamic Acid",
     "Glycine",
     "Histidine",
     "Isoleucine",
@@ -35,7 +57,45 @@ interested_mol = [
     "Valine",
 ]
 
-# interested_mol = ["Alanine", "Glycine"]
+def all_dipeptides():
+    amino_acid_peptide_names = {
+        "Alanine": "Alanyl",
+        "Arginine": "Arginyl",
+        "Asparagine": "Asparaginyl",
+        "Aspartic Acid": "Aspartyl",
+        "Cysteine": "Cysteinyl-",
+        "Glutamine": "Glutaminyl",
+        "Glutamic Acid": "Glutamyl-",
+        "Glycine": "Glycyl",
+        "Histidine": "Histidyl",
+        "Isoleucine": "Isoleucyl",
+        "Leucine": "Leucyl",
+        "Lysine": "Lysyl",
+        "Methionine": "Methionyl",
+        "Phenylalanine": "Phenylalanyl",
+        "Proline": "Prolyl-",
+        "Serine": "Seryl",
+        "Threonine": "Threonyl",
+        "Tryptophan": "Tryptophyl",
+        "Tyrosine": "Tyrosyl",
+        "Valine": "Valyl"
+    }
+
+
+    # Create a list to store the dipeptides
+    dipeptides = []
+
+    # Iterate over each possible pair of amino acids
+    for aa1 in amino_acids:
+        for aa2 in amino_acids:
+            dipeptide = amino_acid_peptide_names[aa1] + aa2
+            dipeptides.append(dipeptide)
+
+    return dipeptides
+
+
+dipeptides = all_dipeptides()
+
 
 # DataFrame to store molecule data
 mol_data = pd.DataFrame(columns=["graph", "formula", "smiles", "name", "flatten_formula"])
@@ -93,7 +153,13 @@ def verify_graph(compound, graph):
 
 def process_molecule(mol_name):
     # TODO: we are only using the first one, do we need to check the other ones?
-    pubchem_mol = pubchempy.get_compounds(mol_name, "name")[0]
+    pubchem_mols = pubchempy.get_compounds(mol_name, "name")
+
+    if len(pubchem_mols) == 0:
+        warnings.warn(f"Skipping {mol_name}, no PubChem entry found")
+        return None
+
+    pubchem_mol = pubchem_mols[0]
     formula = pubchem_mol.molecular_formula
 
     if not is_CHNO_only(formula):
@@ -126,11 +192,14 @@ def process_molecule(mol_name):
         generate_flatten_formula(atomic_nums),
     ]
 
+
+interested_mols = nucleobases + simple_sugars + fatty_acids + amino_acids + dipeptides
 # Process each molecule
-for mol in interested_mol:
+for mol in interested_mols:
     process_molecule(mol)
 
 # Save the DataFrame
 print(mol_data)
 # mol_data.to_parquet("small_molecule_data.pq")
-mol_data.to_parquet("animal_acid.pq")
+# mol_data.to_parquet("animal_acid.pq")
+mol_data.to_parquet("nucleobases-simple_sugars-fatty_acids-amino_acids-dipeptides.pq")

@@ -258,6 +258,12 @@ def edge_match(edge1, edge2):
     return edge1['element_pair'] == edge2['element_pair']
 
 
+# NOTE: TO DO:
+#  * Load all graphs, rather than iterating mol_database every time, just have them pre-loaded
+#    -- maybe this would be better to do in molfind.py, so that the df isn't reloaded every time a frame is analyzed? 
+
+
+
 def analyze_a_frame(
     mdtraj_frame, time_offset, dump_interval, timestep, stride, frame_num, mol_database, use_cell_list=True
 ):

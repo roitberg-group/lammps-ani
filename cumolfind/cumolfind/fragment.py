@@ -12,9 +12,9 @@ import time as timetime
 from torchani.neighbors import _parse_neighborlist
 import matplotlib.pyplot as plt
 
-import cProfile
-import pstats
-import io
+
+# Specify a formula of interest:
+extract_formula = 'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNNNNOO'
 
 # TODO: use RMM allocator for pytorch
 
@@ -265,7 +265,7 @@ def edge_match(edge1, edge2):
 
 
 def analyze_a_frame(
-    mdtraj_frame, time_offset, dump_interval, timestep, stride, frame_num, mol_database, use_cell_list=True
+    mdtraj_frame, time_offset, dump_interval, timestep, stride, frame_num, extract_formula, use_cell_list=True
 ):
     """
     filter_fragment_from_mdtraj_frame
@@ -308,6 +308,47 @@ def analyze_a_frame(
         ]
     )
 
+    # Filter df_per_frag for the fragment matching extract_formula
+    df_extract_formula = df_per_frag[df_per_frag["flatten_formula"] == extract_formula]
+
+    if not df_extract_formula.empty:
+        # Extract atom_indices for the matching fragment
+        extract_atom_indices = df_extract_formula.iloc[0]["atom_indices"]
+
+        # Build a subgraph for the fragment matching extract_formula
+        #extract_nxgraph = cugraph_slice_subgraph(cG, species, extract_atom_indices)
+
+
+        new_row = {
+            "frame": frame,
+            "local_frame": frame_num,
+            "formula": extract_formula,
+            "flatten_formula": extract_formula,
+            "smiles": None,  # No SMILES since it's not in the database
+            "name": None,  # No name since it's not in the database
+            "atom_indices": extract_atom_indices.to_pandas().tolist(),
+            "time": time
+        }
+
+        # Convert the new row to a DataFrame and concatenate
+        df_molecule = pd.concat([df_molecule, pd.DataFrame([new_row])], ignore_index=True)
+
+
+        # Optionally, visualize or save the graph if needed
+        #draw_netx_graph(extract_nxgraph)
+
+    else:
+        return print(f"No fragments matching the formula {extract_formula} found in frame {frame_num}")
+
+    df_formula = df_per_frag["flatten_formula"].value_counts().to_frame("counts").reset_index()
+    df_formula["local_frame"] = frame_num
+    df_formula["frame"] = frame
+    df_formula["time"] = time
+
+    if timing:
+        print("analyze_a_frame time:", timetime.time() - start_total)
+    return df_formula.to_pandas(), df_molecule
+    '''
     start1 = timetime.time()
     for index, row in mol_database.iterrows():
         flatten_formula = row["flatten_formula"]
@@ -367,16 +408,8 @@ def analyze_a_frame(
     df_formula["frame"] = frame
     df_formula["time"] = time
 
-    return df_formula.to_pandas(), df_molecule
+    if timing:
+        print("analyze_a_frame time:", timetime.time() - start_total)
 
-def profile_code(func, *args, **kwargs):
-    pr = cProfile.Profile()
-    pr.enable()
-    result = func(*args, **kwargs)
-    pr.disable()
-    s = io.StringIO()
-    sortby = 'cumulative'
-    ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-    ps.print_stats()
-    print(s.getvalue())
-    return result
+    return df_formula.to_pandas(), df_molecule
+    '''

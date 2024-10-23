@@ -103,7 +103,7 @@ def analyze_all_frames(
                 timestep,
                 stride,
                 frame_num,
-                mol_database,
+                extract_formula='CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHNNNNOO',
                 use_cell_list=True,
             )
 

@@ -132,18 +132,63 @@ def neighborlist_to_fragment(atom_index12, species):
         # using ase to get formula
         # Assuming you have ase.Atoms installed and available, you can get the chemical formula:
         df_per_frag["formula"] = cudf.from_pandas(
-            df_per_frag.to_pandas()["collected_symbols"].apply(lambda x: ase.Atoms(x).get_chemical_formula())
+            df_per_frag.to_pandas()["collected_symbols"].apply(
+                lambda x: ase.Atoms(x).get_chemical_formula())
         )  # 2s
     else:
         # Sort and concatenate symbols to create a flatten_formula (without using ASE)
         df_per_frag["collected_symbols"] = df_per_frag["collected_symbols"].list.sort_values(
             ascending=True, na_position="last"
         )
-        df_per_frag["flatten_formula"] = df_per_frag.collected_symbols.str.join("")
+        df_per_frag["flatten_formula"] = df_per_frag.collected_symbols.str.join(
+            "")
 
     # Grouping by labels and collecting atom_index using cuDF
     df_per_frag["atom_indices"] = df.groupby("labels").agg(
         {"atom_index": list}).reset_index()["atom_index"]
+
+    df_edges = df_edges.merge(
+        df[["atom_index", "labels", "symbols"]],
+        left_on="source",
+        right_on="atom_index"
+    ).rename(columns={"labels": "labels_source", "symbols": "symbols_source"}).drop(columns=["atom_index"])
+
+    df_edges = df_edges.merge(
+        df[["atom_index", "labels", "symbols"]],
+        left_on="destination",
+        right_on="atom_index"
+    ).rename(columns={"labels": "labels_dest", "symbols": "symbols_dest"}).drop(columns=["atom_index"])
+
+    df_edges = df_edges.rename(columns={"labels_source": "labels"}).drop(
+        columns=["labels_dest"])
+
+    # Compare 'symbols_source' and 'symbols_dest' to create sorted pairs
+    mask = df_edges['symbols_source'] <= df_edges['symbols_dest']
+
+    df_edges['edge_symbol_1'] = df_edges['symbols_source'].where(mask, df_edges['symbols_dest'])
+    df_edges['edge_symbol_2'] = df_edges['symbols_dest'].where(mask, df_edges['symbols_source'])
+
+        # Create 'edge_symbols' as 'symbol1-symbol2'
+    df_edges["edge_symbols"] = df_edges["edge_symbol_1"].str.cat(df_edges["edge_symbol_2"], sep="-")
+
+    # Group edges per fragment and collect edge_symbols into lists
+    df_edges_per_frag = df_edges.groupby("labels").agg({"edge_symbols": list}).reset_index()
+
+    # Sort edge symbols per fragment
+    df_edges_per_frag["edge_symbols"] = df_edges_per_frag["edge_symbols"].list.sort_values()
+
+    # Merge edge information with fragment DataFrame
+    df_per_frag = df_per_frag.merge(df_edges_per_frag, on="labels", how="left")
+
+    # **Convert 'edge_symbols' list column to string representation and clean it**
+    df_per_frag["edge_symbols_str"] = df_per_frag["edge_symbols"].astype("str")
+    # Remove brackets, quotes, and spaces
+    df_per_frag["edge_symbols_str"] = df_per_frag["edge_symbols_str"].str.replace('[\\[\\]\' ]', '', regex=True)
+    # Replace commas with underscores
+    df_per_frag["edge_symbols_str"] = df_per_frag["edge_symbols_str"].str.replace(',', '_')
+
+    # Create unique signatures by combining formula and edge symbols
+    df_per_frag["signature"] = df_per_frag["flatten_formula"] + "_" + df_per_frag["edge_symbols_str"]
 
     return cG, df_per_frag
 
@@ -160,7 +205,6 @@ def cugraph_slice_subgraph(cgraph, species, nodes):
     start_indices = offset_col[nodes]
     end_indices = cupy.roll(cupy.array(offset_col), -1)[nodes]
 
-
     # we run this on CPU because now the graph is small and retrieving the data with this pattern will be slow on GPU
     for node, start_idx, end_idx in zip(nodes, start_indices.values_host, end_indices.get()):
         adj_nodes = index_col[start_idx:end_idx]
@@ -173,7 +217,7 @@ def cugraph_slice_subgraph(cgraph, species, nodes):
     nxgraph = nx.from_pandas_edgelist(df_edges, "source", "target")
 
     atomic_numbers = species.flatten()[torch.tensor(nodes)].cpu().numpy()
-    # NOTE: There is some issue with nodes matching atomic numbers here, probably from something i changed 
+    # NOTE: There is some issue with nodes matching atomic numbers here, probably from something i changed
 
     for node, atomic_number in zip(nodes, atomic_numbers):
         nxgraph.nodes[node]["atomic_number"] = atomic_number
@@ -260,8 +304,7 @@ def edge_match(edge1, edge2):
 
 # NOTE: TO DO:
 #  * Load all graphs, rather than iterating mol_database every time, just have them pre-loaded
-#    -- maybe this would be better to do in molfind.py, so that the df isn't reloaded every time a frame is analyzed? 
-
+#    -- maybe this would be better to do in molfind.py, so that the df isn't reloaded every time a frame is analyzed?
 
 
 def analyze_a_frame(
@@ -288,13 +331,15 @@ def analyze_a_frame(
     frame = frame_num * stride + frame_offset
     time = frame * timestep * dump_interval * 1e-6
 
-    cG, df_per_frag = find_fragments(species, positions, cell, pbc, use_cell_list=use_cell_list)
+    cG, df_per_frag = find_fragments(
+        species, positions, cell, pbc, use_cell_list=use_cell_list)
     if timing:
         print("Time to find fragments: ", timetime.time() - start)
 
     start_filter = timetime.time()
     if timing:
-        print("Time to filter fragment dataframe: ", timetime.time() - start_filter)
+        print("Time to filter fragment dataframe: ",
+              timetime.time() - start_filter)
     df_molecule = pd.DataFrame(
         columns=[
             "frame",
@@ -312,7 +357,8 @@ def analyze_a_frame(
     for index, row in mol_database.iterrows():
         flatten_formula = row["flatten_formula"]
         # filter df_per_frag by flatten_formula
-        df_this_formula = df_per_frag[df_per_frag["flatten_formula"] == flatten_formula]
+        df_this_formula = df_per_frag[df_per_frag["flatten_formula"]
+                                      == flatten_formula]
 
         # skip if there is no fragment for this formula
         if len(df_this_formula) == 0:
@@ -341,8 +387,10 @@ def analyze_a_frame(
             add_element_pairs_to_edges(fragment_graph)
             add_element_pairs_to_edges(graph)
             node_match = nx.isomorphism.categorical_node_match('element', '')
-            edge_match = nx.isomorphism.categorical_edge_match('element_pair', '')
-            gm = nx.isomorphism.GraphMatcher(graph, fragment_graph, node_match=node_match, edge_match=edge_match)
+            edge_match = nx.isomorphism.categorical_edge_match(
+                'element_pair', '')
+            gm = nx.isomorphism.GraphMatcher(
+                graph, fragment_graph, node_match=node_match, edge_match=edge_match)
             if gm.is_isomorphic():
                 df_molecule.loc[len(df_molecule)] = [
                     frame,
@@ -356,18 +404,25 @@ def analyze_a_frame(
                 ]
                 match += 1
         if timing:
-            print(f"    is_isomorphic {row['name']}, time: {timetime.time() - start}, total formula {len(df_this_formula)}, match {match}")
+            print(
+                f"    is_isomorphic {row['name']}, time: {timetime.time() - start}, total formula {len(df_this_formula)}, match {match}")
 
     if timing:
         print("iterate database: ", timetime.time() - start1)
 
-    df_formula = df_per_frag["flatten_formula"].value_counts().to_frame("counts").reset_index()
-
+    # **Modify this part to include counts of unique signatures**
+    df_formula = (
+        df_per_frag.groupby(["signature", "flatten_formula"])
+        .size()
+        .reset_index(name="counts")
+    )
+    
     df_formula["local_frame"] = frame_num
     df_formula["frame"] = frame
     df_formula["time"] = time
 
     return df_formula.to_pandas(), df_molecule
+
 
 def profile_code(func, *args, **kwargs):
     pr = cProfile.Profile()

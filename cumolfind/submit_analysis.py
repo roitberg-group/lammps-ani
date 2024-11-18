@@ -6,28 +6,24 @@ from simple_slurm import Slurm
 
 
 def submit_job(traj_file, top_file, mol_pq, time_offset, num_segments, segment_index, output_dir, submit=False):
-    job_name = f"cumolfind_{os.path.splitext(os.path.basename(traj_file))[0]}_segment_{segment_index:0{len(str(num_segments))}d}_of_{num_segments}"
-    output_filename = f"logs/{job_name}_%j.log"
+    job_name = f"cumolfind_unique{os.path.splitext(os.path.basename(traj_file))[0]}_segment_{segment_index:0{len(str(num_segments))}d}_of_{num_segments}"
+    output_filename = f"logs/unique_{job_name}_%j.log"
     os.makedirs(os.path.dirname(output_filename), exist_ok=True)
     num_gpus = 1
     nodes = 1
     ntasks_per_node = num_gpus
-    gres = f"gpu:{1}"
+    gres = f"gpu:a100:1"
     slurm = Slurm(
         job_name=job_name,
         ntasks=num_gpus,
         nodes=nodes,
         ntasks_per_node=ntasks_per_node,
         cpus_per_task=1,
-        partition="hpg-ai",
-        reservation="roitberg-phase2",
-        qos="roitberg",
-        account="roitberg",
+        partition="gpu",
         gres=gres,
-        mem_per_cpu="500gb",
-        time="20:00:00",
+        mem_per_cpu="64gb",
+        time="04:00:00",
         output=output_filename,
-        exclude="c0900a-s23",
     )
 
     commands = [
@@ -40,8 +36,7 @@ def submit_job(traj_file, top_file, mol_pq, time_offset, num_segments, segment_i
         'echo "Number of Tasks Allocated      = $SLURM_NTASKS"',
         'echo "Number of Cores/Task Allocated = $SLURM_CPUS_PER_TASK"',
         # module load and setup environment variables
-        "module load cuda/11.4.3 gcc/9.3.0 openmpi/4.1.5 cmake/3.21.3 git/2.30.1",
-        'export LAMMPS_ANI_ROOT="/blue/roitberg/apps/lammps-ani"',
+        'export LAMMPS_ANI_ROOT="/blue/roitberg/nterrel/lammps-ani"',
         "export LAMMPS_ROOT=${LAMMPS_ANI_ROOT}/external/lammps/",
         "export LAMMPS_PLUGIN_PATH=${LAMMPS_ANI_ROOT}/build/",
         # setup conda in the subshell and activate the environment

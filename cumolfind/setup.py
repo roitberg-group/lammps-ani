@@ -11,7 +11,7 @@ setup(
         'console_scripts': [
             'cumolfind-molfind=cumolfind.molfind:main',
             'cumolfind-split_traj=cumolfind.split_traj:main',
+            'cumolfind-trace=cumolfind.trace:main'
         ],
     },
 )
-

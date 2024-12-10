@@ -1,13 +1,4 @@
 # Set RMM allocator to be used by PyTorch
-from .fragment import find_fragments, cugraph_slice_subgraph, draw_netx_graph
-from tqdm import tqdm
-import pandas as pd
-import mdtraj as md
-import pytraj as pt
-import warnings
-from pathlib import Path
-import os
-import argparse
 import torch
 import traceback
 import rmm.mr as mr
@@ -27,6 +18,15 @@ pool = mr.PoolMemoryResource(
 
 # Set the pool as the current memory resource for RMM.
 mr.set_current_device_resource(pool)
+
+import argparse
+import os
+from pathlib import Path
+import warnings
+import pandas as pd
+import mdtraj as md
+from tqdm import tqdm
+from .fragment import find_fragments, cugraph_slice_subgraph, draw_netx_graph
 
 
 def save_data(temp_dfs, output_dir, filename):
@@ -111,37 +111,37 @@ def trace_molecule(
             cG, df_per_frag = find_fragments(species, positions, cell=cell, pbc=pbc, use_cell_list=True)
 
             # Identify the fragment containing the specified atom indices
-            fragment_found = None
-            for _, fragment_row in df_per_frag.to_pandas().iterrows():
-                frag_atom_indices = fragment_row["atom_indices"]
-                if all(atom in frag_atom_indices for atom in atom_indices.tolist()):
-                    fragment_found = fragment_row
-                    break
+            fragments = []
+            for atom_index in atom_indices.tolist():
+                fragment = df_per_frag[df_per_frag["atom_indices"].apply(lambda x: atom_index in x)].to_dict("records")
+                if fragment:
+                    fragments.append(fragment[0])
 
-            if fragment_found is None:
-                print(f"Frame {frame_num}: Atom indices {atom_indices.tolist()} are no longer in the same fragment.")
+            # Stop if each atom index is in a separate fragment
+            if len(fragments) == len(atom_indices):
+                print(f"Frame {frame_num}: Each atom index is now in a separate fragment.")
                 break
+            for fragment in fragments:
+                # Compare the fragment with known molecules
+                match_found = False
+                matched_name = "Unknown"
+                for _, mol_row in mol_database.iterrows():
+                    if mol_row["flatten_formula"] == fragment["flatten_formula"]:
+                        match_found = True
+                        matched_name = mol_row["name"]
+                        break
 
-            # Compare the fragment with known molecules
-            match_found = False
-            for _, mol_row in mol_database.iterrows():
-                if mol_row["flatten_formula"] == fragment_found["flatten_formula"]:
-                    match_found = True
-                    matched_name = mol_row["name"]
-                    break
-            matched_name = matched_name if match_found else "Unknown"
+                # Collect fragment details
+                fragment_graph = cugraph_slice_subgraph(cG, species, fragment["atom_indices"])
+                draw_netx_graph(fragment_graph)
 
-            # Collect fragment details
-            fragment_graph = cugraph_slice_subgraph(cG, species, fragment_found["atom_indices"])
-            draw_netx_graph(fragment_graph)
-
-            tracked_data.append({
-                "frame": frame_num,
-                "time": frame_num * timestep * dump_interval * 1e-6 + segment_time_offset,  # Include segment offset
-                "atom_indices": fragment_found["atom_indices"],
-                "formula": fragment_found["flatten_formula"],
-                "name": matched_name,
-            })
+                tracked_data.append({
+                    "frame": frame_num,
+                    "time": frame_num * timestep * dump_interval * 1e-6 + segment_time_offset,  # Include segment offset
+                    "atom_indices": fragment["atom_indices"],
+                    "formula": fragment["flatten_formula"],
+                    "name": matched_name,
+                })
         except Exception as e:
             print(f"Error analyzing frame {frame_num}: {e}")
             traceback.print_exc()

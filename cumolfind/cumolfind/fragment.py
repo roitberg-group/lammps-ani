@@ -211,6 +211,9 @@ def build_netx_graph_from_ase(ase_mol, use_cell_list=True):
     return nxgraph
 
 
+# NOTE: NEED TO ADD EDGE MATCHING INFO HERE
+
+
 def analyze_a_frame(
     mdtraj_frame, time_offset, dump_interval, timestep, stride, frame_num, mol_database, use_cell_list=True
 ):

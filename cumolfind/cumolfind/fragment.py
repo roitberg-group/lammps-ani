@@ -12,10 +12,6 @@ import time as timetime
 from torchani.neighbors import _parse_neighborlist
 import matplotlib.pyplot as plt
 
-import cProfile
-import pstats
-import io
-
 # TODO: use RMM allocator for pytorch
 
 timing = True
@@ -368,15 +364,3 @@ def analyze_a_frame(
     df_formula["time"] = time
 
     return df_formula.to_pandas(), df_molecule
-
-def profile_code(func, *args, **kwargs):
-    pr = cProfile.Profile()
-    pr.enable()
-    result = func(*args, **kwargs)
-    pr.disable()
-    s = io.StringIO()
-    sortby = 'cumulative'
-    ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-    ps.print_stats()
-    print(s.getvalue())
-    return result

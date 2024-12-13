@@ -5,16 +5,12 @@ import cudf
 import cupy
 import cugraph as cnx
 import pandas as pd
-import mdtraj as md
+# import mdtraj as md   # Nick NOTE: i think this is only used by molfind.py or trace.py so might not need the import
 import numpy as np
 import networkx as nx
 import time as timetime
 from torchani.neighbors import _parse_neighborlist
 import matplotlib.pyplot as plt
-
-import cProfile
-import pstats
-import io
 
 # TODO: use RMM allocator for pytorch
 
@@ -43,9 +39,7 @@ if not torch.cuda.is_available():
 # Set device to CUDA
 device = "cuda"
 
-# NICK EDITS:
-# We don't want to save molecule information for the molecules present at frame zero -- also added individual elements, since a lot of those were found
-initial_molecules = {'HH', 'CHHHH', 'CO', 'HHHN', 'HHO', 'C', 'H', 'N', 'O'}
+# initial_molecules = {'HH', 'CHHHH', 'CO', 'HHHN', 'HHO', 'C', 'H', 'N', 'O'}
 
 
 def get_bond_data_table():

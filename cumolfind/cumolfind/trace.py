@@ -27,6 +27,9 @@ import pandas as pd
 import mdtraj as md
 from tqdm import tqdm
 from .fragment import find_fragments, cugraph_slice_subgraph, draw_netx_graph
+from .top_loader import load_topology
+
+# NOTE: NEED TO IMPLEMENT load_topology LOGIC
 
 
 def save_data(temp_dfs, output_dir, filename):
@@ -123,11 +126,11 @@ def trace_molecule(
                 break
             for fragment in fragments:
                 # Compare the fragment with known molecules
-                match_found = False
+                # match_found = False
                 matched_name = "Unknown"
                 for _, mol_row in mol_database.iterrows():
                     if mol_row["flatten_formula"] == fragment["flatten_formula"]:
-                        match_found = True
+                        # match_found = True
                         matched_name = mol_row["name"]
                         break
 
@@ -154,7 +157,7 @@ def trace_molecule(
 def main():
     parser = argparse.ArgumentParser(description="Trace molecule formation backwards from a specified frame")
     parser.add_argument("traj_file", type=str, help="Trajectory file to be analyzed")
-    parser.add_argument("top_file", type=str, help="Topology file to be analyzed")
+    parser.add_argument("top_file", type=str, help="H5 topology file to be analyzed")
     parser.add_argument("mol_pq", type=str, help="Molecule database file")
     parser.add_argument(
         "atom_indices",

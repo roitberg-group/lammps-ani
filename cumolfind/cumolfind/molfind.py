@@ -28,6 +28,10 @@ import mdtraj as md
 import pandas as pd
 from tqdm import tqdm
 from .fragment import analyze_a_frame
+from .top_loader import load_topology
+
+
+# NOTE: NEED TO IMPLEMENT load_topology LOGIC
 
 
 def save_data(temp_dfs, output_dir, filename):
@@ -36,11 +40,13 @@ def save_data(temp_dfs, output_dir, filename):
         concatenated_df = pd.concat(temp_dfs)
         concatenated_df.to_parquet(os.path.join(output_dir, filename))
 
+
 def read_dcd_header(dcd_file_path):
     with open(dcd_file_path, 'rb') as file:
         file.seek(8)  # Skip magic number and version
         n_frames = int.from_bytes(file.read(4), byteorder='little')
         return n_frames
+
 
 @torch.inference_mode()
 def analyze_all_frames(
@@ -131,7 +137,7 @@ def analyze_all_frames(
 def main():
     parser = argparse.ArgumentParser(description="Analyze trajectory")
     parser.add_argument("traj_file", type=str, help="Trajectory file to be analyzed")
-    parser.add_argument("top_file", type=str, help="Topology file to be analyzed")
+    parser.add_argument("top_file", type=str, help="H5 topology file to be analyzed")
     parser.add_argument("mol_pq", type=str, help="Molecule database file")
     parser.add_argument("--time_offset", type=float, help="Time offset for the trajectory", default=0.0)
     parser.add_argument(

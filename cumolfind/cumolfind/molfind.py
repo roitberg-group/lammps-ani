@@ -50,7 +50,7 @@ def read_dcd_header(dcd_file_path):
 
 @torch.inference_mode()
 def analyze_all_frames(
-    top_file,
+    topology,
     traj_file,
     time_offset,
     dump_interval,
@@ -68,7 +68,7 @@ def analyze_all_frames(
     if Path(traj_file).suffix == ".dcd":
         total_frames = read_dcd_header(traj_file)
     else:
-        traj_iterator = pt.iterload(traj_file, top=top_file)
+        traj_iterator = pt.iterload(traj_file, top=topology)
         total_frames = len(traj_iterator)
 
     if segment_index >= num_segments:
@@ -88,7 +88,7 @@ def analyze_all_frames(
     print(f"Total frames: {total_frames}, total frames in segment: {total_frames_in_segment}, frame range: {local_start_frame} - {end_frame}")
 
     # load the first frame to get the cell size
-    # first_frame = md.load_frame(traj_file, index=0, top=top_file)
+    # first_frame = md.load_frame(traj_file, index=0, top=topology)
     # cell = first_frame.unitcell_vectors * 10.0
     # print(f"pbc box cell is {cell.tolist()}")
 
@@ -98,7 +98,7 @@ def analyze_all_frames(
     frame_num = local_start_frame
     output_filename = f"{Path(traj_file).stem}_seg{segment_index:04d}of{num_segments:04d}"
     for mdtraj_frame in tqdm(
-        md.iterload(traj_file, top=top_file, chunk=1, stride=stride, skip=local_start_frame),
+        md.iterload(traj_file, top=topology, chunk=1, stride=stride, skip=local_start_frame),
         total=total_frames_in_segment,
     ):
         try:
@@ -159,9 +159,11 @@ def main():
     output_directory = args.output_dir
     os.makedirs(output_directory, exist_ok=True)
 
+    topology = load_topology(args.top_file)
+
     # Analyze the entire trajectory
     analyze_all_frames(
-        args.top_file,
+        topology,
         args.traj_file,
         args.time_offset,
         args.dump_interval,

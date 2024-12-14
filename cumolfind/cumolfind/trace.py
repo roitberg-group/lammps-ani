@@ -29,8 +29,6 @@ from tqdm import tqdm
 from .fragment import find_fragments, cugraph_slice_subgraph, draw_netx_graph
 from .top_loader import load_topology
 
-# NOTE: NEED TO IMPLEMENT load_topology LOGIC
-
 
 def save_data(temp_dfs, output_dir, filename):
     """Concatenates and saves the given list of DataFrames."""
@@ -48,7 +46,7 @@ def read_dcd_header(dcd_file_path):
 
 @torch.inference_mode()
 def trace_molecule(
-    top_file,
+    topology,
     traj_file,
     mol_pq,
     atom_indices,
@@ -71,7 +69,7 @@ def trace_molecule(
     if Path(traj_file).suffix == ".dcd":
         total_frames = read_dcd_header(traj_file)
     else:
-        traj_iterator = md.iterload(traj_file, top=top_file)
+        traj_iterator = md.iterload(traj_file, top=topology)
         total_frames = len(traj_iterator)
 
     if segment_index >= num_segments:
@@ -97,7 +95,7 @@ def trace_molecule(
 
     for frame_num in tqdm(frame_range, desc="Tracing molecule"):
         try:
-            mdtraj_frame = md.load_frame(traj_file, index=frame_num, top=top_file)
+            mdtraj_frame = md.load_frame(traj_file, index=frame_num, top=topology)
 
             # Convert MDTraj data to PyTorch tensors
             positions = (
@@ -125,18 +123,24 @@ def trace_molecule(
                 print(f"Frame {frame_num}: Each atom index is now in a separate fragment.")
                 break
             for fragment in fragments:
+                # Collect fragment coordinates
+                frag_coords = positions[0, fragment["atom_indices"], :].cpu().numpy()
+
                 # Compare the fragment with known molecules
-                # match_found = False
+                # match_found = False           # NOTE: there is no logic for matching before appending to the dataframe
                 matched_name = "Unknown"
                 for _, mol_row in mol_database.iterrows():
                     if mol_row["flatten_formula"] == fragment["flatten_formula"]:
-                        # match_found = True
+                        # match_found = True    # NOTE: there is no logic for matching before appending to the dataframe
                         matched_name = mol_row["name"]
                         break
 
                 # Collect fragment details
                 fragment_graph = cugraph_slice_subgraph(cG, species, fragment["atom_indices"])
-                draw_netx_graph(fragment_graph)
+                graph_filename = os.path.join(
+                    output_dir, f"frame_{frame_num}_fragment_{'_'.join(map(str, fragment['atom_indices']))}"
+                )
+                draw_netx_graph(fragment_graph, filename=graph_filename)
 
                 tracked_data.append({
                     "frame": frame_num,
@@ -144,6 +148,7 @@ def trace_molecule(
                     "atom_indices": fragment["atom_indices"],
                     "formula": fragment["flatten_formula"],
                     "name": matched_name,
+                    "coordinates": frag_coords.tolist(),
                 })
         except Exception as e:
             print(f"Error analyzing frame {frame_num}: {e}")
@@ -183,10 +188,12 @@ def main():
     output_directory = args.output_dir
     os.makedirs(output_directory, exist_ok=True)
 
+    topology = load_topology(args.top_file)
+
     # Analyze the entire trajectory
     trace_molecule(
         args.traj_file,
-        args.top_file,
+        topology,
         args.mol_pq,
         args.atom_indices,
         args.start_frame,

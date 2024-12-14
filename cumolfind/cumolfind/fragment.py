@@ -171,14 +171,14 @@ def cugraph_slice_subgraph(cgraph, species, nodes):
     return nxgraph
 
 
-def draw_netx_graph(nxgraph):
+def draw_netx_graph(nxgraph, filename='graph'):
     import matplotlib.pyplot as plt
 
     labels = {
         node: f"{node}\n({nxgraph.nodes[node]['atomic_number']})" for node in nxgraph.nodes()}
     nx.draw(nxgraph, with_labels=True, labels=labels,
             node_color="lightblue", edge_color="gray")
-    plt.savefig("graph.png")
+    plt.savefig(f"{filename}.png")
 
 
 def find_fragments(species, coordinates, cell=None, pbc=None, use_cell_list=True):

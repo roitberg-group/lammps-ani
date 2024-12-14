@@ -31,9 +31,6 @@ from .fragment import analyze_a_frame
 from .top_loader import load_topology
 
 
-# NOTE: NEED TO IMPLEMENT load_topology LOGIC
-
-
 def save_data(temp_dfs, output_dir, filename):
     """Concatenates and saves the given list of DataFrames."""
     if temp_dfs:

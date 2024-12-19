@@ -16,11 +16,13 @@ def parse_arguments():
     parser.add_argument('--output_dir', type=Path, default=None, help='Output directory')
     return parser.parse_args()
 
+
 def calculate_frames_per_segment(timestep, segment_duration_ns, dump_interval):
     frames = (segment_duration_ns * 1e6) / (timestep * dump_interval)
     if not frames.is_integer() or frames % 100 != 0:
         raise ValueError(f"The calculated number of frames per segment must be an integer and a multiple of 100, found: {frames}")
     return int(frames)
+
 
 def split_trajectory(traj_file, top_file, timestep, output_dir, frames_per_segment, dump_interval):
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -33,6 +35,7 @@ def split_trajectory(traj_file, top_file, timestep, output_dir, frames_per_segme
         if time_offset > 1.0:
             break
 
+
 def main():
     args = parse_arguments()
     frames_per_segment = calculate_frames_per_segment(args.timestep, args.segment_duration_ns, args.dump_interval)
@@ -40,6 +43,7 @@ def main():
 
     output_dir = Path(args.output_dir) if args.output_dir else Path(f"{args.traj_file}_split")
     split_trajectory(args.traj_file, args.top_file, args.timestep, output_dir, frames_per_segment, args.dump_interval)
+
 
 if __name__ == "__main__":
     main()

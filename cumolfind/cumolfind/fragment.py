@@ -255,7 +255,6 @@ def analyze_a_frame(
     """
     filter_fragment_from_mdtraj_frame
     """
-    start_total = timetime.time()
     start = timetime.time()
     positions = (
         torch.tensor(mdtraj_frame.xyz, device=device).float().view(
@@ -345,7 +344,7 @@ def analyze_a_frame(
 
     if timing:
         print("iterate database: ", timetime.time() - start1)
-        print("analyze_a_frame time: ", timetime.time() - start_total)
+        print("analyze_a_frame time: ", timetime.time() - start)
 
     df_formula = df_per_frag["flatten_formula"].value_counts().to_frame("counts").reset_index()
 

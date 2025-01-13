@@ -264,7 +264,6 @@ def analyze_a_frame(
     """
     filter_fragment_from_mdtraj_frame
     """
-    start_total = timetime.time()
     start = timetime.time()
     positions = (
         torch.tensor(mdtraj_frame.xyz, device=device).float().view(

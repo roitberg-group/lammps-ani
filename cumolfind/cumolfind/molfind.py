@@ -85,7 +85,7 @@ def analyze_all_frames(
     print(f"Total frames: {total_frames}, total frames in segment: {total_frames_in_segment}, frame range: {local_start_frame} - {end_frame}")
 
     # load the first frame to get the cell size
-    # first_frame = md.load_frame(traj_file, index=0, top=top_file)
+    # first_frame = md.load_frame(traj_file, index=0, top=topology)
     # cell = first_frame.unitcell_vectors * 10.0
     # print(f"pbc box cell is {cell.tolist()}")
 

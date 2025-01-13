@@ -28,6 +28,7 @@ import mdtraj as md
 import pandas as pd
 from tqdm import tqdm
 from .fragment import analyze_a_frame
+from .top_loader import load_topology
 
 
 def save_data(temp_dfs, output_dir, filename):
@@ -36,15 +37,17 @@ def save_data(temp_dfs, output_dir, filename):
         concatenated_df = pd.concat(temp_dfs)
         concatenated_df.to_parquet(os.path.join(output_dir, filename))
 
+
 def read_dcd_header(dcd_file_path):
     with open(dcd_file_path, 'rb') as file:
         file.seek(8)  # Skip magic number and version
         n_frames = int.from_bytes(file.read(4), byteorder='little')
         return n_frames
 
+
 @torch.inference_mode()
 def analyze_all_frames(
-    top_file,
+    topology,
     traj_file,
     time_offset,
     dump_interval,
@@ -62,7 +65,7 @@ def analyze_all_frames(
     if Path(traj_file).suffix == ".dcd":
         total_frames = read_dcd_header(traj_file)
     else:
-        traj_iterator = pt.iterload(traj_file, top=top_file)
+        traj_iterator = pt.iterload(traj_file, top=topology)
         total_frames = len(traj_iterator)
 
     if segment_index >= num_segments:
@@ -92,7 +95,7 @@ def analyze_all_frames(
     frame_num = local_start_frame
     output_filename = f"{Path(traj_file).stem}_seg{segment_index:04d}of{num_segments:04d}"
     for mdtraj_frame in tqdm(
-        md.iterload(traj_file, top=top_file, chunk=1, stride=stride, skip=local_start_frame),
+        md.iterload(traj_file, top=topology, chunk=1, stride=stride, skip=local_start_frame),
         total=total_frames_in_segment,
     ):
         try:
@@ -131,7 +134,7 @@ def analyze_all_frames(
 def main():
     parser = argparse.ArgumentParser(description="Analyze trajectory")
     parser.add_argument("traj_file", type=str, help="Trajectory file to be analyzed")
-    parser.add_argument("top_file", type=str, help="Topology file to be analyzed")
+    parser.add_argument("top_file", type=str, help="H5 topology file to be analyzed")
     parser.add_argument("mol_pq", type=str, help="Molecule database file")
     parser.add_argument("--time_offset", type=float, help="Time offset for the trajectory", default=0.0)
     parser.add_argument(
@@ -153,9 +156,11 @@ def main():
     output_directory = args.output_dir
     os.makedirs(output_directory, exist_ok=True)
 
+    topology = load_topology(args.top_file)
+
     # Analyze the entire trajectory
     analyze_all_frames(
-        args.top_file,
+        topology,
         args.traj_file,
         args.time_offset,
         args.dump_interval,

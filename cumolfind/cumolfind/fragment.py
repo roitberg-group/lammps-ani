@@ -156,7 +156,6 @@ def cugraph_slice_subgraph(cgraph, species, nodes):
     start_indices = offset_col[nodes]
     end_indices = cupy.roll(cupy.array(offset_col), -1)[nodes]
 
-
     # we run this on CPU because now the graph is small and retrieving the data with this pattern will be slow on GPU
     for node, start_idx, end_idx in zip(nodes, start_indices.values_host, end_indices.get()):
         adj_nodes = index_col[start_idx:end_idx]
@@ -169,7 +168,7 @@ def cugraph_slice_subgraph(cgraph, species, nodes):
     nxgraph = nx.from_pandas_edgelist(df_edges, "source", "target")
 
     atomic_numbers = species.flatten()[torch.tensor(nodes)].cpu().numpy()
-    # NOTE: There is some issue with nodes matching atomic numbers here, probably from something i changed 
+    # NOTE: There was some issue with nodes matching atomic numbers here, probably from something i changed
 
     for node, atomic_number in zip(nodes, atomic_numbers):
         nxgraph.nodes[node]["atomic_number"] = atomic_number
@@ -256,8 +255,7 @@ def edge_match(edge1, edge2):
 
 # NOTE: TO DO:
 #  * Load all graphs, rather than iterating mol_database every time, just have them pre-loaded
-#    -- maybe this would be better to do in molfind.py, so that the df isn't reloaded every time a frame is analyzed? 
-
+#    -- maybe this would be better to do in molfind.py, so that the df isn't reloaded every time a frame is analyzed?
 
 
 def analyze_a_frame(

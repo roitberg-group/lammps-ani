@@ -18,9 +18,9 @@ neigh_modify   every 10 delay 0 check yes
 newton         ${newton_pair} off
 
 # Atom Definition
-read_data      ${datafile}
+# read_data      ${datafile}
 # replicate      3 3 3
-change_box     all boundary p p p
+# change_box     all boundary p p p
 
 # pair_style ani 5.1 model_file device num_models ani_aev ani_neighbor
 # 0. model_file               = path to the model file
@@ -29,8 +29,12 @@ change_box     all boundary p p p
 # 3. ani_aev (Optional)       = cuaev/pyaev, default as cuaev
 # 4. ani_neighbor (Optional)  = full/half, default as full nbrlist
 # 5. ani_precision (Optional) = single/double, default as single
-pair_style     ani 5.1 ${modelfile} cuda ${num_models} cuaev full single
-pair_coeff     * *
+# pair_style     ani 5.1 ${modelfile} cuda ${num_models} cuaev full single
+# pair_coeff     * *
+
+read_restart   logs/2023-12-22-092948.restart
+pair_coeff * *
+
 
 # Output: dump atom positions every 0.5 ps and log info every 0.5 ps
 dump           1 all custom 100 logs/${timestamp}.lammpstrj id element x y z ix iy iz
@@ -46,7 +50,6 @@ timestep       ${timestep}
 # run nvt
 fix            1 all langevin 300.0 300.0 100.0 12345
 fix            2 all nve
-
 run            10
 write_restart  logs/${timestamp}.restart
 

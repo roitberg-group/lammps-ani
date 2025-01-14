@@ -45,13 +45,14 @@ def setup_and_run_job(num_gpus, data_file, job_name, submit=False, weak_scaling=
         ntasks_per_node=ntasks_per_node,
         cpus_per_task=1,
         partition="hpg-ai",
-        # reservation="roitberg2",
+        reservation="roitberg-phase1",
         qos="roitberg",
         account="roitberg",
         gres=gres,
         mem_per_cpu="100gb",
         time="120:00:00",
         output=output_filename,
+        exclude="c0900a-s23",
     )
 
     commands = [

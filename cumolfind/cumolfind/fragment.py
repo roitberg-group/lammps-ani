@@ -3,6 +3,7 @@ import pickle
 import ase
 import cudf
 import cupy
+import ast
 import cugraph as cnx
 import pandas as pd
 import mdtraj as md
@@ -257,6 +258,23 @@ def edge_match(edge1, edge2):
 #  * Load all graphs, rather than iterating mol_database every time, just have them pre-loaded
 #    -- maybe this would be better to do in molfind.py, so that the df isn't reloaded every time a frame is analyzed?
 
+def compute_fragment_edge_count(frag_atom_indices, nxgraph):
+    fragment_graph = nxgraph.subgraph(frag_atom_indices)
+    return fragment_graph.number_of_edges()
+
+def is_isomorphic(row):
+    fragment_graph = row["fragment_graph"]
+    reference_graph = row["reference_graph"]
+
+    # Add element pairs to both graphs
+    add_element_pairs_to_edges(fragment_graph)
+    add_element_pairs_to_edges(reference_graph)
+
+    # Isomorphism check
+    node_match = nx.isomorphism.categorical_node_match('element', '')
+    edge_match = nx.isomorphism.categorical_edge_match('element_pair', '')
+    gm = nx.isomorphism.GraphMatcher(reference_graph, fragment_graph, node_match=node_match, edge_match=edge_match)
+    return gm.is_isomorphic()
 
 def analyze_a_frame(
     mdtraj_frame, time_offset, dump_interval, timestep, stride, frame_num, mol_database, use_cell_list=True
@@ -288,6 +306,8 @@ def analyze_a_frame(
     start_filter = timetime.time()
     if timing:
         print("Time to filter fragment dataframe: ", timetime.time() - start_filter)
+
+    # we will be saving the relevant ones in this dataframe
     df_molecule = pd.DataFrame(
         columns=[
             "frame",
@@ -301,7 +321,76 @@ def analyze_a_frame(
         ]
     )
 
+    mol_database2 = mol_database
+    mol_database2 = mol_database2.astype(str)
+    mol_database2 = cudf.from_pandas(mol_database2)
     start1 = timetime.time()
+    merged_df_per_frag = mol_database2.merge(df_per_frag, on="flatten_formula", how="inner")
+    global_atom_indices = np.concatenate(merged_df_per_frag["atom_indices"].to_pandas().to_numpy())
+    nxgraph = cugraph_slice_subgraph(cG, species, global_atom_indices) #0.60s, the longest time here
+    merged_df_per_frag["fragment_edge_count"] = merged_df_per_frag["atom_indices"].to_pandas().apply(
+    lambda frag_atom_indices: compute_fragment_edge_count(frag_atom_indices, nxgraph)) #0.009s
+    # Throw away fragments that don't have the same number of edges as the reference graph
+    merged_df_per_frag["num_edges"] = merged_df_per_frag["num_edges"].astype(int)
+    filtered_df = merged_df_per_frag[merged_df_per_frag["fragment_edge_count"] == merged_df_per_frag["num_edges"]] # 0.007s
+
+    # From now on, we have to keep working in pandas because graph isomorphism check is not possible for cuDF/cuGraph
+    graph_pandas = filtered_df["graph"].to_pandas()
+    # Convert serialized strings to bytes
+    graph_pandas = graph_pandas.apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
+    reference_graphs = graph_pandas.apply(pickle.loads)
+    filtered_df = filtered_df.to_pandas() 
+    filtered_df["reference_graph"] = reference_graphs
+    if timing:
+        print("preprocessing: ", timetime.time() - start1)
+
+    start1 = timetime.time()
+    match = 0
+    # Potential optimziation: remove iterrows! 
+    for frame_num, row in filtered_df.iterrows():
+        frag_atom_indices = row["atom_indices"]
+        # get subgraph for this fragment
+        fragment_graph = nxgraph.subgraph(frag_atom_indices)
+        graph = reference_graphs[frame_num] # pull from preprocessed reference graph
+
+        # Keep the rest as before
+        # Add element pairs to edges (assuming function modifies graphs in-place)
+        add_element_pairs_to_edges(fragment_graph)
+        add_element_pairs_to_edges(graph)
+
+        # Perform isomorphism check
+        node_match = nx.isomorphism.categorical_node_match('element', '')
+        edge_match = nx.isomorphism.categorical_edge_match('element_pair', '')
+        gm = nx.isomorphism.GraphMatcher(graph, fragment_graph, node_match=node_match, edge_match=edge_match)
+
+        if gm.is_isomorphic():
+            df_molecule.loc[len(df_molecule)] = [
+                frame_num,
+                frame_num,  
+                row["formula"],
+                row["flatten_formula"],  
+                row["smiles"],
+                row["name"],
+                row["atom_indices"],  
+                time,  
+            ]
+            match += 1
+            print(f"    is_isomorphic {row['name']}, flatten_formula {row['flatten_formula']}, match {match}")
+
+    if timing:
+        print("iterate database: ", timetime.time() - start1)
+
+    # df_formula = df_per_frag["flatten_formula"].value_counts().to_frame("counts").reset_index()
+
+    # df_formula["local_frame"] = frame_num
+    # df_formula["frame"] = frame
+    # df_formula["time"] = time
+
+    # return df_formula.to_pandas(), df_molecule
+
+    start1 = timetime.time()
+    # for debugging
+    first_match = False
     for index, row in mol_database.iterrows():
         flatten_formula = row["flatten_formula"]
         # filter df_per_frag by flatten_formula
@@ -311,16 +400,21 @@ def analyze_a_frame(
         if len(df_this_formula) == 0:
             continue
 
+        first_match = True 
         # we need all the atom_indices in df_this_formula
         atom_indices = df_this_formula.to_pandas().atom_indices
+        # print("atom_indices", atom_indices)
         # flatten the atom_indices
         atom_indices = np.concatenate(atom_indices.to_numpy())
-
+        # print("atom_indices flattened", atom_indices)
+        # print(f"First matched formula: {row['formula']}")
+        # print(f"Flatten formula: {flatten_formula}")
         # unpickle the reference graph
         graph = pickle.loads(row["graph"])
-
+        # print("reference graph", graph)
         # get the nxgraph for this fragment
         nxgraph = cugraph_slice_subgraph(cG, species, atom_indices)
+        # print("nxgraph graph", nxgraph)
 
         start = timetime.time()
         match = 0
@@ -328,8 +422,11 @@ def analyze_a_frame(
         for fragment_index, fragment_row in df_this_formula.to_pandas().iterrows():
             # get the atom_indices for this fragment
             frag_atom_indices = fragment_row["atom_indices"]
+            # print("fragment atom indices", frag_atom_indices)
             # get subgraph for this fragment
             fragment_graph = nxgraph.subgraph(frag_atom_indices)
+            # print("fragment graph", fragment_graph)
+
             # add element pairs and check if this is isomorphic to the reference graph
             add_element_pairs_to_edges(fragment_graph)
             add_element_pairs_to_edges(graph)

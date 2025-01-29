@@ -1,6 +1,7 @@
 # Set RMM allocator to be used by PyTorch
 import torch
 import traceback
+import pickle
 import rmm.mr as mr
 from rmm.allocators.torch import rmm_torch_allocator
 
@@ -58,7 +59,32 @@ def analyze_all_frames(
     segment_index=0,
 ):
     mol_database = pd.read_parquet(mol_pq)
+    print("Columns in mol_database:", mol_database.columns)
 
+    if "graph" in mol_database.columns:
+        print("Graph column exists. Adding num_nodes and num_edges...")
+
+        # Initialize lists for nodes and edges
+        num_nodes = []
+        num_edges = []
+
+        # Compute node and edge counts for each graph
+        for graph_pickle in mol_database["graph"]:
+            graph = pickle.loads(graph_pickle)  # Unpickle the graph
+            num_nodes.append(graph.number_of_nodes())
+            num_edges.append(graph.number_of_edges())
+
+        # Add the new columns
+        mol_database["num_nodes"] = num_nodes
+        mol_database["num_edges"] = num_edges
+
+        # Save the updated DataFrame back to Parquet for future use
+        mol_database.to_parquet(mol_pq)
+        print("Updated mol_database saved with num_nodes and num_edges.")
+    else:
+        print("Graph column does not exist in mol_database. No changes made.")
+
+    print(mol_database[["num_edges"]].head())
     stride = 1  # Currently hardcoded to 1, as we are splitting into segments
     save_interval = 20  # Interval for saving dataframes
 

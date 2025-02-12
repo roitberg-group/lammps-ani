@@ -2,7 +2,7 @@ import torch
 import pickle
 import ase
 import cudf
-import cupy
+import cupy as cp
 import ast
 import cugraph as cnx
 import pandas as pd
@@ -100,8 +100,8 @@ def neighborlist_to_fragment(atom_index12, species):
     # https://docs.rapids.ai/api/cugraph/stable/api_docs/api/cugraph.graph.from_cudf_edgelist#cugraph.Graph.from_cudf_edgelist
     df_edges = cudf.DataFrame(
         {
-            "source": cupy.from_dlpack(torch.to_dlpack(atom_index12[0])),
-            "destination": cupy.from_dlpack(torch.to_dlpack(atom_index12[1])),
+            "source": cp.from_dlpack(torch.to_dlpack(atom_index12[0])),
+            "destination": cp.from_dlpack(torch.to_dlpack(atom_index12[1])),
         }
     )
     cG = cnx.Graph()
@@ -150,12 +150,11 @@ def cugraph_slice_subgraph(cgraph, species, nodes):
     Returns a subgraph of G, containing only the nodes in the list nodes with their edges.
     This implementation assume that the subgraph is a single connected component, so that every edges for each node is included.
     """
-
     offset_col, index_col, _ = cgraph.view_adj_list()
 
     edges = []
     start_indices = offset_col[nodes]
-    end_indices = cupy.roll(cupy.array(offset_col), -1)[nodes]
+    end_indices = cp.roll(cp.array(offset_col), -1)[nodes]
 
     # we run this on CPU because now the graph is small and retrieving the data with this pattern will be slow on GPU
     for node, start_idx, end_idx in zip(nodes, start_indices.values_host, end_indices.get()):
@@ -175,7 +174,110 @@ def cugraph_slice_subgraph(cgraph, species, nodes):
         nxgraph.nodes[node]["atomic_number"] = atomic_number
     return nxgraph
 
+def cugraph_slice_subgraph_gpu1(cgraph, species, nodes):
+    """
+    Returns a subgraph of `cgraph`, containing only the nodes in `nodes` with their edges.
+    Optimized for GPU execution.
+    """
+    time0 = timetime.time()
+    offset_col, index_col, _ = cgraph.view_adj_list()
+    nodes_cp = cp.array(nodes)
 
+    start_indices = offset_col[nodes_cp]
+    end_indices = cp.roll(cp.array(offset_col), -1)[nodes]
+    time00 = timetime.time()
+    # print("Time to get start and end indices", time00 - time0)
+    # print("start loc", start_indices.to_cupy().device)
+    # print("end loc", end_indices.to_cupy().device)
+    # print("start_indices", start_indices)
+    # print("end_indices", end_indices)
+
+    node_repeats = end_indices - start_indices
+    time3 = timetime.time()
+    print("Time to get node_repeats", time3 - time00)
+    # print("node_repeats", node_repeats)
+    node_expanded = cp.concatenate([cp.full((int(r),), int(v), dtype=cp.int32) for v, r in zip(nodes_cp.get(), node_repeats.get())])
+    time4 = timetime.time()
+    print("Time to get node_expanded", time4 - time3)
+    # node_expanded = cp.concatenate([
+    #     cp.full((r,), v, dtype=cp.int32) for v, r in zip(nodes_cp, node_repeats)
+    # ])
+    start_indices = start_indices.to_cupy()
+    start_indices_expanded = cp.concatenate([
+        cp.repeat(cp.array(s, dtype=cp.int32), int(r)) for s, r in zip(start_indices.get(), node_repeats.get())
+    ]) 
+    time5 = timetime.time()
+    print("Time to get start_indices_expanded", time5 - time4)
+    # start_indices_expanded = cp.repeat(start_indices, node_repeats)   
+    offsets = cp.arange(len(node_expanded)) - cp.concatenate([cp.full((int(r),), int(v), dtype=cp.int32) for v, r in zip((cp.cumsum(node_repeats) - node_repeats).get(), node_repeats.get())
+    ])
+    time6 = timetime.time()
+    print("Time to get offsets", time6 - time5)
+
+    adj_nodes = index_col[start_indices_expanded + offsets]  # Retrieve adjacent nodes
+    time7 = timetime.time()
+    print("Time to get adj_nodes", time7 - time6)
+    # Remove duplicate edges (for undirected graphs)
+    mask = node_expanded < adj_nodes  # Keep only (small_node, large_node) pairs
+    edges = cp.vstack((node_expanded[mask], adj_nodes[mask])).T  # Stack into (source, target) pairs
+    time8 = timetime.time()
+    print("Time to get edges", time8 - time7)
+    # Convert edges to a pandas DataFrame (minimal CPU transfer)
+    df_edges = cudf.DataFrame(edges, columns=["source", "target"]).to_pandas()
+    nxgraph = nx.from_pandas_edgelist(df_edges, "source", "target")
+
+    atomic_numbers = species.flatten()[torch.tensor(nodes)].cpu().numpy()
+
+    for node, atomic_number in zip(nodes, atomic_numbers):
+        nxgraph.nodes[node]["atomic_number"] = atomic_number
+    time9 = timetime.time()
+    print("Time to get nxgraph", time9 - time8)
+    return nxgraph
+
+def cugraph_slice_subgraph_gpu(cgraph, species, nodes):
+    """
+    Returns a subgraph of `cgraph`, containing only the nodes in `nodes` with their edges.
+    Optimized for GPU execution.
+    """
+    time1 = timetime.time()
+    offset_col, index_col, _ = cgraph.view_adj_list()
+    nodes_cp = cp.array(nodes)
+
+    start_indices = offset_col[nodes_cp]
+    end_indices = cp.roll(cp.array(offset_col), -1)[nodes]
+    time2 = timetime.time()
+    print("Time to get start and end indices", time2 - time1)
+    print("start_indices", start_indices)
+    print("end_indices", end_indices)
+
+    node_repeats = end_indices - start_indices
+    time3 = timetime.time()
+    print("Time to get node_repeats", time3 - time2)
+    print("node_repeats", node_repeats)
+
+    # Efficiently expand nodes (no .get() calls)
+    # node_expanded = cp.repeat(nodes_cp, node_repeats)
+    # start_indices_expanded = cp.repeat(start_indices, node_repeats)
+
+    # # Compute offsets efficiently (no Python loops)
+    # offset_values = cp.cumsum(node_repeats) - node_repeats
+    # offsets = cp.arange(len(node_expanded)) - cp.repeat(offset_values, node_repeats)
+
+    # adj_nodes = index_col[start_indices_expanded + offsets]  # Retrieve adjacent nodes
+
+    # # Remove duplicate edges (for undirected graphs)
+    # mask = node_expanded < adj_nodes
+    # edges = cp.vstack((node_expanded[mask], adj_nodes[mask])).T
+
+    # # Keep everything in CuGraph instead of moving to Pandas
+    # df_edges = cudf.DataFrame(edges, columns=["source", "target"])
+    # cugraph_graph = cugraph.Graph()
+    # cugraph_graph.from_cudf_edgelist(df_edges, source="source", destination="target")
+
+    # print(f"Created cuGraph graph with {cugraph_graph.number_of_nodes()} nodes and {cugraph_graph.number_of_edges()} edges")
+
+    # return cugraph_graph  # Keep processing in CuGraph instead of Pandas/NetworkX
+    
 def draw_netx_graph(nxgraph):
     import matplotlib.pyplot as plt
 
@@ -326,14 +428,25 @@ def analyze_a_frame(
     mol_database2 = cudf.from_pandas(mol_database2)
     start1 = timetime.time()
     merged_df_per_frag = mol_database2.merge(df_per_frag, on="flatten_formula", how="inner")
+    # check this! 
+    # create an nxgraph only for flatten_formulas that went through the filter
     global_atom_indices = np.concatenate(merged_df_per_frag["atom_indices"].to_pandas().to_numpy())
-    nxgraph = cugraph_slice_subgraph(cG, species, global_atom_indices) #0.60s, the longest time here
+    # print("global_atom_indices", global_atom_indices)
+    # print("big cG graph", cG)
+    # print("Doing the GPU1 subgraph")
+    time1 = timetime.time()
+    nxgraph = cugraph_slice_subgraph_gpu1(cG, species, global_atom_indices)
+    time2 = timetime.time()
+    print("nxgraph gpu1 time", time2-time1)
+    # print("Doing the GPU NEW subgraph")
+    # nxgraph = cugraph_slice_subgraph_gpu(cG, species, global_atom_indices) #0.60s, the longest time here
+    # print("nxgraph", nxgraph)
     merged_df_per_frag["fragment_edge_count"] = merged_df_per_frag["atom_indices"].to_pandas().apply(
     lambda frag_atom_indices: compute_fragment_edge_count(frag_atom_indices, nxgraph)) #0.009s
     # Throw away fragments that don't have the same number of edges as the reference graph
     merged_df_per_frag["num_edges"] = merged_df_per_frag["num_edges"].astype(int)
     filtered_df = merged_df_per_frag[merged_df_per_frag["fragment_edge_count"] == merged_df_per_frag["num_edges"]] # 0.007s
-
+    # print("len(filtered_df)", len(filtered_df))
     # From now on, we have to keep working in pandas because graph isomorphism check is not possible for cuDF/cuGraph
     graph_pandas = filtered_df["graph"].to_pandas()
     # Convert serialized strings to bytes
@@ -346,24 +459,15 @@ def analyze_a_frame(
 
     start1 = timetime.time()
     match = 0
-    # Potential optimziation: remove iterrows! 
     for frame_num, row in filtered_df.iterrows():
         frag_atom_indices = row["atom_indices"]
         # get subgraph for this fragment
         fragment_graph = nxgraph.subgraph(frag_atom_indices)
+        # print("fragment_graph", fragment_graph)
         graph = reference_graphs[frame_num] # pull from preprocessed reference graph
+        # print("graph", graph)
 
-        # Keep the rest as before
-        # Add element pairs to edges (assuming function modifies graphs in-place)
-        add_element_pairs_to_edges(fragment_graph)
-        add_element_pairs_to_edges(graph)
-
-        # Perform isomorphism check
-        node_match = nx.isomorphism.categorical_node_match('element', '')
-        edge_match = nx.isomorphism.categorical_edge_match('element_pair', '')
-        gm = nx.isomorphism.GraphMatcher(graph, fragment_graph, node_match=node_match, edge_match=edge_match)
-
-        if gm.is_isomorphic():
+        if nx.is_isomorphic(graph, fragment_graph):
             df_molecule.loc[len(df_molecule)] = [
                 frame_num,
                 frame_num,  

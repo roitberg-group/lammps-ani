@@ -59,7 +59,6 @@ def analyze_all_frames(
     segment_index=0,
 ):
     mol_database = pd.read_parquet(mol_pq)
-    print("Columns in mol_database:", mol_database.columns)
 
     if "graph" in mol_database.columns:
         print("Graph column exists. Adding num_nodes and num_edges...")
@@ -84,7 +83,6 @@ def analyze_all_frames(
     else:
         print("Graph column does not exist in mol_database. No changes made.")
 
-    print(mol_database[["num_edges"]].head())
     stride = 1  # Currently hardcoded to 1, as we are splitting into segments
     save_interval = 20  # Interval for saving dataframes
 

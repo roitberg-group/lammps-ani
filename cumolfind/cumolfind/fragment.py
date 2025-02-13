@@ -33,10 +33,15 @@ bond_data = {
 
 # Check if CUDA is available
 if not torch.cuda.is_available():
-    raise SystemError("CUDA is required to run this analysis. Please ensure a CUDA-capable GPU is available.")
+    raise SystemError(
+        "CUDA is required to run this analysis. Please ensure a CUDA-capable GPU is available.")
 
 # Set device to CUDA
 device = "cuda"
+
+# NICK EDITS:
+# We don't want to save molecule information for the molecules present at frame zero -- also added individual elements, since a lot of those were found
+initial_molecules = {'HH', 'CHHHH', 'CO', 'HHHN', 'HHO', 'C', 'H', 'N', 'O'}
 
 
 def get_bond_data_table():
@@ -54,9 +59,12 @@ def get_bond_data_table():
     bond_data_length = torch.tensor(list(bond_data_stretched.values()))
 
     # very simple way for pytorch to index
-    bond_length_table = -1.0 * torch.ones((PERIODIC_TABLE_LENGTH + 1), (PERIODIC_TABLE_LENGTH + 1))
-    bond_length_table[bond_data_atomic_pairs[0], bond_data_atomic_pairs[1]] = bond_data_length
-    bond_length_table[bond_data_atomic_pairs[1], bond_data_atomic_pairs[0]] = bond_data_length
+    bond_length_table = -1.0 * \
+        torch.ones((PERIODIC_TABLE_LENGTH + 1), (PERIODIC_TABLE_LENGTH + 1))
+    bond_length_table[bond_data_atomic_pairs[0],
+                      bond_data_atomic_pairs[1]] = bond_data_length
+    bond_length_table[bond_data_atomic_pairs[1],
+                      bond_data_atomic_pairs[0]] = bond_data_length
 
     # sanity check
     assert bond_length_table[1, 1] == bond_data_stretched["HH"]
@@ -130,7 +138,8 @@ def neighborlist_to_fragment(atom_index12, species):
         df_per_frag["flatten_formula"] = df_per_frag.collected_symbols.str.join("")
 
     # Grouping by labels and collecting atom_index using cuDF
-    df_per_frag["atom_indices"] = df.groupby("labels").agg({"atom_index": list}).reset_index()["atom_index"]
+    df_per_frag["atom_indices"] = df.groupby("labels").agg(
+        {"atom_index": list}).reset_index()["atom_index"]
 
     return cG, df_per_frag
 
@@ -159,17 +168,20 @@ def cugraph_slice_subgraph(cgraph, species, nodes):
     nxgraph = nx.from_pandas_edgelist(df_edges, "source", "target")
 
     atomic_numbers = species.flatten()[torch.tensor(nodes)].cpu().numpy()
+    # NOTE: There was some issue with nodes matching atomic numbers here, probably from something i changed
+
     for node, atomic_number in zip(nodes, atomic_numbers):
         nxgraph.nodes[node]["atomic_number"] = atomic_number
-
     return nxgraph
 
 
 def draw_netx_graph(nxgraph):
     import matplotlib.pyplot as plt
 
-    labels = {node: f"{node}\n({nxgraph.nodes[node]['atomic_number']})" for node in nxgraph.nodes()}
-    nx.draw(nxgraph, with_labels=True, labels=labels, node_color="lightblue", edge_color="gray")
+    labels = {
+        node: f"{node}\n({nxgraph.nodes[node]['atomic_number']})" for node in nxgraph.nodes()}
+    nx.draw(nxgraph, with_labels=True, labels=labels,
+            node_color="lightblue", edge_color="gray")
     plt.savefig("graph.png")
 
 
@@ -183,14 +195,17 @@ def find_fragments(species, coordinates, cell=None, pbc=None, use_cell_list=True
     if use_cell_list:
         neighborlist = _parse_neighborlist("cell_list", cutoff=2).to(device)
     else:
-        neighborlist = _parse_neighborlist("full_pairwise", cutoff=2).to(device)
+        neighborlist = _parse_neighborlist(
+            "full_pairwise", cutoff=2).to(device)
 
-    atom_index12, distances, _ = neighborlist(species, coordinates, cell=cell, pbc=pbc)
+    atom_index12, distances, _ = neighborlist(
+        species, coordinates, cell=cell, pbc=pbc)
 
     bond_length_table = get_bond_data_table().to(device)
     spe12 = species.flatten()[atom_index12]
     atom_index12_bond_length = bond_length_table[spe12[0], spe12[1]]
-    in_bond_length = (distances <= atom_index12_bond_length).nonzero().flatten()
+    in_bond_length = (
+        distances <= atom_index12_bond_length).nonzero().flatten()
     atom_index12 = atom_index12.index_select(1, in_bond_length)
 
     return neighborlist_to_fragment(atom_index12, species)
@@ -200,15 +215,47 @@ def build_netx_graph_from_ase(ase_mol, use_cell_list=True):
     """
     Build networkx object for a single ASE molecule.
     """
-    species = torch.tensor(ase_mol.get_atomic_numbers(), device=device).unsqueeze(0)
-    positions = torch.tensor(ase_mol.get_positions(), dtype=torch.float32, device=device).unsqueeze(0)
+    species = torch.tensor(ase_mol.get_atomic_numbers(),
+                           device=device).unsqueeze(0)
+    positions = torch.tensor(ase_mol.get_positions(
+    ), dtype=torch.float32, device=device).unsqueeze(0)
 
-    cG, df_per_frag = find_fragments(species, positions, use_cell_list=use_cell_list)
-    assert len(df_per_frag) == 1, f"This should be a single molecule, but df_per_frag has more than one fragments: {df_per_frag}"
+    cG, df_per_frag = find_fragments(
+        species, positions, use_cell_list=use_cell_list)
+    assert len(
+        df_per_frag) == 1, f"This should be a single molecule, but df_per_frag has more than one fragments: {df_per_frag}"
 
-    nxgraph = cugraph_slice_subgraph(cG, species, df_per_frag.iloc[0].to_pandas().atom_indices[0])
+    nxgraph = cugraph_slice_subgraph(
+        cG, species, df_per_frag.iloc[0].to_pandas().atom_indices[0])
 
     return nxgraph
+
+
+def update_graph_with_elements(graph):
+    """Updates reference graph with element symbols based on atomic numbers."""
+    for node, data in graph.nodes(data=True):
+        data['element'] = species_dict[data['atomic_number']]
+    return graph
+
+
+def add_element_pairs_to_edges(graph):
+    """Adds element pair attributes to the edges of the graph for easier comparison."""
+    update_graph_with_elements(graph)
+    for (node1, node2) in graph.edges():
+        element1 = graph.nodes[node1]['element']
+        element2 = graph.nodes[node2]['element']
+        graph.edges[node1,
+                    node2]['element_pair'] = '-'.join(sorted([element1, element2]))
+
+
+def edge_match(edge1, edge2):
+    """Simple check for element pairs to ensure correct bonding pattern in every molecule that is isomorphic with a reference grah."""
+    return edge1['element_pair'] == edge2['element_pair']
+
+
+# NOTE: TO DO:
+#  * Load all graphs, rather than iterating mol_database every time, just have them pre-loaded
+#    -- maybe this would be better to do in molfind.py, so that the df isn't reloaded every time a frame is analyzed?
 
 
 def analyze_a_frame(
@@ -217,10 +264,10 @@ def analyze_a_frame(
     """
     filter_fragment_from_mdtraj_frame
     """
-
     start = timetime.time()
     positions = (
-        torch.tensor(mdtraj_frame.xyz, device=device).float().view(1, -1, 3) * 10.0
+        torch.tensor(mdtraj_frame.xyz, device=device).float().view(
+            1, -1, 3) * 10.0
     )  # convert to angstrom
     species = torch.tensor(
         [atom.element.atomic_number for atom in mdtraj_frame.topology.atoms], device=device
@@ -236,8 +283,11 @@ def analyze_a_frame(
 
     cG, df_per_frag = find_fragments(species, positions, cell, pbc, use_cell_list=use_cell_list)
     if timing:
-        print("find_fragments: ", timetime.time() - start)
+        print("Time to find fragments: ", timetime.time() - start)
 
+    start_filter = timetime.time()
+    if timing:
+        print("Time to filter fragment dataframe: ", timetime.time() - start_filter)
     df_molecule = pd.DataFrame(
         columns=[
             "frame",
@@ -247,7 +297,7 @@ def analyze_a_frame(
             "smiles",
             "name",
             "atom_indices",
-            "time",
+            "time"
         ]
     )
 
@@ -280,8 +330,13 @@ def analyze_a_frame(
             frag_atom_indices = fragment_row["atom_indices"]
             # get subgraph for this fragment
             fragment_graph = nxgraph.subgraph(frag_atom_indices)
-            # check if this is isomorphic to the reference graph
-            if nx.is_isomorphic(graph, fragment_graph):
+            # add element pairs and check if this is isomorphic to the reference graph
+            add_element_pairs_to_edges(fragment_graph)
+            add_element_pairs_to_edges(graph)
+            node_match = nx.isomorphism.categorical_node_match('element', '')
+            edge_match = nx.isomorphism.categorical_edge_match('element_pair', '')
+            gm = nx.isomorphism.GraphMatcher(graph, fragment_graph, node_match=node_match, edge_match=edge_match)
+            if gm.is_isomorphic():
                 df_molecule.loc[len(df_molecule)] = [
                     frame,
                     frame_num,  # local_frame

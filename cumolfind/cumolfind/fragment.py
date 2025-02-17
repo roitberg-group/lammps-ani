@@ -12,8 +12,15 @@ import networkx as nx
 import time as timetime
 from torchani.neighbors import _parse_neighborlist
 import matplotlib.pyplot as plt
+from ase.build import nanotube
 
 # TODO: use RMM allocator for pytorch
+
+# MA: For NV Cell List
+from .nv_atomic_data import AtomicData
+from .nv_batch import Batch
+from .nv_batch_nl import batched_neighbor_list
+from .nv_cell_list import batched_cell_list
 
 timing = True
 PERIODIC_TABLE_LENGTH = 118
@@ -98,6 +105,7 @@ def neighborlist_to_fragment(atom_index12, species):
     """
     # build cugraph from cudf edges
     # https://docs.rapids.ai/api/cugraph/stable/api_docs/api/cugraph.graph.from_cudf_edgelist#cugraph.Graph.from_cudf_edgelist
+    timm0 = timetime.time()
     df_edges = cudf.DataFrame(
         {
             "source": cp.from_dlpack(torch.to_dlpack(atom_index12[0])),
@@ -106,17 +114,12 @@ def neighborlist_to_fragment(atom_index12, species):
     )
     cG = cnx.Graph()
     cG.from_cudf_edgelist(df_edges, renumber=False)
-    # run cugraph to find all connected_components, all the atoms that are connected
-    # will be labeled by the same label
     df = cnx.connected_components(cG)
-
     atom_index = torch.from_dlpack(df["vertex"].to_dlpack())
     vertex_spe = species.flatten()[atom_index]
     df["atomic_numbers"] = cudf.from_dlpack(torch.to_dlpack(vertex_spe))
     # TODO: use ase to convert atomic numbers to symbols
     df["symbols"] = df["atomic_numbers"].map(species_dict)
-
-    # rename "vertex" to "atom_index"
     df = df.rename(columns={"vertex": "atom_index"})
 
     # Grouping by labels and collecting symbols
@@ -174,55 +177,29 @@ def cugraph_slice_subgraph(cgraph, species, nodes):
         nxgraph.nodes[node]["atomic_number"] = atomic_number
     return nxgraph
 
-def cugraph_slice_subgraph_gpu1(cgraph, species, nodes):
+def cugraph_slice_subgraph_gpu(cgraph, species, nodes):
     """
-    Returns a subgraph of `cgraph`, containing only the nodes in `nodes` with their edges.
-    Optimized for GPU execution.
+    Returns a subgraph of G, containing only the nodes in the list nodes with their edges.
+    GPU version.
     """
-    time0 = timetime.time()
+
     offset_col, index_col, _ = cgraph.view_adj_list()
     nodes_cp = cp.array(nodes)
 
     start_indices = offset_col[nodes_cp]
     end_indices = cp.roll(cp.array(offset_col), -1)[nodes]
-    time00 = timetime.time()
-    # print("Time to get start and end indices", time00 - time0)
-    # print("start loc", start_indices.to_cupy().device)
-    # print("end loc", end_indices.to_cupy().device)
-    # print("start_indices", start_indices)
-    # print("end_indices", end_indices)
 
     node_repeats = end_indices - start_indices
-    time3 = timetime.time()
-    print("Time to get node_repeats", time3 - time00)
-    # print("node_repeats", node_repeats)
     node_expanded = cp.concatenate([cp.full((int(r),), int(v), dtype=cp.int32) for v, r in zip(nodes_cp.get(), node_repeats.get())])
-    time4 = timetime.time()
-    print("Time to get node_expanded", time4 - time3)
-    # node_expanded = cp.concatenate([
-    #     cp.full((r,), v, dtype=cp.int32) for v, r in zip(nodes_cp, node_repeats)
-    # ])
+
     start_indices = start_indices.to_cupy()
     start_indices_expanded = cp.concatenate([
         cp.repeat(cp.array(s, dtype=cp.int32), int(r)) for s, r in zip(start_indices.get(), node_repeats.get())
     ]) 
-    time5 = timetime.time()
-    print("Time to get start_indices_expanded", time5 - time4)
-    # start_indices_expanded = cp.repeat(start_indices, node_repeats)   
-    offsets = cp.arange(len(node_expanded)) - cp.concatenate([cp.full((int(r),), int(v), dtype=cp.int32) for v, r in zip((cp.cumsum(node_repeats) - node_repeats).get(), node_repeats.get())
-    ])
-    time6 = timetime.time()
-    print("Time to get offsets", time6 - time5)
-
-    adj_nodes = index_col[start_indices_expanded + offsets]  # Retrieve adjacent nodes
-    time7 = timetime.time()
-    print("Time to get adj_nodes", time7 - time6)
-    # Remove duplicate edges (for undirected graphs)
-    mask = node_expanded < adj_nodes  # Keep only (small_node, large_node) pairs
-    edges = cp.vstack((node_expanded[mask], adj_nodes[mask])).T  # Stack into (source, target) pairs
-    time8 = timetime.time()
-    print("Time to get edges", time8 - time7)
-    # Convert edges to a pandas DataFrame (minimal CPU transfer)
+    offsets = cp.arange(len(node_expanded)) - cp.concatenate([cp.full((int(r),), int(v), dtype=cp.int32) for v, r in zip((cp.cumsum(node_repeats) - node_repeats).get(), node_repeats.get())])
+    adj_nodes = index_col[start_indices_expanded + offsets]  
+    mask = node_expanded < adj_nodes  
+    edges = cp.vstack((node_expanded[mask], adj_nodes[mask])).T 
     df_edges = cudf.DataFrame(edges, columns=["source", "target"]).to_pandas()
     nxgraph = nx.from_pandas_edgelist(df_edges, "source", "target")
 
@@ -230,54 +207,8 @@ def cugraph_slice_subgraph_gpu1(cgraph, species, nodes):
 
     for node, atomic_number in zip(nodes, atomic_numbers):
         nxgraph.nodes[node]["atomic_number"] = atomic_number
-    time9 = timetime.time()
-    print("Time to get nxgraph", time9 - time8)
     return nxgraph
 
-def cugraph_slice_subgraph_gpu(cgraph, species, nodes):
-    """
-    Returns a subgraph of `cgraph`, containing only the nodes in `nodes` with their edges.
-    Optimized for GPU execution.
-    """
-    time1 = timetime.time()
-    offset_col, index_col, _ = cgraph.view_adj_list()
-    nodes_cp = cp.array(nodes)
-
-    start_indices = offset_col[nodes_cp]
-    end_indices = cp.roll(cp.array(offset_col), -1)[nodes]
-    time2 = timetime.time()
-    print("Time to get start and end indices", time2 - time1)
-    print("start_indices", start_indices)
-    print("end_indices", end_indices)
-
-    node_repeats = end_indices - start_indices
-    time3 = timetime.time()
-    print("Time to get node_repeats", time3 - time2)
-    print("node_repeats", node_repeats)
-
-    # Efficiently expand nodes (no .get() calls)
-    # node_expanded = cp.repeat(nodes_cp, node_repeats)
-    # start_indices_expanded = cp.repeat(start_indices, node_repeats)
-
-    # # Compute offsets efficiently (no Python loops)
-    # offset_values = cp.cumsum(node_repeats) - node_repeats
-    # offsets = cp.arange(len(node_expanded)) - cp.repeat(offset_values, node_repeats)
-
-    # adj_nodes = index_col[start_indices_expanded + offsets]  # Retrieve adjacent nodes
-
-    # # Remove duplicate edges (for undirected graphs)
-    # mask = node_expanded < adj_nodes
-    # edges = cp.vstack((node_expanded[mask], adj_nodes[mask])).T
-
-    # # Keep everything in CuGraph instead of moving to Pandas
-    # df_edges = cudf.DataFrame(edges, columns=["source", "target"])
-    # cugraph_graph = cugraph.Graph()
-    # cugraph_graph.from_cudf_edgelist(df_edges, source="source", destination="target")
-
-    # print(f"Created cuGraph graph with {cugraph_graph.number_of_nodes()} nodes and {cugraph_graph.number_of_edges()} edges")
-
-    # return cugraph_graph  # Keep processing in CuGraph instead of Pandas/NetworkX
-    
 def draw_netx_graph(nxgraph):
     import matplotlib.pyplot as plt
 
@@ -294,16 +225,14 @@ def find_fragments(species, coordinates, cell=None, pbc=None, use_cell_list=True
     """
     assert torch.cuda.is_available(), "CUDA is required to run analysis"
     device = "cuda"
-
     if use_cell_list:
         neighborlist = _parse_neighborlist("cell_list", cutoff=2).to(device)
     else:
+        print("Using full pairwise")
         neighborlist = _parse_neighborlist(
             "full_pairwise", cutoff=2).to(device)
-
     atom_index12, distances, _ = neighborlist(
         species, coordinates, cell=cell, pbc=pbc)
-
     bond_length_table = get_bond_data_table().to(device)
     spe12 = species.flatten()[atom_index12]
     atom_index12_bond_length = bond_length_table[spe12[0], spe12[1]]
@@ -313,6 +242,119 @@ def find_fragments(species, coordinates, cell=None, pbc=None, use_cell_list=True
 
     return neighborlist_to_fragment(atom_index12, species)
 
+def find_fragments_nv(species, coordinates, cell=None, pbc=None, use_cell_list=True):
+    """
+    Find fragments for a single molecule.
+    """
+    device="cuda"
+
+    # this is just a sample ase Atoms object
+    atom = nanotube(2, 0, length=1)
+    # manually set pbc and cell to none to match the original system cell list
+    atom.pbc = [False, False, False]
+    atom.cell = np.zeros((3, 3)) 
+    print(atom)
+    atomic_data = AtomicData.from_atoms(
+        atom, compute_graph_embedding=False, device="cpu"
+    )
+    # make a batch object
+    b = Batch.from_data_list([atomic_data])
+    b.to(device)
+    # make sure cutoff matches the torchani neighborlist
+    cutoff = torch.tensor([2.0, 2.0], device=device)
+
+    # THERE ARE TWO IMPLEMENTATIONS OF NEIGHBOR LIST
+    # Both are batched, however, batched_neighbor_list is optimized
+    # batched_cell_list is not optimized yet, but we can test both
+    # Compute neighbor list for this batch
+    i, j, u, S = batched_neighbor_list(b, cutoff) 
+    # i, j, u, S = batched_cell_list(b, cutoff)
+    # THIS MATCHES THE OUTPUT OF THE CELL LIST FUNCTION
+
+    # --- THIS BELOW FUNCTION IS FOR REFERENCE --- 
+    device="cuda"
+    species = atom.get_atomic_numbers()  
+    coordinates = atom.get_positions()   
+    species = torch.tensor(species, dtype=torch.int32)  
+    coordinates = torch.tensor(coordinates, dtype=torch.float32) 
+    species = species.unsqueeze(0)  
+    coordinates = coordinates.unsqueeze(0)  
+    species = species.to(device)
+    coordinates = coordinates.to(device)
+    if use_cell_list:
+        neighborlist = _parse_neighborlist("cell_list", cutoff=2).to(device)
+    else:
+        neighborlist = _parse_neighborlist(
+            "full_pairwise", cutoff=2).to(device)
+
+    atom_index12, distances, _ = neighborlist(
+        species, coordinates, cell=cell, pbc=pbc)
+    # --- THIS ABOVE FUNCTION IS FOR REFERENCE --- 
+
+    # THE FUNCTION BELOW IS TO DEBUG THE ACTUAL NEIGHBOR LIST FUNCTION WITH 22.8M ATOMS
+    # device = "cuda"
+    # batch_size = 20000 
+    # num_atoms = species.shape[1]  # Total atoms (22.8M)
+    # print("num_atoms", num_atoms)
+    # # num_atoms = species.shape[0]  # Total atoms (22.8M)
+    # # time1 = timetime.time()
+    # # Initialize storage for final neighbor list results
+    # all_i, all_j, all_u, all_S = [], [], [], []
+
+    # # Process the atoms in 20K chunks
+    # for start in range(0, num_atoms, batch_size):
+    #     end = min(start + batch_size, num_atoms)  # Ensure we don't exceed total atoms
+
+    #     # Move current batch to CUDA
+    #     species_batch = species[:, start:end].to(device)
+    #     coordinates_batch = coordinates[:, start:end, :].to(device)
+    #     # species_batch = species[start:end].to(device)
+    #     # coordinates_batch = coordinates[start:end, :].to(device)
+
+    #     atomic_numbers = species_batch.squeeze(0)  # Shape: [batch_size]
+    #     positions = coordinates_batch.squeeze(0)  # Shape: [batch_size, 3]
+
+    #     # Set PBC explicitly to False
+    #     pbc = torch.tensor([[False, False, False]], dtype=torch.bool, device=device)
+    #     cell = np.zeros((3, 3)) # Set cell to zero to match the original system cell list
+
+    #     # Create AtomicData
+    #     # time1 = timetime.time()
+    #     atomic_data = AtomicData(
+    #         atomic_numbers=atomic_numbers,
+    #         positions=positions,
+    #         cell=cell,
+    #         pbc=pbc,
+    #         forces=None,
+    #         energy=None,
+    #         charges=None,
+    #         edge_index=None,
+    #         node_attrs=None,
+    #         shifts=None,
+    #         unit_shifts=None,
+    #         spin_multiplicity=None,
+    #         info={},
+    #     )
+
+    #     b = Batch.from_data_list([atomic_data])
+    #     # Ensure batch is on CUDA
+    #     b.to(device)
+    #     cutoff = torch.tensor([2.0, 2.0], device=device)
+
+    #     # Compute neighbor list for this batch
+    #     i, j, u, S = batched_neighbor_list(b, cutoff)
+    #     # print(type(i), type(j), type(u), type(S))
+    #     print("i", i)
+    #     print("j", j)
+    #     # Free up GPU memory
+    #     del atomic_data, b, species_batch, coordinates_batch
+    #     torch.cuda.empty_cache()
+
+    #     # print("Time to get all cell lists:", timetime.time() - time1)
+
+    # print("Finished processing all atoms.")
+
+    return neighborlist_to_fragment(atom_index12, species)
 
 def build_netx_graph_from_ase(ase_mol, use_cell_list=True):
     """
@@ -401,7 +443,8 @@ def analyze_a_frame(
     frame = frame_num * stride + frame_offset
     time = frame * timestep * dump_interval * 1e-6
 
-    cG, df_per_frag = find_fragments(species, positions, cell, pbc, use_cell_list=use_cell_list)
+    # cG, df_per_frag = find_fragments(species, positions, cell, pbc, use_cell_list=use_cell_list)
+    cG, df_per_frag = find_fragments_nv(species, positions, cell, pbc, use_cell_list=use_cell_list)
     if timing:
         print("Time to find fragments: ", timetime.time() - start)
 
@@ -419,10 +462,11 @@ def analyze_a_frame(
             "smiles",
             "name",
             "atom_indices",
+            "nxgraph",
             "time"
         ]
     )
-
+    # todo for later is to make this a cudf dataframe right away in analyze_traj.py
     mol_database2 = mol_database
     mol_database2 = mol_database2.astype(str)
     mol_database2 = cudf.from_pandas(mol_database2)
@@ -431,22 +475,14 @@ def analyze_a_frame(
     # check this! 
     # create an nxgraph only for flatten_formulas that went through the filter
     global_atom_indices = np.concatenate(merged_df_per_frag["atom_indices"].to_pandas().to_numpy())
-    # print("global_atom_indices", global_atom_indices)
-    # print("big cG graph", cG)
-    # print("Doing the GPU1 subgraph")
-    time1 = timetime.time()
-    nxgraph = cugraph_slice_subgraph_gpu1(cG, species, global_atom_indices)
-    time2 = timetime.time()
-    print("nxgraph gpu1 time", time2-time1)
-    # print("Doing the GPU NEW subgraph")
-    # nxgraph = cugraph_slice_subgraph_gpu(cG, species, global_atom_indices) #0.60s, the longest time here
-    # print("nxgraph", nxgraph)
+    # This function is the most costly!!!! (98% of the time is spent here)
+    nxgraph = cugraph_slice_subgraph_gpu(cG, species, global_atom_indices)
+
     merged_df_per_frag["fragment_edge_count"] = merged_df_per_frag["atom_indices"].to_pandas().apply(
     lambda frag_atom_indices: compute_fragment_edge_count(frag_atom_indices, nxgraph)) #0.009s
     # Throw away fragments that don't have the same number of edges as the reference graph
     merged_df_per_frag["num_edges"] = merged_df_per_frag["num_edges"].astype(int)
     filtered_df = merged_df_per_frag[merged_df_per_frag["fragment_edge_count"] == merged_df_per_frag["num_edges"]] # 0.007s
-    # print("len(filtered_df)", len(filtered_df))
     # From now on, we have to keep working in pandas because graph isomorphism check is not possible for cuDF/cuGraph
     graph_pandas = filtered_df["graph"].to_pandas()
     # Convert serialized strings to bytes
@@ -459,23 +495,22 @@ def analyze_a_frame(
 
     start1 = timetime.time()
     match = 0
-    for frame_num, row in filtered_df.iterrows():
+    for local_frame, row in filtered_df.iterrows():
         frag_atom_indices = row["atom_indices"]
         # get subgraph for this fragment
         fragment_graph = nxgraph.subgraph(frag_atom_indices)
-        # print("fragment_graph", fragment_graph)
-        graph = reference_graphs[frame_num] # pull from preprocessed reference graph
-        # print("graph", graph)
+        graph = reference_graphs[local_frame] # pull from preprocessed reference graph
 
         if nx.is_isomorphic(graph, fragment_graph):
             df_molecule.loc[len(df_molecule)] = [
                 frame_num,
-                frame_num,  
+                local_frame,  
                 row["formula"],
                 row["flatten_formula"],  
                 row["smiles"],
                 row["name"],
                 row["atom_indices"],  
+                pickle.dumps(fragment_graph),  
                 time,  
             ]
             match += 1
@@ -483,81 +518,11 @@ def analyze_a_frame(
 
     if timing:
         print("iterate database: ", timetime.time() - start1)
-
-    # df_formula = df_per_frag["flatten_formula"].value_counts().to_frame("counts").reset_index()
-
-    # df_formula["local_frame"] = frame_num
-    # df_formula["frame"] = frame
-    # df_formula["time"] = time
-
-    # return df_formula.to_pandas(), df_molecule
-
-    start1 = timetime.time()
-    # for debugging
-    first_match = False
-    for index, row in mol_database.iterrows():
-        flatten_formula = row["flatten_formula"]
-        # filter df_per_frag by flatten_formula
-        df_this_formula = df_per_frag[df_per_frag["flatten_formula"] == flatten_formula]
-
-        # skip if there is no fragment for this formula
-        if len(df_this_formula) == 0:
-            continue
-
-        first_match = True 
-        # we need all the atom_indices in df_this_formula
-        atom_indices = df_this_formula.to_pandas().atom_indices
-        # print("atom_indices", atom_indices)
-        # flatten the atom_indices
-        atom_indices = np.concatenate(atom_indices.to_numpy())
-        # print("atom_indices flattened", atom_indices)
-        # print(f"First matched formula: {row['formula']}")
-        # print(f"Flatten formula: {flatten_formula}")
-        # unpickle the reference graph
-        graph = pickle.loads(row["graph"])
-        # print("reference graph", graph)
-        # get the nxgraph for this fragment
-        nxgraph = cugraph_slice_subgraph(cG, species, atom_indices)
-        # print("nxgraph graph", nxgraph)
-
-        start = timetime.time()
-        match = 0
-        # iterate all rows in the df_this_formula
-        for fragment_index, fragment_row in df_this_formula.to_pandas().iterrows():
-            # get the atom_indices for this fragment
-            frag_atom_indices = fragment_row["atom_indices"]
-            # print("fragment atom indices", frag_atom_indices)
-            # get subgraph for this fragment
-            fragment_graph = nxgraph.subgraph(frag_atom_indices)
-            # print("fragment graph", fragment_graph)
-
-            # add element pairs and check if this is isomorphic to the reference graph
-            add_element_pairs_to_edges(fragment_graph)
-            add_element_pairs_to_edges(graph)
-            node_match = nx.isomorphism.categorical_node_match('element', '')
-            edge_match = nx.isomorphism.categorical_edge_match('element_pair', '')
-            gm = nx.isomorphism.GraphMatcher(graph, fragment_graph, node_match=node_match, edge_match=edge_match)
-            if gm.is_isomorphic():
-                df_molecule.loc[len(df_molecule)] = [
-                    frame,
-                    frame_num,  # local_frame
-                    row["formula"],
-                    flatten_formula,
-                    row["smiles"],
-                    row["name"],
-                    frag_atom_indices,
-                    time,
-                ]
-                match += 1
-        if timing:
-            print(f"    is_isomorphic {row['name']}, time: {timetime.time() - start}, total formula {len(df_this_formula)}, match {match}")
-
-    if timing:
-        print("iterate database: ", timetime.time() - start1)
-
+    # the rest is kept the same
+    # Ask, why do we need to return df_formula? # I can use this for mol tracking!
     df_formula = df_per_frag["flatten_formula"].value_counts().to_frame("counts").reset_index()
 
-    df_formula["local_frame"] = frame_num
+    df_formula["local_frame"] = local_frame
     df_formula["frame"] = frame
     df_formula["time"] = time
 

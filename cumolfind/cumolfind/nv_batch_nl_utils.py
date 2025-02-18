@@ -71,7 +71,7 @@ def _count_shifts(
                     for a_j in range(a_0, a_n):
                         # if not ((a_j == a_i) and wp.length(cshift) < 1e-10):
                         # MA modified to remove bidirectionality!
-                        if a_j > a_i: 
+                        if a_j > a_i:
                             dist = wp.length(coord[a_j] - pos_i + cshift)
 
                             if dist < l_cutoff:
@@ -89,7 +89,7 @@ def _count_shifts(  # noqa: F811
     cutoff: wp.array(dtype=wp.float32),
     nneigh: wp.array(dtype=int),
     dbg_cutoff: float,
-):  #  pragma: no cover
+):  # pragma: no cover
     """Computes a batch of shifts (float32 version)"""
     ...
 
@@ -104,7 +104,7 @@ def _count_shifts(  # noqa: F811
     cutoff: wp.array(dtype=wp.float64),
     nneigh: wp.array(dtype=int),
     dbg_cutoff: float,
-):  #  pragma: no cover
+):  # pragma: no cover
     """Computes a batch of shifts (float64 version)"""
     ...
 
@@ -196,7 +196,7 @@ def _build_neighbor_list(  # noqa: F811
     j: wp.array(dtype=int),
     u: wp.array(dtype=wp.vec3i),
     S: wp.array(dtype=wp.vec3f),
-):  #  pragma: no cover
+):  # pragma: no cover
     """Computes neighborlist for float32 version"""
     ...
 
@@ -213,6 +213,6 @@ def _build_neighbor_list(  # noqa: F811
     j: wp.array(dtype=int),
     u: wp.array(dtype=wp.vec3i),
     S: wp.array(dtype=wp.vec3d),
-):  #  pragma: no cover
+):  # pragma: no cover
     """Computes neighborlist for float64 version"""
     ...

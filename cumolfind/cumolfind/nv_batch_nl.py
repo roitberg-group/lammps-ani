@@ -28,6 +28,7 @@ from .nv_utils import (
 
 wp.init()
 
+
 def batched_neighbor_list(
     batch: Batch,
     cutoff: torch.Tensor,
@@ -121,7 +122,7 @@ def batched_neighbor_list(
 
     # Set up output tensors
     with nvtx.annotate(message="creating offset", color="blue"):
-        ## Need to build the i, j, S buffers
+        # Need to build the i, j, S buffers
         nneigh = wp.to_torch(wp_nneigh)
         if offset is None:
             offset = torch.zeros(
@@ -175,7 +176,6 @@ def batched_neighbor_list(
         )
         if os.environ.get("ALCHEMI_PROFILE_NVTX", False):
             wp.synchronize()
-
 
     if i is None:
         with nvtx.annotate(message="converting ijS to pytorch", color="blue"):

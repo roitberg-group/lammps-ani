@@ -67,4 +67,3 @@ def _split_tensors(
         torch.split(S, split_sizes),
     )
     return i, j, u, S
-

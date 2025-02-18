@@ -80,7 +80,7 @@ def _construct_bins(  # noqa: F811
     cell: wp.array(dtype=wp.mat33d),
     cutoff: wp.array(dtype=wp.float64),
     max_nbins: int,
-):  #  pragma: no cover
+):  # pragma: no cover
     """This utility method prepares the neighborlist bins (float64 version)"""
     ...
 
@@ -93,7 +93,7 @@ def _construct_bins(  # noqa: F811
     cell: wp.array(dtype=wp.mat33f),
     cutoff: wp.array(dtype=wp.float32),
     max_nbins: int,
-):  #  pragma: no cover
+):  # pragma: no cover
     """This utility method prepares the neighborlist bins (float32 version)"""
     ...
 
@@ -227,7 +227,7 @@ def _prepare_bins(  # noqa: F811
     cutoff: wp.array(dtype=wp.float32),
     max_nbins: int,
     max_natoms_per_bin: wp.array(dtype=int),
-):  #  pragma: no cover
+):  # pragma: no cover
     """This utility method prepares the neighborlist bins (float32 version)"""
     ...
 
@@ -249,7 +249,7 @@ def _prepare_bins(  # noqa: F811
     cutoff: wp.array(dtype=wp.float64),
     max_nbins: int,
     max_natoms_per_bin: wp.array(dtype=int),
-):  #  pragma: no cover
+):  # pragma: no cover
     """This utility method prepares the neighborlist bins (float64 version)"""
     ...
 
@@ -406,7 +406,7 @@ def _query_neighbor_list(
     cutoff: wp.array(dtype=wp.float64),
     result_count: wp.array(dtype=wp.int32),
     max_natoms_per_bin: int,
-):  #  pragma: no cover
+):  # pragma: no cover
     """Determine the number of neighbors for each atom (float64 version)"""
     ...
 
@@ -543,7 +543,7 @@ def _build_neighbor_list(  # noqa: F811
     u: wp.array(dtype=wp.vec3i),
     S: wp.array(dtype=wp.vec3f),
     max_natoms_per_bin: int,
-):  #  pragma: no cover
+):  # pragma: no cover
     """Determine the number of neighbors for each atom (float32 version)"""
     ...
 
@@ -566,7 +566,6 @@ def _build_neighbor_list(  # noqa: F811
     u: wp.array(dtype=wp.vec3i),
     S: wp.array(dtype=wp.vec3d),
     max_natoms_per_bin: int,
-):  #  pragma: no cover
+):  # pragma: no cover
     """Determine the number of neighbors for each atom (float64 version)"""
     ...
-

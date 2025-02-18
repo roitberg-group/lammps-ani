@@ -28,6 +28,7 @@ from .nv_utils import _estimate_max_neighbors
 
 wp.init()
 
+
 class CellList:
     """A cell list implementation for efficient neighbor list computation.
 

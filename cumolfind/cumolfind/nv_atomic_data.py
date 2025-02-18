@@ -39,6 +39,7 @@ with warnings.catch_warnings():
     #     voigt_to_matrix,
     # )
 
+
 class AtomicNumberTable:
     def __init__(self, zs: Sequence[int]):
         self.zs = zs
@@ -180,7 +181,7 @@ class AtomicData(torch_geometric.data.Data):
         """
 
         # Get base components from ase.Atoms object
-        atomic_numbers = torch.as_tensor(atoms.arrays["numbers"], device=device, dtype = torch.int32)
+        atomic_numbers = torch.as_tensor(atoms.arrays["numbers"], device=device, dtype=torch.int32)
         positions = torch.as_tensor(atoms.arrays["positions"], device=device, dtype=dtype)
         pbc = torch.as_tensor(atoms.get_pbc().reshape(1, 3), device=device)
         cell = torch.as_tensor(np.array(atoms.get_cell(complete=True)), device=device, dtype=dtype)
@@ -205,7 +206,7 @@ class AtomicData(torch_geometric.data.Data):
             charges = torch.as_tensor(
                 atoms.info.get(charges_key, np.zeros((len(atomic_numbers),))),
                 device=device,
-                dtype = torch.int32
+                dtype=torch.int32
             )
         if spin_multiplicity is None:
             spin_multiplicity = torch.ones((1,), device=device, dtype=torch.int32)
@@ -315,4 +316,3 @@ class AtomicData(torch_geometric.data.Data):
             charges=self.charges.cpu().numpy(),
             info=info | self.info,
         )
-

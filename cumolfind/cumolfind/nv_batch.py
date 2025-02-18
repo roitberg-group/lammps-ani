@@ -39,6 +39,7 @@ except ImportError:
 
 IndexType = Union[slice, Tensor, np.ndarray, Sequence]
 
+
 class Batch(Data):
     r"""A plain old python object modeling a batch of graphs as one big
     (disconnected) graph. With :class:`torch_geometric.data.Data` being the
@@ -522,4 +523,3 @@ class Batch(Data):
                 )
 
         self.num_nodes = sum(self.__num_nodes_list__)
-

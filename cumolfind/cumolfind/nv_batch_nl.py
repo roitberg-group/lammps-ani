@@ -36,6 +36,7 @@ def batched_neighbor_list(
     j: torch.Tensor | None = None,
     u: torch.Tensor | None = None,
     S: torch.Tensor | None = None,
+    dist: torch.Tensor | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Compute the neighbor list for a `Batch` (a batch of atomic systems)
 
@@ -152,6 +153,11 @@ def batched_neighbor_list(
             wp_S = wp.zeros((total_count,), dtype=wp_vec_dtype, device=device)
         else:
             wp_S = wp.from_torch(S[:total_count], dtype=wp_vec_dtype)
+        if dist is None:
+            print("allocating wp_dist")
+            wp_dist = wp.zeros((total_count,), dtype=wp.float32, device=device)
+        else:
+            wp_dist = wp.from_torch(i[:total_count], dtype=wp.float32)
         if os.environ.get("ALCHEMI_PROFILE_NVTX", False):
             wp.synchronize()
 
@@ -170,6 +176,7 @@ def batched_neighbor_list(
                 wp_j,
                 wp_u,
                 wp_S,
+                wp_dist,
             ],
             device=device,
         )
@@ -180,20 +187,21 @@ def batched_neighbor_list(
     if i is None:
         with nvtx.annotate(message="converting ijS to pytorch", color="blue"):
             # Now safely convert to PyTorch
-            i, j, u, S = (
+            i, j, u, S, dist = (
                 wp.to_torch(wp_i),
                 wp.to_torch(wp_j),
                 wp.to_torch(wp_u),
                 wp.to_torch(wp_S),
+                wp.to_torch(wp_dist),
             )
 
             if os.environ.get("ALCHEMI_PROFILE_NVTX", False):
                 torch.cuda.synchronize()
 
         with nvtx.annotate(message="splitting tensors", color="green"):
-            i, j, u, S = _split_tensors(offset, atom_ptr, i, j, u, S)
+            i, j, u, S, dist = _split_tensors(offset, atom_ptr, i, j, u, S, dist)
 
             if os.environ.get("ALCHEMI_PROFILE_NVTX", False):
                 torch.cuda.synchronize()
 
-    return i, j, u, S
+    return i, j, u, S, dist

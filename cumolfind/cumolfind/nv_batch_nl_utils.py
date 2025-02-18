@@ -121,6 +121,7 @@ def _build_neighbor_list(
     j: wp.array(dtype=Any),
     u: wp.array(dtype=Any),
     S: wp.array(dtype=Any),
+    dist_ij: wp.array(dtype=Any),
 ):
     """Computes a batch of shifts
 
@@ -181,6 +182,7 @@ def _build_neighbor_list(
                                 j[idx] = a_j - a_0
                                 u[idx] = type(l_nshift)(k1, k2, k3)
                                 S[idx] = cshift
+                                dist_ij[idx] = dist
                                 count += 1
 
 
@@ -196,6 +198,7 @@ def _build_neighbor_list(  # noqa: F811
     j: wp.array(dtype=int),
     u: wp.array(dtype=wp.vec3i),
     S: wp.array(dtype=wp.vec3f),
+    dist_ij: wp.array(dtype=wp.float32)
 ):  #  pragma: no cover
     """Computes neighborlist for float32 version"""
     ...
@@ -213,6 +216,7 @@ def _build_neighbor_list(  # noqa: F811
     j: wp.array(dtype=int),
     u: wp.array(dtype=wp.vec3i),
     S: wp.array(dtype=wp.vec3d),
+    dist_ij: wp.array(dtype=wp.float64)
 ):  #  pragma: no cover
     """Computes neighborlist for float64 version"""
     ...

@@ -267,28 +267,47 @@ def find_fragments_nv(species, coordinates, cell=None, pbc=None, use_cell_list=T
     # Both are batched, however, batched_neighbor_list is optimized
     # batched_cell_list is not optimized yet, but we can test both
     # Compute neighbor list for this batch
-    i, j, u, S = batched_neighbor_list(b, cutoff) 
-    # i, j, u, S = batched_cell_list(b, cutoff)
+    i, j, _, _, distances = batched_neighbor_list(b, cutoff) 
+    print("i", i)
+    print("j", j)
+    distances = torch.cat(distances, dim=0)
+    i_tensor = torch.cat(i, dim=0)
+    j_tensor = torch.cat(j, dim=0)
+    atom_index12 = torch.stack([i_tensor, j_tensor], dim=0)
+    # print("u", u)
+    # print("S", S)
+    print("index_ij", atom_index12)
+    print("dist", distances)
     # THIS MATCHES THE OUTPUT OF THE CELL LIST FUNCTION
 
-    # --- THIS BELOW FUNCTION IS FOR REFERENCE --- 
-    device="cuda"
-    species = atom.get_atomic_numbers()  
-    coordinates = atom.get_positions()   
-    species = torch.tensor(species, dtype=torch.int32)  
-    coordinates = torch.tensor(coordinates, dtype=torch.float32) 
-    species = species.unsqueeze(0)  
-    coordinates = coordinates.unsqueeze(0)  
-    species = species.to(device)
-    coordinates = coordinates.to(device)
-    if use_cell_list:
-        neighborlist = _parse_neighborlist("cell_list", cutoff=2).to(device)
-    else:
-        neighborlist = _parse_neighborlist(
-            "full_pairwise", cutoff=2).to(device)
+    # # --- THIS BELOW FUNCTION IS FOR REFERENCE --- 
+    # device="cuda"
+    # species = atom.get_atomic_numbers()  
+    # coordinates = atom.get_positions()   
+    # species = torch.tensor(species, dtype=torch.int32)  
+    # coordinates = torch.tensor(coordinates, dtype=torch.float32) 
+    # species = species.unsqueeze(0)  
+    # coordinates = coordinates.unsqueeze(0)  
+    # species = species.to(device)
+    # coordinates = coordinates.to(device)
+    # if use_cell_list:
+    #     neighborlist = _parse_neighborlist("cell_list", cutoff=2).to(device)
+    # else:
+    #     neighborlist = _parse_neighborlist(
+    #         "full_pairwise", cutoff=2).to(device)
 
-    atom_index12, distances, _ = neighborlist(
-        species, coordinates, cell=cell, pbc=pbc)
+    # atom_index12, distances, _ = neighborlist(
+    #     species, coordinates, cell=cell, pbc=pbc)
+    # print("atom_index12", atom_index12)
+    # print("distances", distances)
+    bond_length_table = get_bond_data_table().to(device)
+    spe12 = species.flatten()[atom_index12]
+    print("spe12", spe12)
+    atom_index12_bond_length = bond_length_table[spe12[0], spe12[1]]
+    in_bond_length = (
+        distances <= atom_index12_bond_length).nonzero().flatten()
+    atom_index12 = atom_index12.index_select(1, in_bond_length)
+
     # --- THIS ABOVE FUNCTION IS FOR REFERENCE --- 
 
     # THE FUNCTION BELOW IS TO DEBUG THE ACTUAL NEIGHBOR LIST FUNCTION WITH 22.8M ATOMS

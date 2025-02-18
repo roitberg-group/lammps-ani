@@ -53,6 +53,7 @@ def _split_tensors(
     j: torch.Tensor,
     u: torch.Tensor,
     S: torch.Tensor,
+    dist: torch.Tensor,
 ):  # pragma: no cover
 
     split_sizes = [
@@ -60,11 +61,12 @@ def _split_tensors(
         for a_0, a_end in zip(atom_ptr[:-1], atom_ptr[1:])
     ]
 
-    i, j, u, S = (
+    i, j, u, S, dist = (
         torch.split(i, split_sizes),
         torch.split(j, split_sizes),
         torch.split(u, split_sizes),
         torch.split(S, split_sizes),
+        torch.split(dist, split_sizes),
     )
-    return i, j, u, S
+    return i, j, u, S, dist
 

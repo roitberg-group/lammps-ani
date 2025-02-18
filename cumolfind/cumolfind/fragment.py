@@ -105,7 +105,7 @@ def neighborlist_to_fragment(atom_index12, species):
     """
     # build cugraph from cudf edges
     # https://docs.rapids.ai/api/cugraph/stable/api_docs/api/cugraph.graph.from_cudf_edgelist#cugraph.Graph.from_cudf_edgelist
-    timm0 = timetime.time()
+    # timm0 = timetime.time()
     df_edges = cudf.DataFrame(
         {
             "source": cp.from_dlpack(torch.to_dlpack(atom_index12[0])),
@@ -177,6 +177,7 @@ def cugraph_slice_subgraph(cgraph, species, nodes):
         nxgraph.nodes[node]["atomic_number"] = atomic_number
     return nxgraph
 
+
 def cugraph_slice_subgraph_gpu(cgraph, species, nodes):
     """
     Returns a subgraph of G, containing only the nodes in the list nodes with their edges.
@@ -195,11 +196,11 @@ def cugraph_slice_subgraph_gpu(cgraph, species, nodes):
     start_indices = start_indices.to_cupy()
     start_indices_expanded = cp.concatenate([
         cp.repeat(cp.array(s, dtype=cp.int32), int(r)) for s, r in zip(start_indices.get(), node_repeats.get())
-    ]) 
+    ])
     offsets = cp.arange(len(node_expanded)) - cp.concatenate([cp.full((int(r),), int(v), dtype=cp.int32) for v, r in zip((cp.cumsum(node_repeats) - node_repeats).get(), node_repeats.get())])
-    adj_nodes = index_col[start_indices_expanded + offsets]  
-    mask = node_expanded < adj_nodes  
-    edges = cp.vstack((node_expanded[mask], adj_nodes[mask])).T 
+    adj_nodes = index_col[start_indices_expanded + offsets]
+    mask = node_expanded < adj_nodes
+    edges = cp.vstack((node_expanded[mask], adj_nodes[mask])).T
     df_edges = cudf.DataFrame(edges, columns=["source", "target"]).to_pandas()
     nxgraph = nx.from_pandas_edgelist(df_edges, "source", "target")
 
@@ -208,6 +209,7 @@ def cugraph_slice_subgraph_gpu(cgraph, species, nodes):
     for node, atomic_number in zip(nodes, atomic_numbers):
         nxgraph.nodes[node]["atomic_number"] = atomic_number
     return nxgraph
+
 
 def draw_netx_graph(nxgraph):
     import matplotlib.pyplot as plt
@@ -242,17 +244,18 @@ def find_fragments(species, coordinates, cell=None, pbc=None, use_cell_list=True
 
     return neighborlist_to_fragment(atom_index12, species)
 
+
 def find_fragments_nv(species, coordinates, cell=None, pbc=None, use_cell_list=True):
     """
     Find fragments for a single molecule.
     """
-    device="cuda"
+    device = "cuda"
 
     # this is just a sample ase Atoms object
     atom = nanotube(2, 0, length=1)
     # manually set pbc and cell to none to match the original system cell list
     atom.pbc = [False, False, False]
-    atom.cell = np.zeros((3, 3)) 
+    atom.cell = np.zeros((3, 3))
     print(atom)
     atomic_data = AtomicData.from_atoms(
         atom, compute_graph_embedding=False, device="cpu"
@@ -267,18 +270,18 @@ def find_fragments_nv(species, coordinates, cell=None, pbc=None, use_cell_list=T
     # Both are batched, however, batched_neighbor_list is optimized
     # batched_cell_list is not optimized yet, but we can test both
     # Compute neighbor list for this batch
-    i, j, u, S = batched_neighbor_list(b, cutoff) 
+    i, j, u, S = batched_neighbor_list(b, cutoff)
     # i, j, u, S = batched_cell_list(b, cutoff)
     # THIS MATCHES THE OUTPUT OF THE CELL LIST FUNCTION
 
-    # --- THIS BELOW FUNCTION IS FOR REFERENCE --- 
-    device="cuda"
-    species = atom.get_atomic_numbers()  
-    coordinates = atom.get_positions()   
-    species = torch.tensor(species, dtype=torch.int32)  
-    coordinates = torch.tensor(coordinates, dtype=torch.float32) 
-    species = species.unsqueeze(0)  
-    coordinates = coordinates.unsqueeze(0)  
+    # --- THIS BELOW FUNCTION IS FOR REFERENCE ---
+    device = "cuda"
+    species = atom.get_atomic_numbers()
+    coordinates = atom.get_positions()
+    species = torch.tensor(species, dtype=torch.int32)
+    coordinates = torch.tensor(coordinates, dtype=torch.float32)
+    species = species.unsqueeze(0)
+    coordinates = coordinates.unsqueeze(0)
     species = species.to(device)
     coordinates = coordinates.to(device)
     if use_cell_list:
@@ -289,11 +292,11 @@ def find_fragments_nv(species, coordinates, cell=None, pbc=None, use_cell_list=T
 
     atom_index12, distances, _ = neighborlist(
         species, coordinates, cell=cell, pbc=pbc)
-    # --- THIS ABOVE FUNCTION IS FOR REFERENCE --- 
+    # --- THIS ABOVE FUNCTION IS FOR REFERENCE ---
 
     # THE FUNCTION BELOW IS TO DEBUG THE ACTUAL NEIGHBOR LIST FUNCTION WITH 22.8M ATOMS
     # device = "cuda"
-    # batch_size = 20000 
+    # batch_size = 20000
     # num_atoms = species.shape[1]  # Total atoms (22.8M)
     # print("num_atoms", num_atoms)
     # # num_atoms = species.shape[0]  # Total atoms (22.8M)
@@ -356,6 +359,7 @@ def find_fragments_nv(species, coordinates, cell=None, pbc=None, use_cell_list=T
 
     return neighborlist_to_fragment(atom_index12, species)
 
+
 def build_netx_graph_from_ase(ase_mol, use_cell_list=True):
     """
     Build networkx object for a single ASE molecule.
@@ -394,7 +398,7 @@ def add_element_pairs_to_edges(graph):
 
 
 def edge_match(edge1, edge2):
-    """Simple check for element pairs to ensure correct bonding pattern in every molecule that is isomorphic with a reference grah."""
+    """Simple check for element pairs to ensure correct bonding pattern in every molecule that is isomorphic with a reference graph."""
     return edge1['element_pair'] == edge2['element_pair']
 
 
@@ -405,6 +409,7 @@ def edge_match(edge1, edge2):
 def compute_fragment_edge_count(frag_atom_indices, nxgraph):
     fragment_graph = nxgraph.subgraph(frag_atom_indices)
     return fragment_graph.number_of_edges()
+
 
 def is_isomorphic(row):
     fragment_graph = row["fragment_graph"]
@@ -419,6 +424,7 @@ def is_isomorphic(row):
     edge_match = nx.isomorphism.categorical_edge_match('element_pair', '')
     gm = nx.isomorphism.GraphMatcher(reference_graph, fragment_graph, node_match=node_match, edge_match=edge_match)
     return gm.is_isomorphic()
+
 
 def analyze_a_frame(
     mdtraj_frame, time_offset, dump_interval, timestep, stride, frame_num, mol_database, use_cell_list=True
@@ -443,8 +449,8 @@ def analyze_a_frame(
     frame = frame_num * stride + frame_offset
     time = frame * timestep * dump_interval * 1e-6
 
-    # cG, df_per_frag = find_fragments(species, positions, cell, pbc, use_cell_list=use_cell_list)
-    cG, df_per_frag = find_fragments_nv(species, positions, cell, pbc, use_cell_list=use_cell_list)
+    cG, df_per_frag = find_fragments(species, positions, cell, pbc, use_cell_list=use_cell_list)
+    # cG, df_per_frag = find_fragments_nv(species, positions, cell, pbc, use_cell_list=use_cell_list)
     if timing:
         print("Time to find fragments: ", timetime.time() - start)
 
@@ -472,23 +478,23 @@ def analyze_a_frame(
     mol_database2 = cudf.from_pandas(mol_database2)
     start1 = timetime.time()
     merged_df_per_frag = mol_database2.merge(df_per_frag, on="flatten_formula", how="inner")
-    # check this! 
+    # check this!
     # create an nxgraph only for flatten_formulas that went through the filter
     global_atom_indices = np.concatenate(merged_df_per_frag["atom_indices"].to_pandas().to_numpy())
     # This function is the most costly!!!! (98% of the time is spent here)
     nxgraph = cugraph_slice_subgraph_gpu(cG, species, global_atom_indices)
 
     merged_df_per_frag["fragment_edge_count"] = merged_df_per_frag["atom_indices"].to_pandas().apply(
-    lambda frag_atom_indices: compute_fragment_edge_count(frag_atom_indices, nxgraph)) #0.009s
+        lambda frag_atom_indices: compute_fragment_edge_count(frag_atom_indices, nxgraph))  # 0.009s
     # Throw away fragments that don't have the same number of edges as the reference graph
     merged_df_per_frag["num_edges"] = merged_df_per_frag["num_edges"].astype(int)
-    filtered_df = merged_df_per_frag[merged_df_per_frag["fragment_edge_count"] == merged_df_per_frag["num_edges"]] # 0.007s
+    filtered_df = merged_df_per_frag[merged_df_per_frag["fragment_edge_count"] == merged_df_per_frag["num_edges"]]  # 0.007s
     # From now on, we have to keep working in pandas because graph isomorphism check is not possible for cuDF/cuGraph
     graph_pandas = filtered_df["graph"].to_pandas()
     # Convert serialized strings to bytes
     graph_pandas = graph_pandas.apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
     reference_graphs = graph_pandas.apply(pickle.loads)
-    filtered_df = filtered_df.to_pandas() 
+    filtered_df = filtered_df.to_pandas()
     filtered_df["reference_graph"] = reference_graphs
     if timing:
         print("preprocessing: ", timetime.time() - start1)
@@ -499,19 +505,19 @@ def analyze_a_frame(
         frag_atom_indices = row["atom_indices"]
         # get subgraph for this fragment
         fragment_graph = nxgraph.subgraph(frag_atom_indices)
-        graph = reference_graphs[local_frame] # pull from preprocessed reference graph
+        graph = reference_graphs[local_frame]  # pull from preprocessed reference graph
 
         if nx.is_isomorphic(graph, fragment_graph):
             df_molecule.loc[len(df_molecule)] = [
                 frame_num,
-                local_frame,  
+                local_frame,
                 row["formula"],
-                row["flatten_formula"],  
+                row["flatten_formula"],
                 row["smiles"],
                 row["name"],
-                row["atom_indices"],  
-                pickle.dumps(fragment_graph),  
-                time,  
+                row["atom_indices"],
+                pickle.dumps(fragment_graph),
+                time,
             ]
             match += 1
             print(f"    is_isomorphic {row['name']}, flatten_formula {row['flatten_formula']}, match {match}")

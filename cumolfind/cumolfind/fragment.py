@@ -370,22 +370,6 @@ def compute_fragment_edge_count(frag_atom_indices, nxgraph):
     fragment_graph = nxgraph.subgraph(frag_atom_indices)
     return fragment_graph.number_of_edges()
 
-
-def is_isomorphic(row):
-    fragment_graph = row["fragment_graph"]
-    reference_graph = row["reference_graph"]
-
-    # Add element pairs to both graphs
-    add_element_pairs_to_edges(fragment_graph)
-    add_element_pairs_to_edges(reference_graph)
-
-    # Isomorphism check
-    node_match = nx.isomorphism.categorical_node_match('element', '')
-    edge_match = nx.isomorphism.categorical_edge_match('element_pair', '')
-    gm = nx.isomorphism.GraphMatcher(reference_graph, fragment_graph, node_match=node_match, edge_match=edge_match)
-    return gm.is_isomorphic()
-
-
 def analyze_a_frame(
     mdtraj_frame, time_offset, dump_interval, timestep, stride, frame_num, mol_database, use_cell_list=True
 ):
@@ -412,6 +396,7 @@ def analyze_a_frame(
     # calculate frame_offset using time_offset
     frame_offset = int(time_offset / (dump_interval * timestep * 1e-6))
     frame = frame_num * stride + frame_offset
+    print("frame_num", frame_num, "frame_offset", frame_offset, "frame", frame)
     time = frame * timestep * dump_interval * 1e-6
     time_for_frame2 = timetime.time()
     print("Time to calculate frame: ", time_for_frame2 - time_for_frame1)
@@ -475,7 +460,7 @@ def analyze_a_frame(
         node_match = nx.isomorphism.categorical_node_match('element', '')
         edge_match = nx.isomorphism.categorical_edge_match('element_pair', '')
         gm = nx.isomorphism.GraphMatcher(graph, fragment_graph, node_match=node_match, edge_match=edge_match)
-        if nx.is_isomorphic(graph, fragment_graph):
+        if gm.is_isomorphic():
             df_molecule.loc[len(df_molecule)] = [
                 frame_num,
                 local_frame,
@@ -495,7 +480,13 @@ def analyze_a_frame(
     # the rest is kept the same
     # Ask, why do we need to return df_formula? # I can use this for mol tracking!
     df_formula = df_per_frag["flatten_formula"].value_counts().to_frame("counts").reset_index()
+    df_formula = df_formula.rename(columns={"index": "flatten_formula"})  # Fix column name
 
+    df_formula = df_formula.merge(
+        df_per_frag[["flatten_formula", "atom_indices"]], on="flatten_formula", how="left"
+    )
+
+    # Add metadata
     df_formula["local_frame"] = local_frame
     df_formula["frame"] = frame
     df_formula["time"] = time

@@ -28,6 +28,7 @@ import torch.utils.data
 from .nv_data import Data  # type: ignore
 
 
+
 class AtomicNumberTable:
     """
     Atomic number table
@@ -324,14 +325,6 @@ class AtomicData(Data):
         self.charges = kwargs.get(
             "charges", torch.zeros((num_nodes,), device=self.device, dtype=int_dtype)
         )
-
-        # if charges.shape == (1,):
-        #     self.charges = torch.zeros(
-        #         (num_nodes,), device=self.device, dtype=int_dtype
-        #     )
-        #     self.charges[0] = charges[0]
-        # else:
-        #     self.charges = charges
 
         self.spin_multiplicity = kwargs.get(
             "spin_multiplicity", torch.ones((1,), device=self.device, dtype=int_dtype)

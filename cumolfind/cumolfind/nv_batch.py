@@ -31,6 +31,7 @@ except ImportError:
     from typing_extensions import Self
 
 
+
 class Batch(Data):
     """A batch of molecular graphs combined into one large graph.
 

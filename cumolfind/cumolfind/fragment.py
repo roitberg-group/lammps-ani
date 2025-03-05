@@ -469,6 +469,12 @@ def analyze_a_frame(
         fragment_graph = nxgraph.subgraph(frag_atom_indices)
         graph = reference_graphs[local_frame]  # pull from preprocessed reference graph
 
+        # add grapmatcher for cases when number of nodes and edges matches but doesn't correspond to the right molecule
+        add_element_pairs_to_edges(fragment_graph)
+        add_element_pairs_to_edges(graph)
+        node_match = nx.isomorphism.categorical_node_match('element', '')
+        edge_match = nx.isomorphism.categorical_edge_match('element_pair', '')
+        gm = nx.isomorphism.GraphMatcher(graph, fragment_graph, node_match=node_match, edge_match=edge_match)
         if nx.is_isomorphic(graph, fragment_graph):
             df_molecule.loc[len(df_molecule)] = [
                 frame_num,

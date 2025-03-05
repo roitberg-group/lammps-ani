@@ -93,6 +93,7 @@ def analyze_all_frames(
 
     frame_num = local_start_frame
     output_filename = f"{Path(traj_file).stem}_seg{segment_index:04d}of{num_segments:04d}"
+    
     for mdtraj_frame in tqdm(
         md.iterload(traj_file, top=topology, chunk=1, stride=stride, skip=local_start_frame),
         total=total_frames_in_segment,

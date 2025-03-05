@@ -24,15 +24,16 @@ def _estimate_max_neighbors(
     return (multiplicative_factor * cutoff_volume / volume_per_atom).to(torch.int32)
 
 
-@torch.jit.script
-def _compute_num_shifts(
-    cell: torch.Tensor, cutoff: torch.Tensor, pbc: torch.Tensor
-) -> torch.Tensor:  # pragma: no cover
-    rcell = cell.inverse().transpose(-2, -1)
-    inv_d = rcell.norm(2, -1)
-    num_shifts = torch.ceil(cutoff[:, None] * inv_d).to(torch.int32)
-    num_shifts *= pbc.to(torch.int32)
-    return num_shifts
+# @torch.jit.script
+# def _compute_num_shifts(
+#     cell: torch.Tensor, cutoff: torch.Tensor, pbc: torch.Tensor
+# ) -> torch.Tensor:  # pragma: no cover
+#     rcell = cell.inverse().transpose(-2, -1)
+#     inv_d = rcell.norm(2, -1)
+#     num_shifts = torch.ceil(cutoff[:, None] * inv_d).to(torch.int32)
+#     num_shifts *= pbc.to(torch.int32)
+#     print("num_shifts", num_shifts)
+#     return num_shifts
 
 
 @torch.jit.script
@@ -51,8 +52,8 @@ def _split_tensors(
     atom_ptr: torch.Tensor,
     i: torch.Tensor,
     j: torch.Tensor,
-    u: torch.Tensor,
-    S: torch.Tensor,
+    # u: torch.Tensor,
+    # S: torch.Tensor,
     dist: torch.Tensor,
 ):  # pragma: no cover
 
@@ -61,12 +62,16 @@ def _split_tensors(
         for a_0, a_end in zip(atom_ptr[:-1], atom_ptr[1:])
     ]
 
-    i, j, u, S, dist = (
+    # i, j, dist = (
+    #     torch.split(i, split_sizes),
+    #     torch.split(j, split_sizes),
+    #     torch.split(dist, split_sizes),
+    # )
+    i, j, dist = (
         torch.split(i, split_sizes),
         torch.split(j, split_sizes),
-        torch.split(u, split_sizes),
-        torch.split(S, split_sizes),
         torch.split(dist, split_sizes),
     )
-    return i, j, u, S, dist
+
+    return i, j, dist
 

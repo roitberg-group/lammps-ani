@@ -13,14 +13,14 @@ import time as timetime
 from torchani.neighbors import _parse_neighborlist
 import matplotlib.pyplot as plt
 from ase.build import nanotube
+import json
 
 # TODO: use RMM allocator for pytorch
 
 # MA: For NV Cell List
 from .nv_atomic_data import AtomicData
 from .nv_batch import Batch
-from .nv_batch_nl import batched_neighbor_list
-from .nv_cell_list import batched_cell_list
+from .nv_atom_cell_list import _cell_neighbor_list
 
 timing = True
 PERIODIC_TABLE_LENGTH = 118
@@ -242,138 +242,80 @@ def find_fragments(species, coordinates, cell=None, pbc=None, use_cell_list=True
 
     return neighborlist_to_fragment(atom_index12, species)
 
-def find_fragments_nv(species, coordinates, cell=None, pbc=None, use_cell_list=True):
+def find_fragments_nv(species, coordinates):
     """
-    Find fragments for a single molecule.
+    Use NVIDIA's Cell List to find fragments for a single molecule.
     """
     device="cuda"
+    cutoff = torch.tensor([2.0], device=device)
 
-    # this is just a sample ase Atoms object
-    atom = nanotube(2, 0, length=1)
-    # manually set pbc and cell to none to match the original system cell list
-    atom.pbc = [False, False, False]
-    atom.cell = np.zeros((3, 3)) 
-    print(atom)
-    atomic_data = AtomicData.from_atoms(
-        atom, compute_graph_embedding=False, device="cpu"
-    )
-    # make a batch object
-    b = Batch.from_data_list([atomic_data])
-    b.to(device)
-    # make sure cutoff matches the torchani neighborlist
-    cutoff = torch.tensor([2.0, 2.0], device=device)
+    # Compute bounding box for cell list
+    eps = 1e-3
+    min_ = torch.min(coordinates.view(-1, 3), dim=0)[0] - eps
+    max_ = torch.max(coordinates.view(-1, 3), dim=0)[0] + eps
+    largest_dist = max_ - min_
+    cell = torch.eye(3, dtype=torch.float32, device=device) * largest_dist
+    coordinates = coordinates - min_  
+    # Set PBC explicitly to False
+    pbc = torch.tensor([[False, False, False]], dtype=torch.bool, device=device)
 
-    # THERE ARE TWO IMPLEMENTATIONS OF NEIGHBOR LIST
-    # Both are batched, however, batched_neighbor_list is optimized
-    # batched_cell_list is not optimized yet, but we can test both
-    # Compute neighbor list for this batch
-    i, j, _, _, distances = batched_neighbor_list(b, cutoff) 
-    print("i", i)
-    print("j", j)
-    distances = torch.cat(distances, dim=0)
-    i_tensor = torch.cat(i, dim=0)
-    j_tensor = torch.cat(j, dim=0)
+    # Create AtomicData for full system
+    atomic_data = AtomicData(
+        atomic_numbers=species.squeeze(0),  
+        positions=coordinates.squeeze(0),  
+        cell=cell,
+        pbc=pbc,
+        forces=None,
+        energy=None,
+        charges=None,
+        edge_index=None,
+        node_attrs=None,
+        shifts=None,
+        unit_shifts=None,
+        spin_multiplicity=None,
+        info={},
+    ) # everything until now is 0.02s
+
+    # Compute neighbors using cell list
+    i_tensor, j_tensor, distances = _cell_neighbor_list(atomic_data, cutoff, max_nbins=1000000) #4.3s
     atom_index12 = torch.stack([i_tensor, j_tensor], dim=0)
-    # print("u", u)
-    # print("S", S)
-    print("index_ij", atom_index12)
-    print("dist", distances)
-    # THIS MATCHES THE OUTPUT OF THE CELL LIST FUNCTION
 
-    # # --- THIS BELOW FUNCTION IS FOR REFERENCE --- 
-    # device="cuda"
-    # species = atom.get_atomic_numbers()  
-    # coordinates = atom.get_positions()   
-    # species = torch.tensor(species, dtype=torch.int32)  
-    # coordinates = torch.tensor(coordinates, dtype=torch.float32) 
-    # species = species.unsqueeze(0)  
-    # coordinates = coordinates.unsqueeze(0)  
-    # species = species.to(device)
-    # coordinates = coordinates.to(device)
-    # if use_cell_list:
-    #     neighborlist = _parse_neighborlist("cell_list", cutoff=2).to(device)
-    # else:
-    #     neighborlist = _parse_neighborlist(
-    #         "full_pairwise", cutoff=2).to(device)
-
-    # atom_index12, distances, _ = neighborlist(
-    #     species, coordinates, cell=cell, pbc=pbc)
-    # print("atom_index12", atom_index12)
-    # print("distances", distances)
     bond_length_table = get_bond_data_table().to(device)
     spe12 = species.flatten()[atom_index12]
-    print("spe12", spe12)
     atom_index12_bond_length = bond_length_table[spe12[0], spe12[1]]
     in_bond_length = (
         distances <= atom_index12_bond_length).nonzero().flatten()
-    atom_index12 = atom_index12.index_select(1, in_bond_length)
+    atom_index12 = atom_index12.index_select(1, in_bond_length) # this bit takes 0.10s
 
-    # --- THIS ABOVE FUNCTION IS FOR REFERENCE --- 
+    # FINDING FRAGMENTS
+    # build cugraph from cudf edges
+    # https://docs.rapids.ai/api/cugraph/stable/api_docs/api/cugraph.graph.from_cudf_edgelist#cugraph.Graph.from_cudf_edgelist
+    df_edges = cudf.DataFrame(
+        {
+            "source": cp.from_dlpack(torch.to_dlpack(atom_index12[0])),
+            "destination": cp.from_dlpack(torch.to_dlpack(atom_index12[1])),
+        }
+    ) #0.001s
+    cG = cnx.Graph() #10^-5s
+    cG.from_cudf_edgelist(df_edges, renumber=False) 
+    df = cnx.connected_components(cG)
+    atom_index = torch.from_dlpack(df["vertex"].to_dlpack())
+    vertex_spe = species.flatten()[atom_index]
+    df["atomic_numbers"] = cudf.from_dlpack(torch.to_dlpack(vertex_spe))
+    df["symbols"] = df["atomic_numbers"].map(species_dict)
+    df = df.rename(columns={"vertex": "atom_index"})
+    # Grouping by labels and collecting symbols
+    df_per_frag = df.groupby("labels").agg({"symbols": list}).reset_index()
+    df_per_frag.columns = ["labels", "collected_symbols"]
+    # Sort and concatenate symbols to create a flatten_formula (without using ASE)
+    df_per_frag["collected_symbols"] = df_per_frag["collected_symbols"].list.sort_values(
+        ascending=True, na_position="last"
+    )
+    df_per_frag["flatten_formula"] = df_per_frag.collected_symbols.str.join("")
+    # Grouping by labels and collecting atom_index using cuDF
+    df_per_frag["atom_indices"] = df.groupby("labels").agg({"atom_index": list}).reset_index()["atom_index"]
 
-    # THE FUNCTION BELOW IS TO DEBUG THE ACTUAL NEIGHBOR LIST FUNCTION WITH 22.8M ATOMS
-    # device = "cuda"
-    # batch_size = 20000 
-    # num_atoms = species.shape[1]  # Total atoms (22.8M)
-    # print("num_atoms", num_atoms)
-    # # num_atoms = species.shape[0]  # Total atoms (22.8M)
-    # # time1 = timetime.time()
-    # # Initialize storage for final neighbor list results
-    # all_i, all_j, all_u, all_S = [], [], [], []
-
-    # # Process the atoms in 20K chunks
-    # for start in range(0, num_atoms, batch_size):
-    #     end = min(start + batch_size, num_atoms)  # Ensure we don't exceed total atoms
-
-    #     # Move current batch to CUDA
-    #     species_batch = species[:, start:end].to(device)
-    #     coordinates_batch = coordinates[:, start:end, :].to(device)
-    #     # species_batch = species[start:end].to(device)
-    #     # coordinates_batch = coordinates[start:end, :].to(device)
-
-    #     atomic_numbers = species_batch.squeeze(0)  # Shape: [batch_size]
-    #     positions = coordinates_batch.squeeze(0)  # Shape: [batch_size, 3]
-
-    #     # Set PBC explicitly to False
-    #     pbc = torch.tensor([[False, False, False]], dtype=torch.bool, device=device)
-    #     cell = np.zeros((3, 3)) # Set cell to zero to match the original system cell list
-
-    #     # Create AtomicData
-    #     # time1 = timetime.time()
-    #     atomic_data = AtomicData(
-    #         atomic_numbers=atomic_numbers,
-    #         positions=positions,
-    #         cell=cell,
-    #         pbc=pbc,
-    #         forces=None,
-    #         energy=None,
-    #         charges=None,
-    #         edge_index=None,
-    #         node_attrs=None,
-    #         shifts=None,
-    #         unit_shifts=None,
-    #         spin_multiplicity=None,
-    #         info={},
-    #     )
-
-    #     b = Batch.from_data_list([atomic_data])
-    #     # Ensure batch is on CUDA
-    #     b.to(device)
-    #     cutoff = torch.tensor([2.0, 2.0], device=device)
-
-    #     # Compute neighbor list for this batch
-    #     i, j, u, S = batched_neighbor_list(b, cutoff)
-    #     # print(type(i), type(j), type(u), type(S))
-    #     print("i", i)
-    #     print("j", j)
-    #     # Free up GPU memory
-    #     del atomic_data, b, species_batch, coordinates_batch
-    #     torch.cuda.empty_cache()
-
-    #     # print("Time to get all cell lists:", timetime.time() - time1)
-
-    # print("Finished processing all atoms.")
-
-    return neighborlist_to_fragment(atom_index12, species)
+    return cG, df_per_frag
 
 def build_netx_graph_from_ase(ase_mol, use_cell_list=True):
     """
@@ -448,24 +390,26 @@ def analyze_a_frame(
     start = timetime.time()
     positions = (
         torch.tensor(mdtraj_frame.xyz, device=device).float().view(
-            1, -1, 3) * 10.0
+            1, -1, 3) * 10.0 # 0.05s
     )  # convert to angstrom
-    species = torch.tensor(
-        [atom.element.atomic_number for atom in mdtraj_frame.topology.atoms], device=device
-    ).unsqueeze(0)
+    species = cp.array([atom.element.atomic_number for atom in mdtraj_frame.topology.atoms], dtype=cp.int32) # 5s
+    # Convert CuPy array to a PyTorch tensor on GPU
+    species = torch.as_tensor(species, device="cuda").unsqueeze(0)
 
-    cell = torch.tensor(mdtraj_frame.unitcell_vectors[0], device=device) * 10.0
-    pbc = torch.tensor([True, True, True], device=device)
+    prefragment_time = timetime.time()
+    print("Time to preporcess finding fragments: ", prefragment_time - start)
+    fragment_time1 = timetime.time()
+    cG, df_per_frag = find_fragments_nv(species, positions)
+    fragment_time2 = timetime.time()
+    print("Time to find fragments: ", fragment_time2 - fragment_time1)
 
+    time_for_frame1 = timetime.time()
     # calculate frame_offset using time_offset
     frame_offset = int(time_offset / (dump_interval * timestep * 1e-6))
     frame = frame_num * stride + frame_offset
     time = frame * timestep * dump_interval * 1e-6
-
-    # cG, df_per_frag = find_fragments(species, positions, cell, pbc, use_cell_list=use_cell_list)
-    cG, df_per_frag = find_fragments_nv(species, positions, cell, pbc, use_cell_list=use_cell_list)
-    if timing:
-        print("Time to find fragments: ", timetime.time() - start)
+    time_for_frame2 = timetime.time()
+    print("Time to calculate frame: ", time_for_frame2 - time_for_frame1)
 
     start_filter = timetime.time()
     if timing:

@@ -13,7 +13,7 @@ from cumolfind.fragment import build_netx_graph_from_ase
 import time
 import urllib.error
 
-astroid_data = [
+asteroid_data = [
     "Purine",
     "Hypoxanthine",
     "Xanthine",
@@ -21,13 +21,13 @@ astroid_data = [
     "2-Aminopurine",
     "8-Aminopurine",
     "2,6-Diaminopurine",
-    "6,8-Diaminopurine",
+    "6,8-Diaminopurine-7-carboxamide"
     "1-Methyluracil",
     "6-Methyluracil",
     "Imidazole",
-    "2-Imidazole carboxylic acid",
+    "1H-Imidazole-2-carboxylic acid",
     "4-Imidazole carboxylic acid",
-    "2-Methyl-1H-imidazole carboxylic acid",
+    "2-methyl-1H-imidazole-4-carboxylic acid",
     "Picolinic acid",
     "Nicotinic acid",
     "Isonicotinic acid",
@@ -45,7 +45,7 @@ astroid_data = [
     "2,2-Dimethylbutyric acid",
     "3,3-Dimethylbutyric acid",
     "Pentanoic acid",
-    "2-Ethylbutyric",
+    "2-Ethylbutyric acid",
     "2-Methylpentanoic acid",
     "3-Methylpentanoic acid",
     "4-Methylpentanoic acid",
@@ -69,7 +69,7 @@ hcn_polymers = [
     "Aminomalonic acid",
     "Beta-Alanine",
     "Sarcosine",
-    "2,3-aminopropionic acid",
+    "2,3-Diaminopropionic acid",
     "Diaminosuccinic acid",
     "2-aminoisobutyric acid",
     "(-)-2-Aminobutyric acid",
@@ -80,7 +80,7 @@ hcn_polymers = [
     "Hydantoin",
     "5,5-dimethyl-hydantoin",
     "5-carboxymethylidenehydantoin",
-    "Xhantine",
+    "Xanthine",
     "8-hydroxymethyladenine",
     "5-aminoimidazole-4-carboxamide",
     "Aminoimidazole Carboxamide",
@@ -107,12 +107,10 @@ hcn_polymers = [
     "Aminomalononitrile",
     "Diaminobut-2-enedinitrile",
     "Glycolic acid",
-    "Maloic acid",
     "Tartronic acid",
     "Methylmalonic acid",
-    "1,2-dimethylsuccinic acid",
     "2,2-dimethylsuccinic acid",
-    "2,3-dimethylsuccinic acid"
+    "2,3-dimethylsuccinic acid",
     "Itaconic acid",
     "Citraconic acid",
     "Adipic acid",
@@ -120,10 +118,11 @@ hcn_polymers = [
     "(Carboxymethoxy)succinic acid",
     "Aspergillomarasmine A",
     "Pimelic acid",
-    "2-methyltricarballylic acid",
+    "Methyltricarballylic acid",
+    "2-Methylpropane-1,2,3-tricarboxylic acid",
     "Tricarballylic acid",
     "Aconitic acid",
-    "1,2,4-butane tricarboxylic acid",
+    "1,2,4-Butanetricarboxylic acid",
     "Citric acid"
 ]
 
@@ -216,8 +215,8 @@ dipeptides = all_dipeptides()
 
 category_mapping = {}
 
-for mol in astroid_data:
-    category_mapping[mol] = "astroid_data"
+for mol in asteroid_data:
+    category_mapping[mol] = "asteroid_data"
 for mol in hcn_polymers:
     category_mapping[mol] = "hcn_polymers"
 for mol in nucleobases:
@@ -287,54 +286,88 @@ def verify_graph(compound, graph):
     print("graph check passed")
 
 
-def process_molecule(mol_name):
-    # TODO: we are only using the first one, do we need to check the other ones?
-    pubchem_mols = pubchempy.get_compounds(mol_name, "name")
+def process_molecule(mol_name, max_retries=5, initial_wait=5):
+    """ 
+    Process a molecule, handling PubChem downtime by retrying.
+    
+    Parameters:
+    mol_name (str): The molecule name to query in PubChem.
+    max_retries (int): Maximum number of retries for server errors.
+    initial_wait (int): Initial wait time in seconds before retrying.
+    """
+    attempt = 0
 
-    if len(pubchem_mols) == 0:
-        warnings.warn(f"Skipping {mol_name}, no PubChem entry found")
-        failed_molecules.append(mol_name)
-        return None
+    while attempt < max_retries:
+        try:
+            # Query PubChem for the molecule
+            pubchem_mols = pubchempy.get_compounds(mol_name, "name")
 
-    pubchem_mol = pubchem_mols[0]
-    formula = pubchem_mol.molecular_formula
+            if len(pubchem_mols) == 0:
+                warnings.warn(f"Skipping {mol_name}, no PubChem entry found")
+                failed_molecules.append(mol_name)
+                return None
 
-    if not is_CHNO_only(formula):
-        warnings.warn(f"Skipping {mol_name} with formula {formula}, contains elements other than CHNO")
-        return None
+            pubchem_mol = pubchem_mols[0]
+            formula = pubchem_mol.molecular_formula
 
-    canonical_smiles = pubchem_mol.canonical_smiles
-    print(
-        f"===== Processing {mol_name} with formula {formula} and Canonical SMILES: {canonical_smiles} ====="
-    )
+            if not is_CHNO_only(formula):
+                warnings.warn(f"Skipping {mol_name} with formula {formula}, contains elements other than CHNO")
+                return None
 
-    with tempfile.NamedTemporaryFile(suffix=".sdf") as temp:
-        pubchempy.download("SDF", temp.name, pubchem_mol.cid, record_type="3d", overwrite=True)
-        ase_mol = read(temp.name)
+            canonical_smiles = pubchem_mol.canonical_smiles
+            print(
+                f"===== Processing {mol_name} with formula {formula} and Canonical SMILES: {canonical_smiles} ====="
+            )
 
-    # Create NetworkX graph
-    netx_graph = build_netx_graph_from_ase(ase_mol, use_cell_list=False)
-    verify_graph(pubchem_mol, netx_graph)
+            with tempfile.NamedTemporaryFile(suffix=".sdf") as temp:
+                pubchempy.download("SDF", temp.name, pubchem_mol.cid, record_type="3d", overwrite=True)
+                ase_mol = read(temp.name)
 
-    # Serialize netx_graph with pickle
-    pickled_netx_graph = pickle.dumps(netx_graph)
+            # Create NetworkX graph
+            netx_graph = build_netx_graph_from_ase(ase_mol, use_cell_list=False)
+            verify_graph(pubchem_mol, netx_graph)
 
-    # Get the category of the molecule
-    category = category_mapping.get(mol_name, "unknown")
+            # Serialize netx_graph with pickle
+            pickled_netx_graph = pickle.dumps(netx_graph)
 
-    # Add data to the DataFrame
-    atomic_nums = ase_mol.get_atomic_numbers()
-    mol_data.loc[len(mol_data)] = [
-        pickled_netx_graph,
-        ase_mol.get_chemical_formula(),
-        pubchem_mol.canonical_smiles,
-        mol_name,
-        generate_flatten_formula(atomic_nums),
-        category, # Add category column
-    ]
+            # Get the category of the molecule
+            category = category_mapping.get(mol_name, "unknown")
 
+            # Add data to the DataFrame
+            atomic_nums = ase_mol.get_atomic_numbers()
+            mol_data.loc[len(mol_data)] = [
+                pickled_netx_graph,
+                ase_mol.get_chemical_formula(),
+                pubchem_mol.canonical_smiles,
+                mol_name,
+                generate_flatten_formula(atomic_nums),
+                category,  # Add category here
+            ]
 
-interested_mols = nucleobases + simple_sugars + fatty_acids + amino_acids + dipeptides
+            return  # Successfully processed molecule, exit function
+
+        except pubchempy.PubChemHTTPError as e:
+            if "PUGREST.ServerBusy" in str(e):
+                attempt += 1
+                wait_time = initial_wait * (2 ** (attempt - 1))  # Exponential backoff
+                print(f"PubChem server busy (attempt {attempt}/{max_retries}). Retrying in {wait_time} seconds...")
+                time.sleep(wait_time)
+            else:
+                raise  # Reraise other PubChem errors
+
+        except urllib.error.HTTPError as e:
+            if e.code == 503:  # Catch direct HTTP 503 errors
+                attempt += 1
+                wait_time = initial_wait * (2 ** (attempt - 1))
+                print(f"HTTP 503 Error (attempt {attempt}/{max_retries}). Retrying in {wait_time} seconds...")
+                time.sleep(wait_time)
+            else:
+                raise  # Reraise other HTTP errors
+
+    print(f"Failed to process {mol_name} after {max_retries} attempts. Skipping...")
+    failed_molecules.append(mol_name)
+
+interested_mols = asteroid_data + hcn_polymers + nucleobases + simple_sugars + fatty_acids + amino_acids + dipeptides
 # Process each molecule
 for mol in interested_mols:
     process_molecule(mol)

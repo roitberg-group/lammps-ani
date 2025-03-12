@@ -10,6 +10,9 @@ from ase.io import read
 from ase.data import chemical_symbols
 from cumolfind.fragment import build_netx_graph_from_ase
 
+import time
+import urllib.error
+
 astroid_data = [
     "Purine",
     "Hypoxanthine",
@@ -335,6 +338,8 @@ interested_mols = nucleobases + simple_sugars + fatty_acids + amino_acids + dipe
 # Process each molecule
 for mol in interested_mols:
     process_molecule(mol)
+
+print(failed_molecules)
 
 with open("pubchem_failed_molecules.txt", "w") as f:
     for mol in failed_molecules:

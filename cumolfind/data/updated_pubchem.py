@@ -21,7 +21,7 @@ asteroid_data = [
     "2-Aminopurine",
     "8-Aminopurine",
     "2,6-Diaminopurine",
-    "6,8-Diaminopurine-7-carboxamide"
+    "6,8-Diaminopurine-7-carboxamide",
     "1-Methyluracil",
     "6-Methyluracil",
     "Imidazole",

@@ -206,11 +206,11 @@ def _cell_neighbor_list(
         dist = torch.empty((total_count,), device=device, dtype=torch.float32)
         wp_dist = wp.from_torch(dist, dtype=wp.float32)
 
-        # u = torch.empty((total_count, 3), device=device, dtype=torch.int32)
-        # wp_u = wp.from_torch(u, dtype=wp.vec3i)
+        coord_i = torch.empty((total_count, 3), device=device, dtype=torch.float32)
+        wp_coord_i = wp.from_torch(coord_i, dtype=wp_vec_dtype)
 
-        # S = torch.empty((total_count, 3), device=device, dtype=dtype)
-        # wp_S = wp.from_torch(S, dtype=wp_vec_dtype)
+        coord_j = torch.empty((total_count, 3), device=device, dtype=torch.float32)
+        wp_coord_j = wp.from_torch(coord_j, dtype=wp_vec_dtype)
 
         if os.environ.get("ALCHEMI_PROFILE_NVTX", False):
             wp.synchronize()
@@ -235,12 +235,12 @@ def _cell_neighbor_list(
                 wp_i,
                 wp_j,
                 wp_dist,
-                # wp_u,
-                # wp_S,
+                wp_coord_i,
+                wp_coord_j,
             ],
             device=device,
         )
         if os.environ.get("ALCHEMI_PROFILE_NVTX", False):
             wp.synchronize()
 
-    return i, j, dist
+    return i, j, dist, coord_i, coord_j

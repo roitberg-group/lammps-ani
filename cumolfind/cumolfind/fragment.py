@@ -260,7 +260,6 @@ def find_fragments_nv(species, coordinates):
     coordinates = coordinates - min_  
     # Set PBC explicitly to False
     pbc = torch.tensor([[False, False, False]], dtype=torch.bool, device=device)
-
     # Create AtomicData for full system
     atomic_data = AtomicData(
         atomic_numbers=species.squeeze(0),  
@@ -277,18 +276,24 @@ def find_fragments_nv(species, coordinates):
         spin_multiplicity=None,
         info={},
     ) # everything until now is 0.02s
-
     # Compute neighbors using cell list
-    i_tensor, j_tensor, distances = _cell_neighbor_list(atomic_data, cutoff, max_nbins=1000000) #4.3s
+    time0 = timetime.time()
+    i_tensor, j_tensor, distances, coord_i, coord_j = _cell_neighbor_list(atomic_data, cutoff, max_nbins=1000000) #4.3s
+    time1 = timetime.time()
+    print("Time to compute cell list: ", time1 - time0)
     atom_index12 = torch.stack([i_tensor, j_tensor], dim=0)
-
     bond_length_table = get_bond_data_table().to(device)
     spe12 = species.flatten()[atom_index12]
     atom_index12_bond_length = bond_length_table[spe12[0], spe12[1]]
     in_bond_length = (
         distances <= atom_index12_bond_length).nonzero().flatten()
     atom_index12 = atom_index12.index_select(1, in_bond_length) # this bit takes 0.10s
-
+    # for molecule tracking
+    distances = distances.index_select(0, in_bond_length)  # Keep only valid distances
+    coord_i = coord_i.index_select(0, in_bond_length)
+    coord_j = coord_j.index_select(0, in_bond_length)
+    positions = coordinates.squeeze(0)
+ 
     # FINDING FRAGMENTS
     # build cugraph from cudf edges
     # https://docs.rapids.ai/api/cugraph/stable/api_docs/api/cugraph.graph.from_cudf_edgelist#cugraph.Graph.from_cudf_edgelist
@@ -299,23 +304,48 @@ def find_fragments_nv(species, coordinates):
         }
     ) #0.001s
     cG = cnx.Graph() #10^-5s
-    cG.from_cudf_edgelist(df_edges, renumber=False) 
+    cG.from_cudf_edgelist(df_edges[["source", "destination"]], renumber=False) 
     df = cnx.connected_components(cG)
     atom_index = torch.from_dlpack(df["vertex"].to_dlpack())
     vertex_spe = species.flatten()[atom_index]
     df["atomic_numbers"] = cudf.from_dlpack(torch.to_dlpack(vertex_spe))
     df["symbols"] = df["atomic_numbers"].map(species_dict)
     df = df.rename(columns={"vertex": "atom_index"})
-    # Grouping by labels and collecting symbols
+
+    # **Store x, y, z coordinates separately without converting to list**
+    atom_coords = positions[atom_index]
+    df["x"] = cp.from_dlpack(torch.to_dlpack(atom_coords[:, 0]))  # X-coordinates
+    df["y"] = cp.from_dlpack(torch.to_dlpack(atom_coords[:, 1]))  # Y-coordinates
+    df["z"] = cp.from_dlpack(torch.to_dlpack(atom_coords[:, 2]))  # Z-coordinates
+
+    # **Group by labels and store separate xyz columns**
+    df_grouped = df.groupby("labels").agg({
+        "atom_index": ["collect"],  # Collect atomic indices
+        "x": ["collect"], 
+        "y": ["collect"], 
+        "z": ["collect"],  
+    }).reset_index()
+
+    # Rename columns for clarity
+    df_grouped.columns = ["labels", "atom_indices", "x_coords", "y_coords", "z_coords"]
+
+    # **Group by labels and collect symbols**
     df_per_frag = df.groupby("labels").agg({"symbols": list}).reset_index()
-    df_per_frag.columns = ["labels", "collected_symbols"]
-    # Sort and concatenate symbols to create a flatten_formula (without using ASE)
-    df_per_frag["collected_symbols"] = df_per_frag["collected_symbols"].list.sort_values(
+    df_per_frag.columns = ["labels", "symbols_ordered"]
+    df_per_frag["collected_symbols"] = df_per_frag["symbols_ordered"].list.sort_values(
         ascending=True, na_position="last"
     )
     df_per_frag["flatten_formula"] = df_per_frag.collected_symbols.str.join("")
-    # Grouping by labels and collecting atom_index using cuDF
-    df_per_frag["atom_indices"] = df.groupby("labels").agg({"atom_index": list}).reset_index()["atom_index"]
+
+    # **Drop atom_indices from df_per_frag before merging to prevent duplicate columns**
+    if "atom_indices" in df_per_frag.columns:
+        df_per_frag = df_per_frag.drop(columns=["atom_indices"])
+
+    # **Now it's safe to merge**
+    df_per_frag = df_per_frag.merge(df_grouped, on="labels", how="left")
+
+    print("columns: ", df_per_frag.columns)
+    print("df_per_frag: ", df_per_frag.head())
 
     return cG, df_per_frag
 
@@ -391,7 +421,6 @@ def analyze_a_frame(
     cG, df_per_frag = find_fragments_nv(species, positions)
     fragment_time2 = timetime.time()
     print("Time to find fragments: ", fragment_time2 - fragment_time1)
-
     time_for_frame1 = timetime.time()
     # calculate frame_offset using time_offset
     frame_offset = int(time_offset / (dump_interval * timestep * 1e-6))
@@ -415,6 +444,10 @@ def analyze_a_frame(
             "smiles",
             "name",
             "atom_indices",
+            "symbols_ordered",
+            "x_coords",
+            "y_coords",
+            "z_coords",
             "nxgraph",
             "time"
         ]
@@ -443,6 +476,7 @@ def analyze_a_frame(
     reference_graphs = graph_pandas.apply(pickle.loads)
     filtered_df = filtered_df.to_pandas()
     filtered_df["reference_graph"] = reference_graphs
+    positions = positions.squeeze(0)
     if timing:
         print("preprocessing: ", timetime.time() - start1)
 
@@ -453,7 +487,6 @@ def analyze_a_frame(
         # get subgraph for this fragment
         fragment_graph = nxgraph.subgraph(frag_atom_indices)
         graph = reference_graphs[local_frame]  # pull from preprocessed reference graph
-
         # add grapmatcher for cases when number of nodes and edges matches but doesn't correspond to the right molecule
         add_element_pairs_to_edges(fragment_graph)
         add_element_pairs_to_edges(graph)
@@ -469,6 +502,10 @@ def analyze_a_frame(
                 row["smiles"],
                 row["name"],
                 row["atom_indices"],
+                row["symbols_ordered"], 
+                row["x_coords"],
+                row["y_coords"],
+                row["z_coords"],
                 pickle.dumps(fragment_graph),
                 time,
             ]
@@ -485,10 +522,10 @@ def analyze_a_frame(
     df_formula = df_formula.merge(
         df_per_frag[["flatten_formula", "atom_indices"]], on="flatten_formula", how="left"
     )
-
     # Add metadata
     df_formula["local_frame"] = local_frame
     df_formula["frame"] = frame
     df_formula["time"] = time
-
+    # WHY convert to pandas?
     return df_formula.to_pandas(), df_molecule
+    # return df_formula, df_molecule

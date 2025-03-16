@@ -77,10 +77,14 @@ def analyze_all_frames(
 
     # Calculate the range of frames for each segment
     # Ensure at least one frame per segment
+    print("total_frames is", total_frames)
+    print("num_segments is", num_segments)
     segment_length = max(1, total_frames // num_segments)
     local_start_frame = segment_index * segment_length
+    print("local_start_frame is", local_start_frame)
     # Ensure end frame does not exceed total frames
     end_frame = min(total_frames, local_start_frame + segment_length)
+    print("end_frame is", end_frame)
 
     # Adjust time offset for the segment
     segment_time_offset = time_offset + local_start_frame * timestep * dump_interval * 1e-6
@@ -92,6 +96,7 @@ def analyze_all_frames(
     molecule_dfs = []
 
     frame_num = local_start_frame
+    print("frame_num is", frame_num)
     output_filename = f"{Path(traj_file).stem}_seg{segment_index:04d}of{num_segments:04d}"
     
     for mdtraj_frame in tqdm(

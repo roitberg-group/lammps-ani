@@ -402,8 +402,8 @@ def _cell_build_neighbor_list(
     i: wp.array(dtype=Any),
     j: wp.array(dtype=Any),
     dist_ij: wp.array(dtype=Any),
-    # u: wp.array(dtype=Any),
-    # S: wp.array(dtype=Any),
+    coord_i: wp.array(dtype=Any),
+    coord_j: wp.array(dtype=Any),
 ):
     """Determine the number of neighbors for each atom"""
     tid = wp.tid()
@@ -461,10 +461,8 @@ def _cell_build_neighbor_list(
                             i[offset_tid + count] = tid
                             j[offset_tid + count] = aj
                             dist_ij[offset_tid + count] = dist
-                            # u[offset_tid + count] = wp.vec3i(
-                            #     int(shift[0]), int(shift[1]), int(shift[2])
-                            # )
-                            # S[offset_tid + count] = cshift
+                            coord_i[offset_tid + count] = pos_i
+                            coord_j[offset_tid + count] = coord[aj]
                             count += 1
 
 
@@ -485,8 +483,8 @@ def _cell_build_neighbor_list(  # noqa: F811
     i: wp.array(dtype=int),
     j: wp.array(dtype=int),
     dist_ij: wp.array(dtype=wp.float32),
-    # u: wp.array(dtype=wp.vec3i),
-    # S: wp.array(dtype=wp.vec3f),
+    coord_i: wp.array(dtype=wp.vec3f),
+    coord_j: wp.array(dtype=wp.vec3f),
 ):  #  pragma: no cover
     """Determine the number of neighbors for each atom (float32 version)"""
     ...
@@ -509,8 +507,8 @@ def _cell_build_neighbor_list(  # noqa: F811
     i: wp.array(dtype=int),
     j: wp.array(dtype=int),
     dist_ij: wp.array(dtype=wp.float64),
-    # u: wp.array(dtype=wp.vec3i),
-    # S: wp.array(dtype=wp.vec3d),
+    coord_i: wp.array(dtype=wp.vec3d),
+    coord_j: wp.array(dtype=wp.vec3d),
 ):  #  pragma: no cover
     """Determine the number of neighbors for each atom (float64 version)"""
     ...

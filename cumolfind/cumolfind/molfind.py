@@ -29,7 +29,7 @@ from tqdm import tqdm
 from .top_loader import load_topology
 
 # MA added
-from .trackmol import track_mol_origin
+from .trackmol import track_mol_origin, analyze_all_frames_to_track
 from .analyze_traj import analyze_all_frames, read_dcd_header, save_data
 
 def main():
@@ -80,12 +80,24 @@ def main():
         )
 
     elif args.task == "track_molecules":
-        print("Finding origin of molecules...")
-    
         output_directory = args.output_dir
         os.makedirs(output_directory, exist_ok=True)
 
         topology = load_topology(args.top_file)
+        print("First analyzing trajectory...")
+        # first we analyze the frames
+        analyze_all_frames_to_track(
+            topology,
+            args.traj_file,
+            args.time_offset,
+            args.dump_interval,
+            args.timestep,
+            output_directory,
+            args.mol_pq,
+            args.num_segments,
+            args.segment_index,
+        )
+        print("Finding origin of molecules...")
         # Track the origin of molecules
         track_mol_origin(
             topology,

@@ -55,6 +55,7 @@ positional arguments:
 
 options:
   -h, --help            show this help message and exit
+  --task "analyze_trajectory"
   --time_offset TIME_OFFSET
                         Time offset for the trajectory
   --dump_interval DUMP_INTERVAL
@@ -78,6 +79,37 @@ Use this command to analyze trajectory files and find molecules. It exports two 
 
 - `{traj_file}_formula.pq`: Database with "frame, local_frame, formula, count, time".
 - `{traj_file}_molecule.pq`: Database with "frame, local_frame, hash, formula, smiles, name, atom_indices, time".
+
+**Tracking origin of molecules:**
+
+```bash
+cumolfind-molfind --help
+
+positional arguments:
+  traj_file             Trajectory file to be analyzed
+  top_file              Topology file to be analyzed
+  mol_pq                Molecule database file
+
+options:
+  -h, --help            show this help message and exit
+  --task "track_molecules"
+  --time_offset TIME_OFFSET
+                        Time offset for the trajectory
+  --dump_interval DUMP_INTERVAL
+                        How many timesteps between frame dumps
+  --timestep TIMESTEP   Timestep used in the simulation (fs)
+  --output_dir OUTPUT_DIR
+                        Output directory
+  --num_segments NUM_SEGMENTS
+                        Number of segments to divide the trajectory into
+  --segment_index SEGMENT_INDEX
+                        Index of the segment to analyze
+  --frame_stride FRAME_STRIDE
+                        How many frames to skip when searching for mol origin
+#  --frame_to_track_mol_origin
+#                        Path to a .pq file that you want to find mol origin for
+  
+```
 
 **Extracting Frames:**
 

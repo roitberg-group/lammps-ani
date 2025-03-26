@@ -344,9 +344,6 @@ def find_fragments_nv(species, coordinates):
     # **Now it's safe to merge**
     df_per_frag = df_per_frag.merge(df_grouped, on="labels", how="left")
 
-    print("columns: ", df_per_frag.columns)
-    print("df_per_frag: ", df_per_frag.head())
-
     return cG, df_per_frag
 
 
@@ -418,7 +415,7 @@ def analyze_a_frame(
     prefragment_time = timetime.time()
     print("Time to preporcess finding fragments: ", prefragment_time - start)
     fragment_time1 = timetime.time()
-    cG, df_per_frag = find_fragments_nv(species, positions)
+    # cG, df_per_frag = find_fragments_nv(species, positions)
     fragment_time2 = timetime.time()
     print("Time to find fragments: ", fragment_time2 - fragment_time1)
     time_for_frame1 = timetime.time()

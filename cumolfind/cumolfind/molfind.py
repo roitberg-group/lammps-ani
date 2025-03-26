@@ -27,6 +27,7 @@ import mdtraj as md
 import pandas as pd
 from tqdm import tqdm
 from .top_loader import load_topology
+from pathlib import Path
 
 # MA added
 from .trackmol import track_mol_origin, analyze_all_frames_to_track
@@ -54,7 +55,23 @@ def main():
         "--num_segments", type=int, default=1, help="Number of segments to divide the trajectory into"
     )
     parser.add_argument("--segment_index", type=int, default=0, help="Index of the segment to analyze")
-    
+
+    args, remaining_args = parser.parse_known_args()
+
+    if args.task == "track_molecules":
+        parser.add_argument(
+            "--frame_stride", type=int, default=20,
+            help="Frame stride to skip over frames during analysis. Default is 20."
+        )
+        parser.add_argument(
+            "--frame_to_track_mol_origin", type=str, default=None,
+            help="Path to the .pq file for tracking molecule origin."
+        )
+        # parser.add_argument(
+        #     "--formula_frame", type=str, default=None,
+        #     help="Path to the .pq file we will track from."
+        # )
+
     args = parser.parse_args()
 
     if args.task == "analyze_trajectory":
@@ -83,6 +100,8 @@ def main():
         output_directory = args.output_dir
         os.makedirs(output_directory, exist_ok=True)
 
+        output_filename = f"{Path(args.traj_file).stem}_seg{args.segment_index:04d}of{args.num_segments:04d}"
+
         topology = load_topology(args.top_file)
         print("First analyzing trajectory...")
         # first we analyze the frames
@@ -97,6 +116,7 @@ def main():
             args.num_segments,
             args.segment_index,
         )
+        formula_file_path = os.path.join(output_directory, f"{output_filename}_formula.pq")
         print("Finding origin of molecules...")
         # Track the origin of molecules
         track_mol_origin(
@@ -109,6 +129,10 @@ def main():
             args.mol_pq,
             args.num_segments,
             args.segment_index,
+            args.frame_stride,
+            args.frame_to_track_mol_origin,
+            # args.formula_frame,
+            formula_file_path,
         )
 
 if __name__ == "__main__":

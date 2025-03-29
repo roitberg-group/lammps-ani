@@ -403,7 +403,7 @@ def analyze_a_frame(
     """
     filter_fragment_from_mdtraj_frame
     """
-    start = timetime.time()
+    # start = timetime.time()
     positions = (
         torch.tensor(mdtraj_frame.xyz, device=device).float().view(
             1, -1, 3) * 10.0 # 0.05s
@@ -413,9 +413,9 @@ def analyze_a_frame(
     species = torch.as_tensor(species, device="cuda").unsqueeze(0)
 
     prefragment_time = timetime.time()
-    print("Time to preporcess finding fragments: ", prefragment_time - start)
+    # print("Time to preporcess finding fragments: ", prefragment_time - start)
     fragment_time1 = timetime.time()
-    # cG, df_per_frag = find_fragments_nv(species, positions)
+    cG, df_per_frag = find_fragments_nv(species, positions)
     fragment_time2 = timetime.time()
     print("Time to find fragments: ", fragment_time2 - fragment_time1)
     time_for_frame1 = timetime.time()

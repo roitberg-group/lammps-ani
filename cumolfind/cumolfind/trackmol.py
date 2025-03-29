@@ -1,38 +1,36 @@
 import argparse
 import os
-from pathlib import Path
 import warnings
+import re
+import traceback
+import json
+import pickle
+import ast
+import time as timetime
+from collections import defaultdict
+from pathlib import Path
 import torch
 import pytraj as pt
 import mdtraj as md
+import pandas as pd
+import numpy as np
+import cupy as cp
 import cudf
 import dask_cudf
-import cupy as cp
-import pandas as pd
-from .analyze_traj import read_dcd_header, save_data
-from .fragment import find_fragments_nv, compute_fragment_edge_count, add_element_pairs_to_edges, cugraph_slice_subgraph_gpu
-from tqdm import tqdm
-import networkx as nx
-import pickle
-import time as timetime
-import numpy as np
-import traceback
-import re
-from collections import defaultdict
-
-import torch
-import pickle
-import ase
-import ast
 import cugraph as cnx
-import pandas as pd
-import mdtraj as md
-import numpy as np
 import networkx as nx
-import time as timetime
 import matplotlib.pyplot as plt
+from ase import Atoms
 from ase.build import nanotube
-import json
+
+from .analyze_traj import read_dcd_header, save_data
+from .fragment import (
+    find_fragments_nv,
+    compute_fragment_edge_count,
+    add_element_pairs_to_edges,
+    cugraph_slice_subgraph_gpu
+)
+from tqdm import tqdm
 
 timing = True
 PERIODIC_TABLE_LENGTH = 118
@@ -88,20 +86,14 @@ def analyze_a_frame(
     # Convert CuPy array to a PyTorch tensor on GPU
     species = torch.as_tensor(species, device="cuda").unsqueeze(0)
 
-    # prefragment_time = timetime.time()
-    # print("Time to preporcess finding fragments: ", prefragment_time - start)
     fragment_time1 = timetime.time()
     cG, df_per_frag = find_fragments_nv(species, positions)
     fragment_time2 = timetime.time()
     print("Time to find fragments: ", fragment_time2 - fragment_time1)
-    # time_for_frame1 = timetime.time()
     # calculate frame_offset using time_offset
     frame_offset = int(time_offset / (dump_interval * timestep * 1e-6))
     frame = frame_num * stride + frame_offset
-    # print("frame_num", frame_num, "frame_offset", frame_offset, "frame", frame)
     time = frame * timestep * dump_interval * 1e-6
-    # time_for_frame2 = timetime.time()
-    # print("Time to calculate frame: ", time_for_frame2 - time_for_frame1)
 
     start_filter = timetime.time()
     if timing:
@@ -212,6 +204,7 @@ def analyze_all_frames_to_track(
     mol_pq,
     num_segments=1,
     segment_index=0,
+    stride=20,
 ):
     mol_database = pd.read_parquet(mol_pq)
 
@@ -238,7 +231,6 @@ def analyze_all_frames_to_track(
         print("Graph column does not exist in mol_database. No changes made.")
 
     ########## MODIFY THIS PORTION FOR A DIFFERENT TRAJECTORY ##########
-    stride = 1  # To only analyze every 20th frame
     save_interval = 20  # Interval for saving dataframes
 
     if Path(traj_file).suffix == ".dcd":
@@ -275,6 +267,7 @@ def analyze_all_frames_to_track(
         total=total_frames_in_segment,
     ):
         try:
+            print("frame_num is", frame_num)
             df_formula, df_molecule = analyze_a_frame(
                 mdtraj_frame,
                 time_offset,

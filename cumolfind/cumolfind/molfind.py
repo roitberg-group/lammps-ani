@@ -60,17 +60,13 @@ def main():
 
     if args.task == "track_molecules":
         parser.add_argument(
-            "--frame_stride", type=int, default=20,
-            help="Frame stride to skip over frames during analysis. Default is 20."
-        )
-        parser.add_argument(
             "--frame_to_track_mol_origin", type=str, default=None,
             help="Path to the .pq file for tracking molecule origin."
         )
-        # parser.add_argument(
-        #     "--formula_frame", type=str, default=None,
-        #     help="Path to the .pq file we will track from."
-        # )
+        parser.add_argument(
+            "--frame_stride", type=int, default=20,
+            help="Frame stride to skip over frames during analysis. Default is 20."
+        )
 
     args = parser.parse_args()
 
@@ -115,6 +111,7 @@ def main():
             args.mol_pq,
             args.num_segments,
             args.segment_index,
+            args.frame_stride,
         )
         formula_file_path = os.path.join(output_directory, f"{output_filename}_formula.pq")
         print("Finding origin of molecules...")
@@ -131,7 +128,6 @@ def main():
             args.segment_index,
             args.frame_stride,
             args.frame_to_track_mol_origin,
-            # args.formula_frame,
             formula_file_path,
         )
 

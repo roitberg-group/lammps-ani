@@ -68,5 +68,9 @@ def load_topology(file_name: str):
     return topology
 
 
-# Usage: 
-# file = get_topology("/red/roitberg/nick_analysis/traj0.0ns.h5")
+# Usage:
+# # In your script, run:
+# from top_loader import load_topology
+# topology = load_topology("/red/roitberg/nick_analysis/traj0.0ns.h5")
+# # Must be an HDF5 topology -- the one referenced there was created from the initial geometry of the system.
+

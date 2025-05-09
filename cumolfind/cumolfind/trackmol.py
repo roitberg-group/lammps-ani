@@ -25,11 +25,16 @@ from ase.build import nanotube
 
 from .analyze_traj import read_dcd_header, save_data
 from .fragment import (
-    find_fragments_nv,
+    get_bond_data_table,
     compute_fragment_edge_count,
     add_element_pairs_to_edges,
     cugraph_slice_subgraph_gpu
 )
+# MA: For NV Cell List
+from .nv_atomic_data import AtomicData
+from .nv_batch import Batch
+from .nv_atom_cell_list import _cell_neighbor_list
+
 from tqdm import tqdm
 
 timing = True
@@ -60,6 +65,7 @@ def save_xyz_file(directory, frame, flatten_formula, atom_indices, atom_symbols,
     """
     os.makedirs(directory, exist_ok=True) 
     filename = os.path.join(directory, f"{flatten_formula}_frame_{frame}.xyz")
+    print("flatten_formula is", flatten_formula)
     with open(filename, "w") as f:
         f.write(f"{len(atom_symbols)}\n")  
         f.write(f"Frame {frame} - Molecule {flatten_formula}\n")  
@@ -71,9 +77,108 @@ def save_xyz_file(directory, frame, flatten_formula, atom_indices, atom_symbols,
 
     print(f"Saved XYZ file: {filename}")
 
-def analyze_a_frame(
-    mdtraj_frame, time_offset, dump_interval, timestep, stride, frame_num, mol_database, use_cell_list=True
-):
+def find_fragments_nv(species, coordinates):
+    """
+    Use NVIDIA's Cell List to find fragments for a single molecule.
+    """
+    device="cuda"
+    cutoff = torch.tensor([2.0], device=device)
+
+    # Compute bounding box for cell list
+    eps = 1e-3
+    min_ = torch.min(coordinates.view(-1, 3), dim=0)[0] - eps
+    max_ = torch.max(coordinates.view(-1, 3), dim=0)[0] + eps
+    largest_dist = max_ - min_
+    cell = torch.eye(3, dtype=torch.float32, device=device) * largest_dist
+    coordinates = coordinates - min_  
+    # Set PBC explicitly to False
+    pbc = torch.tensor([[False, False, False]], dtype=torch.bool, device=device)
+    # Create AtomicData for full system
+    atomic_data = AtomicData(
+        atomic_numbers=species.squeeze(0),  
+        positions=coordinates.squeeze(0),  
+        cell=cell,
+        pbc=pbc,
+        forces=None,
+        energy=None,
+        charges=None,
+        edge_index=None,
+        node_attrs=None,
+        shifts=None,
+        unit_shifts=None,
+        spin_multiplicity=None,
+        info={},
+    ) # everything until now is 0.02s
+    # Compute neighbors using cell list
+    # time0 = timetime.time()
+    i_tensor, j_tensor, distances, coord_i, coord_j = _cell_neighbor_list(atomic_data, cutoff, max_nbins=1000000) #4.3s
+    # time1 = timetime.time()
+    # print("Time to compute cell list: ", time1 - time0)
+    atom_index12 = torch.stack([i_tensor, j_tensor], dim=0)
+    bond_length_table = get_bond_data_table().to(device)
+    spe12 = species.flatten()[atom_index12]
+    atom_index12_bond_length = bond_length_table[spe12[0], spe12[1]]
+    in_bond_length = (
+        distances <= atom_index12_bond_length).nonzero().flatten()
+    atom_index12 = atom_index12.index_select(1, in_bond_length) # this bit takes 0.10s
+    # for molecule tracking
+    distances = distances.index_select(0, in_bond_length)  # Keep only valid distances
+    coord_i = coord_i.index_select(0, in_bond_length)
+    coord_j = coord_j.index_select(0, in_bond_length)
+    positions = coordinates.squeeze(0)
+ 
+    # FINDING FRAGMENTS
+    # build cugraph from cudf edges
+    # https://docs.rapids.ai/api/cugraph/stable/api_docs/api/cugraph.graph.from_cudf_edgelist#cugraph.Graph.from_cudf_edgelist
+    df_edges = cudf.DataFrame(
+        {
+            "source": cp.from_dlpack(torch.to_dlpack(atom_index12[0])),
+            "destination": cp.from_dlpack(torch.to_dlpack(atom_index12[1])),
+        }
+    ) #0.001s
+    cG = cnx.Graph() #10^-5s
+    cG.from_cudf_edgelist(df_edges[["source", "destination"]], renumber=False) 
+    df = cnx.connected_components(cG)
+    atom_index = torch.from_dlpack(df["vertex"].to_dlpack())
+    vertex_spe = species.flatten()[atom_index]
+    df["atomic_numbers"] = cudf.from_dlpack(torch.to_dlpack(vertex_spe))
+    df["symbols"] = df["atomic_numbers"].map(species_dict)
+    df = df.rename(columns={"vertex": "atom_index"})
+
+    #Store x, y, z coordinates separately without converting to list
+    atom_coords = positions[atom_index]
+    df["x"] = cp.from_dlpack(torch.to_dlpack(atom_coords[:, 0]))  # X-coordinates
+    df["y"] = cp.from_dlpack(torch.to_dlpack(atom_coords[:, 1]))  # Y-coordinates
+    df["z"] = cp.from_dlpack(torch.to_dlpack(atom_coords[:, 2]))  # Z-coordinates
+
+    #Group by labels and store separate xyz columns
+    df_grouped = df.groupby("labels").agg({
+        "atom_index": ["collect"],  # Collect atomic indices
+        "x": ["collect"], 
+        "y": ["collect"], 
+        "z": ["collect"],  
+    }).reset_index()
+
+    # Rename columns for clarity
+    df_grouped.columns = ["labels", "atom_indices", "x_coords", "y_coords", "z_coords"]
+
+    df_per_frag = df.groupby("labels").agg({"symbols": list}).reset_index()
+
+    df_per_frag.columns = ["labels", "symbols_ordered"]
+    df_per_frag["collected_symbols"] = df_per_frag["symbols_ordered"].list.sort_values(
+        ascending=True, na_position="last"
+    )
+    df_per_frag["flatten_formula"] = df_per_frag.collected_symbols.str.join("")
+
+    if "atom_indices" in df_per_frag.columns:
+        df_per_frag = df_per_frag.drop(columns=["atom_indices"])
+
+    df_per_frag = df_per_frag.merge(df_grouped, on="labels", how="left")
+
+    return cG, df_per_frag
+
+def analyze_a_frame_and_track_back(
+    mdtraj_frame, time_offset, dump_interval, timestep, stride, frame_num):
     """
     Modfied from fragment.py for tracking molecules, save a lot more data
     """
@@ -93,105 +198,61 @@ def analyze_a_frame(
     # calculate frame_offset using time_offset
     frame_offset = int(time_offset / (dump_interval * timestep * 1e-6))
     frame = frame_num * stride + frame_offset
-    time = frame * timestep * dump_interval * 1e-6
+    df_per_frag["frame"] = frame
 
-    start_filter = timetime.time()
-    if timing:
-        print("Time to filter fragment dataframe: ", timetime.time() - start_filter)
+    return df_per_frag
 
-    # we will be saving the relevant ones in this dataframe
-    df_molecule = pd.DataFrame(
-        columns=[
-            "frame",
-            "local_frame",
-            "formula",
-            "flatten_formula",
-            "smiles",
-            "name",
-            "atom_indices",
-            "symbols_ordered",
-            "x_coords",
-            "y_coords",
-            "z_coords",
-            "nxgraph",
-            "time"
-        ]
-    )
-    # todo for later is to make this a cudf dataframe right away in analyze_traj.py
-    mol_database2 = mol_database
-    mol_database2 = mol_database2.astype(str)
-    mol_database2 = cudf.from_pandas(mol_database2)
-    start1 = timetime.time()
-    merged_df_per_frag = mol_database2.merge(df_per_frag, on="flatten_formula", how="inner")
-    # check this!
-    # create an nxgraph only for flatten_formulas that went through the filter
-    global_atom_indices = np.concatenate(merged_df_per_frag["atom_indices"].to_pandas().to_numpy())
-    # This function is the most costly!!!! (98% of the time is spent here)
-    nxgraph = cugraph_slice_subgraph_gpu(cG, species, global_atom_indices)
+def analyze_last_frame(
+    mdtraj_frame, frame_to_track, frame_index):
+    """
+    Find the target molecule in the last frame and save it's coordinates to a new dataframe for molecule tracking
+    """
+    positions = (
+        torch.tensor(mdtraj_frame.xyz, device="cuda").float().view(
+            1, -1, 3) * 10.0 # 0.05s
+    )  # convert to angstrom
+    species = cp.array([atom.element.atomic_number for atom in mdtraj_frame.topology.atoms], dtype=cp.int32) # 5s
+    # Convert CuPy array to a PyTorch tensor on GPU
+    species = torch.as_tensor(species, device="cuda").unsqueeze(0)
 
-    merged_df_per_frag["fragment_edge_count"] = merged_df_per_frag["atom_indices"].to_pandas().apply(
-        lambda frag_atom_indices: compute_fragment_edge_count(frag_atom_indices, nxgraph))  # 0.009s
-    # Throw away fragments that don't have the same number of edges as the reference graph
-    merged_df_per_frag["num_edges"] = merged_df_per_frag["num_edges"].astype(int)
-    filtered_df = merged_df_per_frag[merged_df_per_frag["fragment_edge_count"] == merged_df_per_frag["num_edges"]]  # 0.007s
-    # From now on, we have to keep working in pandas because graph isomorphism check is not possible for cuDF/cuGraph
-    graph_pandas = filtered_df["graph"].to_pandas()
-    # Convert serialized strings to bytes
-    graph_pandas = graph_pandas.apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
-    reference_graphs = graph_pandas.apply(pickle.loads)
-    filtered_df = filtered_df.to_pandas()
-    filtered_df["reference_graph"] = reference_graphs
-    positions = positions.squeeze(0)
-    if timing:
-        print("preprocessing: ", timetime.time() - start1)
+    fragment_time1 = timetime.time()
+    cG, df_per_frag = find_fragments_nv(species, positions)
+    fragment_time2 = timetime.time()
+    print("Time to find fragments: ", fragment_time2 - fragment_time1)
 
-    start1 = timetime.time()
-    match = 0
-    for local_frame, row in filtered_df.iterrows():
-        frag_atom_indices = row["atom_indices"]
-        # get subgraph for this fragment
-        fragment_graph = nxgraph.subgraph(frag_atom_indices)
-        graph = reference_graphs[local_frame]  # pull from preprocessed reference graph
-        # add grapmatcher for cases when number of nodes and edges matches but doesn't correspond to the right molecule
-        add_element_pairs_to_edges(fragment_graph)
-        add_element_pairs_to_edges(graph)
-        node_match = nx.isomorphism.categorical_node_match('element', '')
-        edge_match = nx.isomorphism.categorical_edge_match('element_pair', '')
-        gm = nx.isomorphism.GraphMatcher(graph, fragment_graph, node_match=node_match, edge_match=edge_match)
-        if gm.is_isomorphic():
-            df_molecule.loc[len(df_molecule)] = [
-                frame_num,
-                local_frame,
-                row["formula"],
-                row["flatten_formula"],
-                row["smiles"],
-                row["name"],
-                row["atom_indices"],
-                row["symbols_ordered"], 
-                row["x_coords"],
-                row["y_coords"],
-                row["z_coords"],
-                pickle.dumps(fragment_graph),
-                time,
-            ]
-            match += 1
-            print(f"    is_isomorphic {row['name']}, flatten_formula {row['flatten_formula']}, match {match}")
+    atom_indices_pandas = df_per_frag["atom_indices"].to_arrow().to_pylist()
+    match_keys = [str(sorted(indices)) for indices in atom_indices_pandas]
+    df_per_frag = df_per_frag.assign(match_key=cudf.Series(match_keys))
+    # Load frame_to_track and extract match key
+    if isinstance(frame_to_track, str):
+        frame_to_track = pd.read_parquet(frame_to_track)
 
-    if timing:
-        print("iterate database: ", timetime.time() - start1)
-    # the rest is kept the same
-    # Ask, why do we need to return df_formula? # I can use this for mol tracking!
-    df_formula = df_per_frag["flatten_formula"].value_counts().to_frame("counts").reset_index()
-    df_formula = df_formula.rename(columns={"index": "flatten_formula"})  # Fix column name
+    target_key = str(sorted(frame_to_track.iloc[0]["atom_indices"]))
+    key_df = cudf.DataFrame({"match_key": [target_key]})
 
-    df_formula = df_formula.merge(
-        df_per_frag[["flatten_formula", "atom_indices", "symbols_ordered", "x_coords", "y_coords", "z_coords"]], on="flatten_formula", how="left"
-    )
-    # Add metadata
-    df_formula["local_frame"] = local_frame
-    df_formula["frame"] = frame
-    df_formula["time"] = time
-    return df_formula.to_pandas(), df_molecule
+    # Fast GPU merge
+    matched_df = df_per_frag.merge(key_df, on="match_key", how="inner")
+
+    if len(matched_df) > 0:
+        matched_row = matched_df.to_pandas().iloc[0]  
+    else:
+        raise ValueError("Target molecules you want to track are not found in this trajectory. Please modify target molecules.")
+
+    if matched_row is not None:
+        saved_info = {
+            "frame": frame_index,
+            "flatten_formula": matched_row["flatten_formula"],
+            "atom_indices": matched_row["atom_indices"],
+            "symbols_ordered": matched_row["symbols_ordered"],
+            "x_coords": matched_row["x_coords"],
+            "y_coords": matched_row["y_coords"],
+            "z_coords": matched_row["z_coords"],
+        }
+
+        target_df = pd.DataFrame([saved_info])  
+
+    return target_df
+
 
 @torch.inference_mode()
 def analyze_all_frames_to_track(
@@ -205,11 +266,10 @@ def analyze_all_frames_to_track(
     num_segments=1,
     segment_index=0,
     stride=20,
+    frame_to_track = None,
 ):
     mol_database = pd.read_parquet(mol_pq)
-
     if "graph" in mol_database.columns:
-        print("Graph column exists. Adding num_nodes and num_edges...")
         # Initialize lists for nodes and edges
         num_nodes = []
         num_edges = []
@@ -226,13 +286,7 @@ def analyze_all_frames_to_track(
 
         # Save the updated DataFrame back to Parquet for future use
         mol_database.to_parquet(mol_pq)
-        print("Updated mol_database saved with num_nodes and num_edges.")
-    else:
-        print("Graph column does not exist in mol_database. No changes made.")
-
-    ########## MODIFY THIS PORTION FOR A DIFFERENT TRAJECTORY ##########
-    save_interval = 20  # Interval for saving dataframes
-
+        
     if Path(traj_file).suffix == ".dcd":
         total_frames = read_dcd_header(traj_file)
     else:
@@ -259,81 +313,24 @@ def analyze_all_frames_to_track(
     molecule_dfs = []
 
     frame_num = local_start_frame
-    print("frame_num is", frame_num)
     output_filename = f"{Path(traj_file).stem}_seg{segment_index:04d}of{num_segments:04d}"
     exit 
+    # process the last frame first to get the target file!
+    last_frame_index = total_frames
+    last_mdtraj_frame = None
     for mdtraj_frame in tqdm(
         md.iterload(traj_file, top=topology, chunk=1, stride=stride, skip=local_start_frame),
         total=total_frames_in_segment,
     ):
-        try:
-            print("frame_num is", frame_num)
-            df_formula, df_molecule = analyze_a_frame(
-                mdtraj_frame,
-                time_offset,
-                dump_interval,
-                timestep,
-                stride,
-                frame_num,
-                mol_database,
-                use_cell_list=True,
-            )
-
-            # Store the DataFrame for each frame
-            formula_dfs.append(df_formula)
-            molecule_dfs.append(df_molecule)
-
-            if frame_num > 0 and frame_num % save_interval == 0:
-                print(f"Checkpoint save at frame {frame_num} with output filename {output_filename}")
-                save_data(formula_dfs, output_dir, f"{output_filename}_formula.pq")
-                save_data(molecule_dfs, output_dir, f"{output_filename}_molecule.pq")
-        except Exception as e:
-            print(f"Error analyzing frame {frame_num}: {e}")
-            # This will print the line number and other traceback details
-            traceback.print_exc()
-
-        frame_num += stride # MA modifed
-        if frame_num >= end_frame:
-            break
-
-    save_data(formula_dfs, output_dir, f"{output_filename}_formula.pq")
-    save_data(molecule_dfs, output_dir, f"{output_filename}_molecule.pq")
-
-def load_frame_data(file_path, frame_number):
-    # Use the filters argument to only load rows with the desired frame number
-    frame_data = cudf.read_parquet(file_path, filters=[('frame', '==', frame_number)])
-    print(f"Loaded frame {frame_number} with {len(frame_data)} rows")
-    return frame_data
-
-@torch.inference_mode()
-def track_mol_origin(
-    topology,
-    traj_file,
-    time_offset,
-    dump_interval,
-    timestep,
-    output_dir,
-    mol_pq,
-    num_segments=1,
-    segment_index=0,
-    frame_stride=20,
-    file_path=None,
-    prev_file_path=None,
-):
-
-    # Great, now we will be iterating backwards from the current frame
-    current_frame = extract_frame_number(file_path)
-    # Read both in pd, pd is easy for saving files, then cudf for processing, dataframe is small
-    mol_pq = pd.read_parquet(file_path)
-    mol_pq["frame"] = current_frame
-    mol_pq = mol_pq.drop(columns=['nxgraph']) # don't need nxgraph for now
-
-    # First let's save the current frame's data for visualizing later
+        last_mdtraj_frame = mdtraj_frame
+    # we will find the target molecule accordinat to the frame_to_track, have it's xyz saved
+    mol_pq = analyze_last_frame(last_mdtraj_frame, frame_to_track, last_frame_index)
+    # save the last frame's data for visualizing later
     formula_counter = defaultdict(int)
     for idx, row in mol_pq.iterrows():
         frame = row["frame"]
         flatten_formula = row["flatten_formula"]
-        # We might have multiple glycines within the same frame to save
+        # We might have multiple glycines or other targets within the same frame to save
         # so I need to add a unique index to the filename
         formula_counter[flatten_formula] += 1
         file_index = formula_counter[flatten_formula] 
@@ -346,88 +343,85 @@ def track_mol_origin(
         unique_formula = f"{flatten_formula}_{file_index}"
         save_xyz_file(output_dir, frame, unique_formula, atom_indices, atom_symbols, x_coords, y_coords, z_coords)
     
-    # now i will load with cudf because we will be merging common atoms
-    # converting from pandas is not so smooth, dataframe is small so this is ok
-    mol_pq = cudf.read_parquet(file_path)
-    mol_pq["frame"] = current_frame
-    mol_pq = mol_pq.drop(columns=['nxgraph', 'local_frame', 'smiles', 'formula', 'name', 'time'])
+    mol_pq = cudf.from_pandas(mol_pq)
+    # one less frame here since we just analyzed the last one
+    for mdtraj_frame in tqdm(
+        md.iterload(traj_file, top=topology, chunk=1, stride=stride, skip=local_start_frame),
+        total=total_frames_in_segment-1,
+    ):
+        try:
+            df_formula = analyze_a_frame_and_track_back(
+                mdtraj_frame,
+                time_offset,
+                dump_interval,
+                timestep,
+                stride,
+                frame_num,
+            )
 
-    if os.path.exists(prev_file_path):
-        print(f"Loading previous frames from: {prev_file_path}")
+            # Explode mol_pq and prev_mol_pq to work with individual atom indices
+            mol_pq_exploded = mol_pq.explode('atom_indices').rename(columns={'atom_indices': 'atom_index'})
+            prev_mol_pq_exploded = df_formula.explode('atom_indices').rename(columns={'atom_indices': 'atom_index'})
 
-        frame_num = 0 
-        while True:
-            try:
-                # TODO currently we are loading the entire parquet file first and then filtering by frame
-                # Need to think of a better way to do this
-                prev_mol_pq_full = cudf.read_parquet(prev_file_path)
-                prev_mol_pq = prev_mol_pq_full[prev_mol_pq_full["frame"] == frame_num]
-                prev_mol_pq = prev_mol_pq.drop(columns=['counts', 'time'])
-                if len(prev_mol_pq) == 0:
-                    print(f"No more data found for frame {frame_num}.")
-                    break
+            mol_pq_exploded['key'] = 0
+            prev_mol_pq_exploded['key'] = 0
 
-                # Explode mol_pq and prev_mol_pq to work with individual atom indices
-                mol_pq_exploded = mol_pq.explode('atom_indices').rename(columns={'atom_indices': 'atom_index'})
-                prev_mol_pq_exploded = prev_mol_pq.explode('atom_indices').rename(columns={'atom_indices': 'atom_index'})
+            # merging on atom_index to find common atoms
+            merged = mol_pq_exploded.merge(
+                prev_mol_pq_exploded,
+                on='atom_index',
+                suffixes=('_current', '_previous')
+            )
+            merged = merged.sort_values(by=['frame_previous', 'flatten_formula_previous', 'atom_index'])
 
-                mol_pq_exploded['key'] = 0
-                prev_mol_pq_exploded['key'] = 0
+            # cudf needs strings, can't work with lists yet
+            merged['symbols_ordered_previous'] = merged['symbols_ordered_previous'].astype(str)
+            merged['x_coords_previous'] = merged['x_coords_previous'].astype(str)
+            merged['y_coords_previous'] = merged['y_coords_previous'].astype(str)
+            merged['z_coords_previous'] = merged['z_coords_previous'].astype(str)
 
-                # merging on atom_index to find common atoms
-                merged = mol_pq_exploded.merge(
-                    prev_mol_pq_exploded,
-                    on='atom_index',
-                    suffixes=('_current', '_previous')
-                )
+            valid_matches = merged.groupby(['frame_previous', 'flatten_formula_previous']).agg({
+                'atom_index': 'unique',  
+                'symbols_ordered_previous': 'first',
+                'x_coords_previous': 'first',
+                'y_coords_previous': 'first',
+                'z_coords_previous': 'first'
+            }).reset_index()
 
-                # cudf needs strings, can't work with lists yet
-                merged['symbols_ordered_previous'] = merged['symbols_ordered_previous'].astype(str)
-                merged['x_coords_previous'] = merged['x_coords_previous'].astype(str)
-                merged['y_coords_previous'] = merged['y_coords_previous'].astype(str)
-                merged['z_coords_previous'] = merged['z_coords_previous'].astype(str)
+            current_formulas = mol_pq["flatten_formula"].unique().to_pandas().tolist()
+            # Exclude any valid match that has a formula found in current_formulas
+            for f in current_formulas:
+                valid_matches = valid_matches[valid_matches['flatten_formula_previous'] != f]
 
-                valid_matches = merged.groupby(['frame_previous', 'flatten_formula_previous']).agg({
-                    'atom_index': 'unique',  
-                    'symbols_ordered_previous': 'first',
-                    'x_coords_previous': 'first',
-                    'y_coords_previous': 'first',
-                    'z_coords_previous': 'first'
-                }).reset_index()
+            if len(valid_matches) == 0:
+                print(f"No valid matches found in frame {frame_num}")
+                frame_num += 1
+                continue
+            if len(valid_matches) > 0:
+                print(f"Found {len(valid_matches)} valid matches in frame {frame_num}")
 
-                current_formulas = mol_pq["flatten_formula"].unique().to_pandas().tolist()
-                # Exclude any valid match that has a formula found in current_formulas
-                for f in current_formulas:
-                    valid_matches = valid_matches[valid_matches['flatten_formula_previous'] != f]
+            # Convert valid_matches to pandas to be able to use iterrows
+            valid_matches = valid_matches.to_pandas()
 
-                if len(valid_matches) == 0:
-                    print(f"No valid matches found in frame {frame_num}")
-                    frame_num += 1
-                    continue
-                if len(valid_matches) > 0:
-                    print(f"Found {len(valid_matches)} valid matches in frame {frame_num}")
+            formula_counter = defaultdict(int)
+            for idx, row in valid_matches.iterrows():
+                flatten_formula = row["flatten_formula_previous"]
+                formula_counter[flatten_formula] += 1
+                file_index = formula_counter[flatten_formula]
+                atom_indices = row["atom_index"]
+                # convert the string back to a list for coordinates/symbols columns
+                atom_symbols = np.array(row["symbols_ordered_previous"].strip('[]').split(','), dtype=str)
+                x_coords = np.array(ast.literal_eval(row["x_coords_previous"]), dtype=float)
+                y_coords = np.array(ast.literal_eval(row["y_coords_previous"]), dtype=float)
+                z_coords = np.array(ast.literal_eval(row["z_coords_previous"]), dtype=float)
+                unique_formula = f"{flatten_formula}_{file_index}"
+                save_xyz_file(output_dir, frame_num, unique_formula, atom_indices, atom_symbols, x_coords, y_coords, z_coords)
 
-                # Convert valid_matches to pandas to be able to use iterrows
-                valid_matches = valid_matches.to_pandas()
+        except Exception as e:
+            print(f"Finished loading frames. Last successful frame read was {frame_num}.")
+            print(f"Error: {e}")
+            break 
 
-                formula_counter = defaultdict(int)
-                for idx, row in valid_matches.iterrows():
-                    frame = f"{row['frame_previous']}_{current_frame}"
-                    flatten_formula = row["flatten_formula_previous"]
-                    formula_counter[flatten_formula] += 1
-                    file_index = formula_counter[flatten_formula]
-                    atom_indices = row["atom_index"]
-                    # convert the string back to a list for coordinates/symbols columns
-                    atom_symbols = np.array(row["symbols_ordered_previous"].strip('[]').split(','), dtype=str)
-                    x_coords = np.array(ast.literal_eval(row["x_coords_previous"]), dtype=float)
-                    y_coords = np.array(ast.literal_eval(row["y_coords_previous"]), dtype=float)
-                    z_coords = np.array(ast.literal_eval(row["z_coords_previous"]), dtype=float)
-                    unique_formula = f"{flatten_formula}_{file_index}"
-                    save_xyz_file(output_dir, frame, unique_formula, atom_indices, atom_symbols, x_coords, y_coords, z_coords)
-
-            except Exception as e:
-                print(f"Finished loading frames. Last successful frame read was {frame_num}.")
-                print(f"Error: {e}")
-                break 
-
-            frame_num += 1
+        frame_num += stride # MA modifed
+        if frame_num >= end_frame:
+            break

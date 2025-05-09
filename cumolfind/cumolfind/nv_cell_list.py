@@ -50,6 +50,7 @@ class CellList:
 
         # Get the dtype
         self.dtype = batch.positions.dtype
+        
         if self.dtype == torch.float32:
             self.wp_dtype = wp.float32
             self.wp_vec_dtype = wp.vec3f
@@ -60,7 +61,6 @@ class CellList:
             self.wp_mat_dtype = wp.mat33d
 
         self.cutoff = cutoff.to(self.dtype)
-
         self.max_nbins = int(max_nbins)
         self.device = str(batch.positions.device)
         self.num_systems = self.batch.num_graphs

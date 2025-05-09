@@ -59,20 +59,23 @@ def extract_frame_number(file_path):
     match = re.search(r'frame_(\d+)\.pq', file_path)
     return int(match.group(1)) if match else None
 
-def save_xyz_file(directory, frame, flatten_formula, atom_indices, atom_symbols, x_coords, y_coords, z_coords):
+def save_xyz_file(directory, frame, flatten_formula, atom_indices, atom_symbols, x_coords, y_coords, z_coords, target_id, file_index):
     """
     Saves the molecule's XYZ coordinates into a text file.
     """
-    os.makedirs(directory, exist_ok=True) 
-    filename = os.path.join(directory, f"{flatten_formula}_frame_{frame}.xyz")
-    print("flatten_formula is", flatten_formula)
+    os.makedirs(directory, exist_ok=True)
+
+    filename = os.path.join(
+        directory, f"{flatten_formula}_target{target_id}_{file_index}_frame_{frame}.xyz"
+    )
+
     with open(filename, "w") as f:
-        f.write(f"{len(atom_symbols)}\n")  
-        f.write(f"Frame {frame} - Molecule {flatten_formula}\n")  
+        f.write(f"{len(atom_symbols)}\n")
+        f.write(f"Frame {frame} - Molecule {flatten_formula} (target {target_id}, {file_index})\n")
         f.write("Atom Indices: " + " ".join(map(str, atom_indices)) + "\n")
-        for idx, atom_idx in enumerate(atom_symbols):
-            symbol = atom_symbols[idx] 
-            x, y, z = x_coords[idx], y_coords[idx], z_coords[idx] 
+        for idx in range(len(atom_symbols)):
+            symbol = atom_symbols[idx]
+            x, y, z = x_coords[idx], y_coords[idx], z_coords[idx]
             f.write(f"{symbol} {x:.6f} {y:.6f} {z:.6f}\n")
 
     print(f"Saved XYZ file: {filename}")
@@ -220,39 +223,44 @@ def analyze_last_frame(
     fragment_time2 = timetime.time()
     print("Time to find fragments: ", fragment_time2 - fragment_time1)
 
+    # Convert atom indices in df_per_frag to sorted string keys
     atom_indices_pandas = df_per_frag["atom_indices"].to_arrow().to_pylist()
     match_keys = [str(sorted(indices)) for indices in atom_indices_pandas]
     df_per_frag = df_per_frag.assign(match_key=cudf.Series(match_keys))
-    # Load frame_to_track and extract match key
+
+    # Load frame_to_track if it's a file path
     if isinstance(frame_to_track, str):
         frame_to_track = pd.read_parquet(frame_to_track)
 
-    target_key = str(sorted(frame_to_track.iloc[0]["atom_indices"]))
-    key_df = cudf.DataFrame({"match_key": [target_key]})
+    # Generate all target match keys
+    target_keys = [str(sorted(row["atom_indices"])) for _, row in frame_to_track.iterrows()]
+    key_df = cudf.DataFrame({"match_key": target_keys})
 
-    # Fast GPU merge
+    # Merge to find all matches
     matched_df = df_per_frag.merge(key_df, on="match_key", how="inner")
 
-    if len(matched_df) > 0:
-        matched_row = matched_df.to_pandas().iloc[0]  
-    else:
+    if len(matched_df) == 0:
         raise ValueError("Target molecules you want to track are not found in this trajectory. Please modify target molecules.")
 
-    if matched_row is not None:
-        saved_info = {
+    # If needed, convert to pandas
+    matched_df = matched_df.to_pandas()
+
+    # Create a list of enriched dataframes
+    saved_rows = []
+    for _, row in matched_df.iterrows():
+        saved_rows.append({
             "frame": frame_index,
-            "flatten_formula": matched_row["flatten_formula"],
-            "atom_indices": matched_row["atom_indices"],
-            "symbols_ordered": matched_row["symbols_ordered"],
-            "x_coords": matched_row["x_coords"],
-            "y_coords": matched_row["y_coords"],
-            "z_coords": matched_row["z_coords"],
-        }
+            "flatten_formula": row["flatten_formula"],
+            "atom_indices": row["atom_indices"],
+            "symbols_ordered": row["symbols_ordered"],
+            "x_coords": row["x_coords"],
+            "y_coords": row["y_coords"],
+            "z_coords": row["z_coords"],
+        })
 
-        target_df = pd.DataFrame([saved_info])  
-
+    # Combine all into a single DataFrame
+    target_df = pd.DataFrame(saved_rows)
     return target_df
-
 
 @torch.inference_mode()
 def analyze_all_frames_to_track(
@@ -326,9 +334,11 @@ def analyze_all_frames_to_track(
     # we will find the target molecule accordinat to the frame_to_track, have it's xyz saved
     mol_pq = analyze_last_frame(last_mdtraj_frame, frame_to_track, last_frame_index)
     # save the last frame's data for visualizing later
+    mol_pq["target_id"] = range(len(mol_pq))
     formula_counter = defaultdict(int)
     for idx, row in mol_pq.iterrows():
         frame = row["frame"]
+        target_id = row["target_id"]
         flatten_formula = row["flatten_formula"]
         # We might have multiple glycines or other targets within the same frame to save
         # so I need to add a unique index to the filename
@@ -341,13 +351,13 @@ def analyze_all_frames_to_track(
         z_coords = row["z_coords"]
 
         unique_formula = f"{flatten_formula}_{file_index}"
-        save_xyz_file(output_dir, frame, unique_formula, atom_indices, atom_symbols, x_coords, y_coords, z_coords)
+        save_xyz_file(output_dir, frame, flatten_formula, atom_indices, atom_symbols, x_coords, y_coords, z_coords, target_id, file_index)
     
     mol_pq = cudf.from_pandas(mol_pq)
     # one less frame here since we just analyzed the last one
     for mdtraj_frame in tqdm(
         md.iterload(traj_file, top=topology, chunk=1, stride=stride, skip=local_start_frame),
-        total=total_frames_in_segment-1,
+        total=total_frames_in_segment,
     ):
         try:
             df_formula = analyze_a_frame_and_track_back(
@@ -361,6 +371,7 @@ def analyze_all_frames_to_track(
 
             # Explode mol_pq and prev_mol_pq to work with individual atom indices
             mol_pq_exploded = mol_pq.explode('atom_indices').rename(columns={'atom_indices': 'atom_index'})
+            mol_pq_exploded["target_id"] = mol_pq_exploded["target_id"].fillna(method='ffill')
             prev_mol_pq_exploded = df_formula.explode('atom_indices').rename(columns={'atom_indices': 'atom_index'})
 
             mol_pq_exploded['key'] = 0
@@ -380,7 +391,7 @@ def analyze_all_frames_to_track(
             merged['y_coords_previous'] = merged['y_coords_previous'].astype(str)
             merged['z_coords_previous'] = merged['z_coords_previous'].astype(str)
 
-            valid_matches = merged.groupby(['frame_previous', 'flatten_formula_previous']).agg({
+            valid_matches = merged.groupby(['target_id', 'frame_previous', 'flatten_formula_previous']).agg({
                 'atom_index': 'unique',  
                 'symbols_ordered_previous': 'first',
                 'x_coords_previous': 'first',
@@ -405,6 +416,7 @@ def analyze_all_frames_to_track(
 
             formula_counter = defaultdict(int)
             for idx, row in valid_matches.iterrows():
+                target_id = row["target_id"]
                 flatten_formula = row["flatten_formula_previous"]
                 formula_counter[flatten_formula] += 1
                 file_index = formula_counter[flatten_formula]
@@ -414,8 +426,7 @@ def analyze_all_frames_to_track(
                 x_coords = np.array(ast.literal_eval(row["x_coords_previous"]), dtype=float)
                 y_coords = np.array(ast.literal_eval(row["y_coords_previous"]), dtype=float)
                 z_coords = np.array(ast.literal_eval(row["z_coords_previous"]), dtype=float)
-                unique_formula = f"{flatten_formula}_{file_index}"
-                save_xyz_file(output_dir, frame_num, unique_formula, atom_indices, atom_symbols, x_coords, y_coords, z_coords)
+                save_xyz_file(output_dir, frame_num, flatten_formula, atom_indices, atom_symbols, x_coords, y_coords, z_coords, target_id, file_index)
 
         except Exception as e:
             print(f"Finished loading frames. Last successful frame read was {frame_num}.")

@@ -59,7 +59,39 @@ def extract_frame_number(file_path):
     match = re.search(r'frame_(\d+)\.pq', file_path)
     return int(match.group(1)) if match else None
 
-def save_xyz_file(directory, frame, flatten_formula, atom_indices, atom_symbols, x_coords, y_coords, z_coords, target_id, file_index):
+def save_xyz_file_child(directory, frame, flatten_formula, atom_indices, atom_symbols, x_coords, y_coords, z_coords, target_id, file_index, atom_indices_buffer_str):
+    """
+    Saves the molecule's XYZ coordinates into a text file.
+    """
+    os.makedirs(directory, exist_ok=True)
+
+    # Convert the full index buffer string to list
+    full_indices = ast.literal_eval(atom_indices_buffer_str)
+    if isinstance(atom_indices, (int, np.integer)):
+        matched_indices = {atom_indices}
+    else:
+        matched_indices = set(list(atom_indices))
+
+    filename = os.path.join(
+        directory, f"{flatten_formula}_target{target_id}_{file_index}_frame_{frame}.xyz"
+    )
+
+    with open(filename, "w") as f:
+        f.write(f"{len(atom_symbols)}\n")
+        f.write(f"Frame {frame} - Molecule {flatten_formula} (target {target_id}, {file_index})\n")
+
+        for idx in range(len(atom_symbols)):
+            symbol = atom_symbols[idx]
+            x, y, z = x_coords[idx], y_coords[idx], z_coords[idx]
+            full_index = full_indices[idx]
+            if full_index in matched_indices:
+                f.write(f"{symbol} {x:.6f} {y:.6f} {z:.6f}  # index: {full_index}\n")
+            else:
+                f.write(f"{symbol} {x:.6f} {y:.6f} {z:.6f}\n")
+
+    print(f"Saved XYZ file: {filename}")
+
+def save_xyz_file_parent(directory, frame, flatten_formula, atom_indices, atom_symbols, x_coords, y_coords, z_coords, target_id, file_index):
     """
     Saves the molecule's XYZ coordinates into a text file.
     """
@@ -72,11 +104,11 @@ def save_xyz_file(directory, frame, flatten_formula, atom_indices, atom_symbols,
     with open(filename, "w") as f:
         f.write(f"{len(atom_symbols)}\n")
         f.write(f"Frame {frame} - Molecule {flatten_formula} (target {target_id}, {file_index})\n")
-        f.write("Atom Indices: " + " ".join(map(str, atom_indices)) + "\n")
         for idx in range(len(atom_symbols)):
             symbol = atom_symbols[idx]
+            atom_index = atom_indices[idx]
             x, y, z = x_coords[idx], y_coords[idx], z_coords[idx]
-            f.write(f"{symbol} {x:.6f} {y:.6f} {z:.6f}\n")
+            f.write(f"{symbol} {x:.6f} {y:.6f} {z:.6f} # index: {atom_index} \n")
 
     print(f"Saved XYZ file: {filename}")
 
@@ -322,7 +354,6 @@ def analyze_all_frames_to_track(
 
     frame_num = local_start_frame
     output_filename = f"{Path(traj_file).stem}_seg{segment_index:04d}of{num_segments:04d}"
-    exit 
     # process the last frame first to get the target file!
     last_frame_index = total_frames
     last_mdtraj_frame = None
@@ -335,6 +366,7 @@ def analyze_all_frames_to_track(
     mol_pq = analyze_last_frame(last_mdtraj_frame, frame_to_track, last_frame_index)
     # save the last frame's data for visualizing later
     mol_pq["target_id"] = range(len(mol_pq))
+    # create a copy so we can map the atom indices with symbols ordered/coordinates
     formula_counter = defaultdict(int)
     for idx, row in mol_pq.iterrows():
         frame = row["frame"]
@@ -351,8 +383,8 @@ def analyze_all_frames_to_track(
         z_coords = row["z_coords"]
 
         unique_formula = f"{flatten_formula}_{file_index}"
-        save_xyz_file(output_dir, frame, flatten_formula, atom_indices, atom_symbols, x_coords, y_coords, z_coords, target_id, file_index)
-    
+        save_xyz_file_parent(output_dir, frame, flatten_formula, atom_indices, atom_symbols, x_coords, y_coords, z_coords, target_id, file_index)
+        
     mol_pq = cudf.from_pandas(mol_pq)
     # one less frame here since we just analyzed the last one
     for mdtraj_frame in tqdm(
@@ -368,12 +400,13 @@ def analyze_all_frames_to_track(
                 stride,
                 frame_num,
             )
+            # Trick here is to copy atom indices into a full buffer, we will keep the full buffer at all times while merging
+            df_formula["atom_indices_buffer"] = df_formula["atom_indices"].copy()
 
             # Explode mol_pq and prev_mol_pq to work with individual atom indices
             mol_pq_exploded = mol_pq.explode('atom_indices').rename(columns={'atom_indices': 'atom_index'})
             mol_pq_exploded["target_id"] = mol_pq_exploded["target_id"].fillna(method='ffill')
             prev_mol_pq_exploded = df_formula.explode('atom_indices').rename(columns={'atom_indices': 'atom_index'})
-
             mol_pq_exploded['key'] = 0
             prev_mol_pq_exploded['key'] = 0
 
@@ -385,7 +418,7 @@ def analyze_all_frames_to_track(
             )
             merged = merged.sort_values(by=['frame_previous', 'flatten_formula_previous', 'atom_index'])
 
-            # cudf needs strings, can't work with lists yet
+            merged['atom_indices_buffer'] = merged['atom_indices_buffer'].astype(str)
             merged['symbols_ordered_previous'] = merged['symbols_ordered_previous'].astype(str)
             merged['x_coords_previous'] = merged['x_coords_previous'].astype(str)
             merged['y_coords_previous'] = merged['y_coords_previous'].astype(str)
@@ -394,6 +427,7 @@ def analyze_all_frames_to_track(
             valid_matches = merged.groupby(['target_id', 'frame_previous', 'flatten_formula_previous']).agg({
                 'atom_index': 'unique',  
                 'symbols_ordered_previous': 'first',
+                'atom_indices_buffer': 'first',
                 'x_coords_previous': 'first',
                 'y_coords_previous': 'first',
                 'z_coords_previous': 'first'
@@ -426,7 +460,19 @@ def analyze_all_frames_to_track(
                 x_coords = np.array(ast.literal_eval(row["x_coords_previous"]), dtype=float)
                 y_coords = np.array(ast.literal_eval(row["y_coords_previous"]), dtype=float)
                 z_coords = np.array(ast.literal_eval(row["z_coords_previous"]), dtype=float)
-                save_xyz_file(output_dir, frame_num, flatten_formula, atom_indices, atom_symbols, x_coords, y_coords, z_coords, target_id, file_index)
+                save_xyz_file_child(
+                    output_dir,
+                    frame_num,
+                    flatten_formula,
+                    atom_indices,
+                    atom_symbols,
+                    x_coords,
+                    y_coords,
+                    z_coords,
+                    target_id,
+                    file_index,
+                    row["atom_indices_buffer"]  
+                )
 
         except Exception as e:
             print(f"Finished loading frames. Last successful frame read was {frame_num}.")

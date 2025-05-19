@@ -118,6 +118,22 @@ def main():
             args.frame_stride,
             args.frame_to_track_mol_origin,
         )
+        
+        from .combine_xyzs import combine_xyz_per_frame  # adjust if not part of a package
+
+        if args.frame_to_track_mol_origin:
+            mol_df = pd.read_parquet(args.frame_to_track_mol_origin)
+            if 'atom_indices' not in mol_df.columns:
+                raise ValueError(f"'atom_indices' column not found in {args.frame_to_track_mol_origin}")
+            if len(mol_df) > 1:
+                print(f"[molfind] Warning: multiple entries in {args.frame_to_track_mol_origin}, using first row")
+
+            tracked_indices = set(mol_df.iloc[0]['atom_indices'])
+            print(f"[molfind] Loaded {len(tracked_indices)} tracked atom indices from {args.frame_to_track_mol_origin}")
+        else:
+            raise ValueError("You must provide --frame_to_track_mol_origin when using 'track_molecules'.")
+
+        combine_xyz_per_frame(Path(output_directory), tracked_indices)
 
 if __name__ == "__main__":
     main()

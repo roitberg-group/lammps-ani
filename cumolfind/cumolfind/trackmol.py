@@ -424,19 +424,20 @@ def analyze_all_frames_to_track(
             merged['y_coords_previous'] = merged['y_coords_previous'].astype(str)
             merged['z_coords_previous'] = merged['z_coords_previous'].astype(str)
 
-            valid_matches = merged.groupby(['target_id', 'frame_previous', 'flatten_formula_previous']).agg({
+            # NICK CHANGED THIS: INCLUDE LABELS IN GROPUBY
+            valid_matches = merged.groupby(['target_id', 'frame_previous', 'labels', 'flatten_formula_previous']).agg({
                 'atom_index': 'unique',  
                 'symbols_ordered_previous': 'first',
                 'atom_indices_buffer': 'first',
                 'x_coords_previous': 'first',
                 'y_coords_previous': 'first',
-                'z_coords_previous': 'first'
-            }).reset_index()
+                'z_coords_previous': 'first'}).reset_index()
 
             current_formulas = mol_pq["flatten_formula"].unique().to_pandas().tolist()
             # Exclude any valid match that has a formula found in current_formulas
-            for f in current_formulas:
-                valid_matches = valid_matches[valid_matches['flatten_formula_previous'] != f]
+            # NICK CHANGED THIS -- COMMENT THESE OUT TO TRACK ALL FORMULAS, EVEN IF THEY DIDN'T CHANGE
+            #for f in current_formulas:
+            #    valid_matches = valid_matches[valid_matches['flatten_formula_previous'] != f]
 
             if len(valid_matches) == 0:
                 print(f"No valid matches found in frame {frame_num}")

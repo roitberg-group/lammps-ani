@@ -1,6 +1,6 @@
 # This script runs automatically after molfind if the 'trackmol' task option is chosen
 # The point is just to concatenate outputs to a single xyz per frame
-# combine_xyzs.py
+
 from pathlib import Path
 from collections import defaultdict
 import glob

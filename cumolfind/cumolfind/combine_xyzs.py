@@ -62,9 +62,11 @@ def combine_xyz_per_frame(output_dir: Path, tracked_indices: set):
     # 3) make output directory
     combined_dir = output_dir / "combined_xyzs"
     combined_dir.mkdir(exist_ok=True)
+    traj_path = combined_dir / "all_frames_combined.xyz"
+    traj_file_handle = open(traj_path, "w")
 
     # 4) second pass: combine, sort, pad, write
-    for frame_id, files in frame_groups.items():
+    for frame_id, files in sorted(frame_groups.items(), key=lambda x: int(x[0])):
         flat_data = []
         for fname in files:
             flat_data.extend(parse_xyz_new_format(fname))
@@ -101,3 +103,10 @@ def combine_xyz_per_frame(output_dir: Path, tracked_indices: set):
                 )
 
         print(f"[cat_xyz] Wrote {output_file}")
+
+        with open(output_file) as cf:
+            traj_file_handle.write(cf.read())
+    
+    traj_file_handle.close()
+    print(f"[cat_xyz] Wrote multi-frame trajectory: {traj_path}")
+

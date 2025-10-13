@@ -7,7 +7,6 @@ import warnings
 import tables
 from mdtraj import Topology
 import mdtraj.core.element as elem
-from mdtraj.utils.six import string_types
 
 
 def load_topology(file_name: str):
@@ -25,7 +24,7 @@ def load_topology(file_name: str):
 
     try:
         raw = get_node(file_name, root="/", name="topology")[0]
-        if not isinstance(raw, string_types):
+        if not isinstance(raw, bytes):
             raw = raw.decode()
         topology_dict = json.loads(raw)
     except tables.NoSuchNodeError:

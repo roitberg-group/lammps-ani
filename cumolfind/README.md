@@ -2,13 +2,13 @@
 
 Purpose: This package is designed to analyze extensive trajectory data and identify specific molecules of interest within that trajectory.
 
-## Key Features:
+## Key Features
 
 - Users can define the molecules of interest in a custom database.
 - The program searches for these molecules in each frame of the trajectory. This is done by initially fragmenting the data to identify subgraphs, and then determining if these subgraphs match any molecules in the user's database.
 - The identified molecule information is saved in a dataframe for easy post-analysis.
 
-## Environment Setup:
+## Environment Setup
 
 ```bash
 mamba create -n rapids-23.10 -c rapidsai -c conda-forge -c nvidia \
@@ -22,8 +22,8 @@ python setup.py install --ext
 
 RAPIDS version 23.02 or later is required. This enables configuring PyTorch to use RAPIDS Memory Manager (RMM) for GPU memory allocation, facilitating effective memory sharing between RAPIDS and PyTorch.
 
-
 ## Installation
+
 ```bash
 pip install -e .
 ```
@@ -128,6 +128,7 @@ cumolfind-split_traj --traj_file [path/to/traj_file] [other arguments]
 This command splits a large trajectory file into smaller segments, naming each segment with the suffix `traj_name_x.xns.dcd`, where `x.x` represents the time offset for the start of each segment.
 
 **Submit analysis job parallaly:**
+
 ```bash
 python /blue/roitberg/apps/lammps-ani/cumolfind/submit_analysis.py --help
 usage: submit_analysis.py [-h] --traj TRAJ --top TOP --num_segments NUM_SEGMENTS --mol_pq MOL_PQ [--output_dir OUTPUT_DIR] [-y]
@@ -147,6 +148,7 @@ optional arguments:
 ```
 
 Example
-```
+
+```bash
 python /blue/roitberg/apps/lammps-ani/cumolfind/submit_analysis.py --traj=/red/roitberg/22M_20231216_testrun/ --top=/blue/roitberg/apps/lammps-ani/examples/early_earth/data/mixture_22800000.pdb --num_segments=2 --mol_pq=/blue/roitberg/apps/lammps-ani/cumolfind/data/animal_acid.pq
 ```

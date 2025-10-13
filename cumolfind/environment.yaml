@@ -1,0 +1,48 @@
+name: rapids-b200
+channels:
+  - rapidsai
+  - pytorch
+  - nvidia
+  - conda-forge
+channel_priority: strict
+dependencies:
+  - python=3.11
+  - cuda-version=12.4
+
+  # RAPIDS 25.10 (CUDA 12)
+  - cudf=25.10
+  - cugraph=25.10
+  - dask-cuda=25.10
+  - rmm=25.10
+  - ucx>=1.18
+  - nccl>=2.27
+
+  # PyTorch GPU stack (CUDA 12.4)
+  - pytorch=2.5.1
+  - torchvision=0.20.1
+  - pytorch-cuda=12.4          # pulls the right CUDA + cuDNN from nvidia
+  - cudnn                      # satisfied by nvidia channel, version aligned
+
+  # CuPy for CUDA 12.x (v13 supports CUDA 12.x)
+  - cupy=13.*
+
+  # Sci stack + your runtime deps
+  - pandas
+  - scipy
+  - tqdm
+  - ase
+  - pubchempy
+  - pytables
+  - h5py
+
+  # mdtraj new-enough so you don’t need the mdtraj.utils.six hack
+  - mdtraj>=1.10
+
+  # small utilities you install later today
+  - typer
+  - huggingface_hub
+
+  # build helpers + pip
+  - pip
+  - sed
+  - patch

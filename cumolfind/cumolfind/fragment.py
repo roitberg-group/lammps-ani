@@ -13,7 +13,6 @@ import time as timetime
 from torchani.neighbors import _parse_neighborlist
 import matplotlib.pyplot as plt
 from ase.build import nanotube
-import json
 
 # TODO: use RMM allocator for pytorch
 

@@ -11,13 +11,14 @@ Purpose: This package is designed to analyze extensive trajectory data and ident
 ## Environment Setup
 
 ```bash
-mamba create -n rapids-23.10 -c rapidsai -c conda-forge -c nvidia \
+mamba create -n rapids-25.10 -c rapidsai -c conda-forge -c nvidia \
 cudf=23.10 cugraph=23.10 python=3.10 cuda-version=11.8 \
 pytorch jupyterlab \
 pubchempy ase mdtraj tqdm ambertools
 
 cd /path/to/torchani_sandbox
-python setup.py install --ext
+pip install -r dev_requirements.txt
+pip install --config-settings=--global-option=ext-all-sms --no-build-isolation --no-deps -v .
 ```
 
 RAPIDS version 23.02 or later is required. This enables configuring PyTorch to use RAPIDS Memory Manager (RMM) for GPU memory allocation, facilitating effective memory sharing between RAPIDS and PyTorch.
@@ -25,6 +26,7 @@ RAPIDS version 23.02 or later is required. This enables configuring PyTorch to u
 ## Installation
 
 ```bash
+cd /path/to/cumolfind
 pip install -e .
 ```
 

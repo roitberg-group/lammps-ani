@@ -8,11 +8,29 @@ Purpose: This package is designed to analyze extensive trajectory data and ident
 - The program searches for these molecules in each frame of the trajectory. This is done by initially fragmenting the data to identify subgraphs, and then determining if these subgraphs match any molecules in the user's database.
 - The identified molecule information is saved in a dataframe for easy post-analysis.
 
-## Environment Setup
+## Environment Setup on Blackwell GPUs (CUDA 12.9.1)
+
+(Before installing on HiPerGator, purge all modules then load cuda/12.9.1)
 
 ```bash
-mamba create -n rapids-25.10 -c rapidsai -c conda-forge -c nvidia \
-cudf=23.10 cugraph=23.10 python=3.10 cuda-version=11.8 \
+cd /path/to/torchani
+mamba create -f blackwell.yaml  # Edit environment name on line 1 of this file as you please
+mamba activate ENV_NAME 
+pip install --config-settings=--global-option=ext --no-build-isolation --no-deps -v .
+
+cd /path/to/cumolfind
+mamba install -c rapidsai -c conda-forge -c nvidia cudf=25.02 cugraph=25.02 cuda-version=12.9 mdtraj
+
+pip install warp-lang
+
+pip install -e .
+```
+
+## Environment Setup (CUDA 11)
+
+```bash
+mamba create -n rapids-23.10 -c rapidsai -c conda-forge -c nvidia \
+cudf=23.10 cugraph=23.10 python=3.11 cuda-version=12.9 \
 pytorch jupyterlab \
 pubchempy ase mdtraj tqdm ambertools
 
@@ -57,7 +75,7 @@ positional arguments:
 
 options:
   -h, --help            show this help message and exit
-  --task "analyze_trajectory"
+  --task TASK           "analyze_trajectory" or "track_molecules"
   --time_offset TIME_OFFSET
                         Time offset for the trajectory
   --dump_interval DUMP_INTERVAL

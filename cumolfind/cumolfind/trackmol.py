@@ -10,7 +10,7 @@ import time as timetime
 from collections import defaultdict
 from pathlib import Path
 import torch
-import pytraj as pt
+#import pytraj as pt
 import mdtraj as md
 import pandas as pd
 import numpy as np
@@ -330,7 +330,7 @@ def analyze_all_frames_to_track(
     if Path(traj_file).suffix == ".dcd":
         total_frames = read_dcd_header(traj_file)
     else:
-        traj_iterator = pt.iterload(traj_file, top=topology)
+        traj_iterator = md.iterload(traj_file, top=topology)
         total_frames = len(traj_iterator)
 
     if segment_index >= num_segments:

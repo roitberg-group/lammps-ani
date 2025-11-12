@@ -22,13 +22,9 @@ import os
 from pathlib import Path
 import warnings
 import torch
-import pytraj as pt
-import mdtraj as md
 import pandas as pd
-from tqdm import tqdm
 from .top_loader import load_topology
 from pathlib import Path
-import time as timetime
 
 # MA added
 from .trackmol import analyze_all_frames_to_track

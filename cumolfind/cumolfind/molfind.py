@@ -1,21 +1,4 @@
-# Set RMM allocator to be used by PyTorch
 import torch
-import rmm.mr as mr
-from rmm.allocators.torch import rmm_torch_allocator
-
-# Configure PyTorch to use RAPIDS Memory Manager (RMM) for GPU memory management.
-torch.cuda.memory.change_current_allocator(rmm_torch_allocator)
-
-# Initialize a PoolMemoryResource with ManagedMemoryResource. This approach uses
-# CUDA's unified memory, potentially helping with GPU OOM issues by allowing
-# memory spillover to the system memory.
-pool = mr.PoolMemoryResource(
-    mr.ManagedMemoryResource(),
-    maximum_pool_size=450 * 1024 * 1024 * 1024,  # 450GB TODO, make this configurable
-)
-
-# Set the pool as the current memory resource for RMM.
-mr.set_current_device_resource(pool)
 
 import argparse
 import os
@@ -29,6 +12,39 @@ from pathlib import Path
 # MA added
 from .trackmol import analyze_all_frames_to_track
 from .analyze_traj import analyze_all_frames, read_dcd_header, save_data
+
+
+def _init_rmm(pool_max_gb: int = 450, use_managed: bool = True) -> bool:
+    """Initialize RMM pool allocator safely after confirming GPU availability.
+
+    Returns True if RMM was initialized and set as the current allocator, else False.
+    """
+    try:
+        if not torch.cuda.is_available() or torch.cuda.device_count() == 0:
+            print("[molfind] CUDA not available or no devices visible; skipping RMM initialization.")
+            return False
+
+        # Touch the CUDA context early to surface device errors now
+        _ = torch.cuda.current_device()
+
+        import rmm.mr as mr
+        from rmm.allocators.torch import rmm_torch_allocator
+
+        base = mr.ManagedMemoryResource() if use_managed else mr.CudaMemoryResource()
+        pool = mr.PoolMemoryResource(
+            base,
+            maximum_pool_size=pool_max_gb * 1024**3,
+        )
+        mr.set_current_device_resource(pool)
+
+        # Configure PyTorch to use RAPIDS Memory Manager (RMM)
+        torch.cuda.memory.change_current_allocator(rmm_torch_allocator)
+        print(f"[molfind] RMM pool initialized (managed={use_managed}, max={pool_max_gb}GB)")
+        return True
+    except Exception as e:
+        # Do not fail hard here; the rest of the pipeline can still run
+        print(f"[molfind] RMM initialization skipped due to error: {e}")
+        return False
 
 def main():
     parser = argparse.ArgumentParser(description="Trajectory analysis")
@@ -66,6 +82,9 @@ def main():
         )
 
     args = parser.parse_args()
+
+    # Initialize GPU memory management after arguments are parsed
+    _init_rmm()
 
     if args.task == "analyze_trajectory":
         print("Analyzing trajectory...")

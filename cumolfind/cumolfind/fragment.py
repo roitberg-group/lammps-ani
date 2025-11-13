@@ -11,8 +11,6 @@ import numpy as np
 import networkx as nx
 import time as timetime
 from torchani.neighbors import _parse_neighborlist
-import matplotlib.pyplot as plt
-from ase.build import nanotube
 
 # TODO: use RMM allocator for pytorch
 
@@ -228,13 +226,13 @@ def find_fragments(species, coordinates, cell=None, pbc=None, use_cell_list=True
     device = "cuda"
 
     if use_cell_list:
-        neighborlist = _parse_neighborlist("cell_list", cutoff=2).to(device)
+        neighborlist = _parse_neighborlist("cell_list").to(device)
     else:
         neighborlist = _parse_neighborlist(
-            "full_pairwise", cutoff=2).to(device)
+            "all_pairs").to(device)
 
     start = timetime.time()
-    atom_index12, distances, _ = neighborlist(
+    atom_index12, distances, _ = neighborlist(1.75,             # NT: changed from 2.0 to 1.75 to reduce neighbors in each AEV that are outside of the max bond length + 0.2 A buffer 
         species, coordinates, cell=cell, pbc=pbc)
     if timing:
         print("Time to compute TORCH cell list: ", timetime.time() - start)

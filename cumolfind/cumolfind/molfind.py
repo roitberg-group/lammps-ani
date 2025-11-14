@@ -23,7 +23,6 @@ import os
 from pathlib import Path
 import warnings
 import torch
-import pytraj as pt
 import mdtraj as md
 import pandas as pd
 from tqdm import tqdm
@@ -65,7 +64,7 @@ def analyze_all_frames(
     if Path(traj_file).suffix == ".dcd":
         total_frames = read_dcd_header(traj_file)
     else:
-        traj_iterator = pt.iterload(traj_file, top=topology)
+        traj_iterator = md.iterload(traj_file, top=topology)
         total_frames = len(traj_iterator)
 
     if segment_index >= num_segments:

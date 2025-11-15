@@ -19,7 +19,8 @@ from .nv_atomic_data import AtomicData
 from .nv_batch import Batch
 from .nv_atom_cell_list import _cell_neighbor_list
 
-timing = True
+timing = False
+
 PERIODIC_TABLE_LENGTH = 118
 species_dict = {1: "H", 6: "C", 7: "N", 8: "O"}
 # https://media.cheggcdn.com/media%2F5fa%2F5fad12c3-ee27-47fe-917a-f7919c871c63%2FphpEjZPua.png
@@ -180,12 +181,16 @@ def cugraph_slice_subgraph_gpu(cgraph, species, nodes):
     Returns a subgraph of G, containing only the nodes in the list nodes with their edges.
     GPU version.
     """
+    #nodes_np = np.asarray(nodes, dtype=np.int64)
+    nodes_cp = cp.asarray(nodes, dtype=cp.int64)
 
     offset_col, index_col, _ = cgraph.view_adj_list()
-    nodes_cp = cp.array(nodes)
+#    nodes_cp = cp.array(nodes)
 
     start_indices = offset_col[nodes_cp]
-    end_indices = cp.roll(cp.array(offset_col), -1)[nodes]
+#    end_indices = cp.roll(cp.array(offset_col), -1)[nodes]
+    end_indices = cp.roll(cp.asarray(offset_col), -1)[nodes_cp]
+
 
     node_repeats = end_indices - start_indices
     node_expanded = cp.concatenate([cp.full((int(r),), int(v), dtype=cp.int32) for v, r in zip(nodes_cp.get(), node_repeats.get())])
@@ -197,12 +202,17 @@ def cugraph_slice_subgraph_gpu(cgraph, species, nodes):
     offsets = cp.arange(len(node_expanded)) - cp.concatenate([cp.full((int(r),), int(v), dtype=cp.int32) for v, r in zip((cp.cumsum(node_repeats) - node_repeats).get(), node_repeats.get())])
     adj_nodes = index_col[start_indices_expanded + offsets]
     mask = node_expanded < adj_nodes
-    edges = cp.vstack((node_expanded[mask], adj_nodes[mask])).T
+    edges = cp.vstack((node_expanded, adj_nodes)).T
     df_edges = cudf.DataFrame(edges, columns=["source", "target"]).to_pandas()
+
+    # Force source and target to be type(int)
+    df_edges["source"] = df_edges["source"].astype(int)
+    df_edges["target"] = df_edges["target"].astype(int)
+
     nxgraph = nx.from_pandas_edgelist(df_edges, "source", "target")
+    nxgraph.add_nodes_from(int(n) for n in nodes_cp.tolist())
 
     atomic_numbers = species.flatten()[torch.tensor(nodes)].cpu().numpy()
-
     for node, atomic_number in zip(nodes, atomic_numbers):
         nxgraph.nodes[node]["atomic_number"] = atomic_number
     return nxgraph
@@ -330,13 +340,17 @@ def analyze_a_frame(
 
     cell = torch.tensor(mdtraj_frame.unitcell_vectors[0], device=device) * 10.0
     pbc = torch.tensor([True, True, True], device=device)
-    print("Time to read data from mdtraj: ", timetime.time() - start)
+
+    if timing:
+        print("Time to read data from mdtraj: ", timetime.time() - start)
 
     fragment_time1 = timetime.time()
     # cG, df_per_frag = find_fragments_nv(species, positions, cell, pbc, use_cell_list=use_cell_list)
     cG, df_per_frag = find_fragments(species, positions, cell, pbc, use_cell_list=use_cell_list)
     fragment_time2 = timetime.time()
-    print("Time to find fragments: ", fragment_time2 - fragment_time1)
+
+    if timing:
+        print("Time to find fragments: ", fragment_time2 - fragment_time1)
 
     start1 = timetime.time()
     # calculate frame_offset using time_offset
@@ -358,36 +372,60 @@ def analyze_a_frame(
         ]
     )
     # todo for later is to make this a cudf dataframe right away in analyze_traj.py
-    mol_database2 = mol_database
-    mol_database2 = mol_database2.astype(str)
+    # NT: Drop the graph column before converting to cuDF (having trouble converting to string)
+    mol_database2 = mol_database.drop(columns='graph').copy()
+    mol_database2['flatten_formula'] = mol_database2['flatten_formula'].astype(str)
     mol_database2 = cudf.from_pandas(mol_database2)
-    
+
+    df_per_frag["flatten_formula"] = df_per_frag["flatten_formula"].astype(str)
+
     merged_df_per_frag = mol_database2.merge(df_per_frag, on="flatten_formula", how="inner")
-    # check this!
+
+    merged_df_per_frag = mol_database2.merge(df_per_frag, on="flatten_formula", how="inner")
+
+    # If nothing matched this frame, bail out cleanly
+    if len(merged_df_per_frag) == 0:
+        # still record counts per formula for bookkeeping
+        df_formula = df_per_frag["flatten_formula"].value_counts().to_frame("counts").reset_index()
+        df_formula["local_frame"] = frame_num
+        df_formula["frame"] = frame
+        df_formula["time"] = time
+        return df_formula.to_pandas(), df_molecule  # df_molecule is already empty
+
     # create an nxgraph only for flatten_formulas that went through the filter
     global_atom_indices = np.concatenate(merged_df_per_frag["atom_indices"].to_pandas().to_numpy())
+
     # This function is the most costly!!!! (98% of the time is spent here)
     nxgraph = cugraph_slice_subgraph_gpu(cG, species, global_atom_indices)
-
     merged_df_per_frag["fragment_edge_count"] = merged_df_per_frag["atom_indices"].to_pandas().apply(
         lambda frag_atom_indices: compute_fragment_edge_count(frag_atom_indices, nxgraph))  # 0.009s
+
     # Throw away fragments that don't have the same number of edges as the reference graph
-    merged_df_per_frag["num_edges"] = merged_df_per_frag["num_edges"].astype(int)
     filtered_df = merged_df_per_frag[merged_df_per_frag["fragment_edge_count"] == merged_df_per_frag["num_edges"]]  # 0.007s
+    
     # From now on, we have to keep working in pandas because graph isomorphism check is not possible for cuDF/cuGraph
-    graph_pandas = filtered_df["graph"].to_pandas()
+    filtered_pd = filtered_df.to_pandas()
+
+    filtered_pd = filtered_pd.merge(
+        mol_database[["flatten_formula", "name", "graph"]],
+        on=["flatten_formula", "name"],
+        how="left",
+        validate="m:1",
+    )
+    
+    graph_pandas = filtered_pd["graph"]
     # Convert serialized strings to bytes
     graph_pandas = graph_pandas.apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
     reference_graphs = graph_pandas.apply(pickle.loads)
-    filtered_df = filtered_df.to_pandas()
-    filtered_df["reference_graph"] = reference_graphs
+    filtered_pd["reference_graph"] = reference_graphs
     positions = positions.squeeze(0)
     if timing:
         print("preprocessing: ", timetime.time() - start1)
 
     start1 = timetime.time()
     match = 0
-    for local_frame, row in filtered_df.iterrows():
+
+    for local_frame, row in filtered_pd.iterrows():
         frag_atom_indices = row["atom_indices"]
         # get subgraph for this fragment
         fragment_graph = nxgraph.subgraph(frag_atom_indices)

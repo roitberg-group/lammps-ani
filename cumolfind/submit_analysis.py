@@ -5,9 +5,9 @@ import re
 from simple_slurm import Slurm
 
 
-def submit_job(traj_file, top_file, mol_pq, time_offset, num_segments, segment_index, output_dir, submit=False):
+def submit_job(traj_file, top_file, mol_pq, task, time_offset, num_segments, segment_index, output_dir, submit=False):
     job_name = f"cumolfind_{os.path.splitext(os.path.basename(traj_file))[0]}_segment_{segment_index:0{len(str(num_segments))}d}_of_{num_segments}"
-    output_filename = f"logs/{job_name}_%j.log"
+    output_filename = f"/red/roitberg/nick_analysis/B200_rerun/logs/{job_name}_%j.log"
     os.makedirs(os.path.dirname(output_filename), exist_ok=True)
     num_gpus = 1
     nodes = 1
@@ -19,15 +19,13 @@ def submit_job(traj_file, top_file, mol_pq, time_offset, num_segments, segment_i
         nodes=nodes,
         ntasks_per_node=ntasks_per_node,
         cpus_per_task=1,
-        partition="hpg-ai",
-        reservation="roitberg-phase2",
-        qos="roitberg",
-        account="roitberg",
+        partition="hpg-b200",
+        qos="mingjieliu-faimm",
+        account="mingjieliu-faimm",
         gres=gres,
-        mem_per_cpu="500gb",
-        time="20:00:00",
+        mem_per_cpu="64gb",
+        time="10:00:00",
         output=output_filename,
-        exclude="c0900a-s23",
     )
 
     commands = [
@@ -40,23 +38,23 @@ def submit_job(traj_file, top_file, mol_pq, time_offset, num_segments, segment_i
         'echo "Number of Tasks Allocated      = $SLURM_NTASKS"',
         'echo "Number of Cores/Task Allocated = $SLURM_CPUS_PER_TASK"',
         # module load and setup environment variables
-        "module load cuda/11.4.3 gcc/9.3.0 openmpi/4.1.5 cmake/3.21.3 git/2.30.1",
-        'export LAMMPS_ANI_ROOT="/blue/roitberg/apps/lammps-ani"',
+        "module load cuda/12.9.1",
+        'export LAMMPS_ANI_ROOT="/red/roitberg/lammps-ani"',
         "export LAMMPS_ROOT=${LAMMPS_ANI_ROOT}/external/lammps/",
         "export LAMMPS_PLUGIN_PATH=${LAMMPS_ANI_ROOT}/build/",
         # setup conda in the subshell and activate the environment
         # check issue: https://github.com/conda/conda/issues/7980
         "source $(conda info --base)/etc/profile.d/conda.sh",
-        "conda activate rapids-23.10",
+        "conda activate /red/roitberg/conda-envs/envs/ani-b200",
         "echo using python: $(which python)",
         # run the job commands
-        f"cumolfind-molfind {traj_file} {top_file} {mol_pq} --time_offset={time_offset} --dump_interval=50 --timestep=0.25 --output_dir={output_dir} --num_segments={num_segments} --segment_index={segment_index}"
+        f"cumolfind-molfind {traj_file} {top_file} {mol_pq} --task={task} --time_offset={time_offset} --dump_interval=50 --timestep=0.25 --output_dir={output_dir} --num_segments={num_segments} --segment_index={segment_index}"
     ]
     commands = "\n".join(commands)
     if submit:
         slurm.sbatch(commands, convert=False)
         # prevent submitting too fast that results in the same timestamp
-        time.sleep(0.2)
+        time.sleep(0.1)
     else:
         print("Job will not be submitted. The following is the job script:")
         print(str(slurm) + commands)
@@ -67,9 +65,10 @@ def main():
     parser = argparse.ArgumentParser(description="Parallelize cumolfind analysis.")
     parser.add_argument("--traj", type=str, required=True, help="Directory containing trajectory files or a single trajectory file.")
     parser.add_argument("--top", type=str, required=True, help="Topology file.")
-    parser.add_argument("--num_segments", type=int, required=True, help="Number of segments for each trajectory.")
     parser.add_argument("--mol_pq", type=str, required=True, help="Molecule database file")
+    parser.add_argument("--task", type=str, choices=["analyze_trajectory", "track_molecules"], required=True, default="analyze_trajectory")
     parser.add_argument("--output_dir", type=str, help="Output directory", default="test_analyze")
+    parser.add_argument("--num_segments", type=int, required=True, help="Number of segments for each trajectory.")
     parser.add_argument('-y', action='store_true', help='If provided, the job will be submitted. If not, the job will only be prepared but not submitted.')
     args = parser.parse_args()
 
@@ -95,6 +94,7 @@ def main():
                     traj_file=traj_file,  # Use traj_file which will be the full path
                     top_file=args.top,
                     mol_pq=args.mol_pq,
+                    task=args.task,
                     time_offset=time_offset,
                     num_segments=args.num_segments,
                     segment_index=segment_index,

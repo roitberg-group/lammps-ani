@@ -170,5 +170,5 @@ optional arguments:
 Example
 
 ```bash
-python /blue/roitberg/apps/lammps-ani/cumolfind/submit_analysis.py --traj=/red/roitberg/22M_20231216_testrun/ --top=/blue/roitberg/apps/lammps-ani/examples/early_earth/data/mixture_22800000.pdb --num_segments=2 --mol_pq=/blue/roitberg/apps/lammps-ani/cumolfind/data/animal_acid.pq
+python /blue/roitberg/apps/lammps-ani/cumolfind/submit_analysis.py --traj=/red/roitberg/22M_20231216_testrun/ --top=/blue/roitberg/apps/lammps-ani/examples/early_earth/data/mixture_22800000.pdb --task="analyze_trajectory" --num_segments=2 --mol_pq=/blue/roitberg/apps/lammps-ani/cumolfind/data/animal_acid.pq
 ```

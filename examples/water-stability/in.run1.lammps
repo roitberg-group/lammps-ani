@@ -1,0 +1,63 @@
+# TIP3P water with SHAKE constraints (Run 1)
+# 216 molecules, 5 ns NPT + 10 ns NVT, 1.0 fs timestep
+
+units real
+atom_style full
+
+# Box for ~1.0 g/cm³ density
+region box block -9.4 9.4 -9.4 9.4 -9.4 9.4
+create_box 2 box bond/types 1 angle/types 1 &
+            extra/bond/per/atom 2 extra/angle/per/atom 1 extra/special/per/atom 2
+
+mass 1 15.9994   # O
+mass 2 1.008     # H
+
+# TIP3P parameters
+pair_style lj/cut/coul/long 10.0
+pair_coeff 1 1 0.1521 3.1507
+pair_coeff 2 2 0.0    1.0
+kspace_style pppm 1.0e-4
+
+# Zero potentials - SHAKE handles geometry
+bond_style zero
+bond_coeff 1 0.9572
+
+angle_style zero
+angle_coeff 1 104.52
+
+# Generate water molecules
+molecule water tip3p.mol
+create_atoms 0 random 216 34564 NULL mol water 25367 overlap 1.33
+
+# SHAKE constraints (rigid O-H bonds and H-O-H angle)
+fix rigid all shake 0.001 10 10000 b 1 a 1
+minimize 0.0 0.0 1000 10000
+
+reset_timestep 0
+timestep 1.0
+velocity all create 300.0 5463576
+
+thermo_style custom step temp press etotal pe vol density
+thermo 5000
+thermo_modify flush yes
+
+# Trajectory output
+dump 1 all custom 10000 run1/traj.lammpstrj id type x y z
+dump_modify 1 sort id
+
+# Phase 1: NPT equilibration (5 ns = 5,000,000 steps)
+fix integrate all npt temp 300 300 100.0 iso 1.0 1.0 1000.0
+
+# Benchmark run to estimate performance
+run 10000
+
+run 5000000
+unfix integrate
+
+# Phase 2: NVT production (10 ns = 10,000,000 steps)
+velocity all scale 300.0
+fix integrate all nvt temp 300 300 100.0
+run 10000000
+
+write_data run1/tip3p_shake_final.data nocoeff
+write_restart run1/tip3p_shake.restart

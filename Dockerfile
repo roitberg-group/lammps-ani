@@ -45,6 +45,10 @@ SHELL ["/bin/bash", "-cu"]
 RUN apt-get update && \
     apt-get install -y libgsl-dev
 
+# Downgrade CMake to avoid Kokkos/CMake 3.31+ compatibility issue
+# See: https://github.com/kokkos/kokkos/issues/6935
+RUN pip install cmake==3.21.3
+
 # Copy files into container
 COPY . $LAMMPS_ANI_ROOT
 # Build base dependencies: lammps, kokkos, and torchani

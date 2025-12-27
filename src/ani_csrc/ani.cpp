@@ -1,6 +1,6 @@
 #include "ani.h"
 #include <c10/util/env.h>
-#include <nvToolsExt.h>
+#include <nvtx3/nvToolsExt.h>
 #include <torch/script.h>
 #include <torch/torch.h>
 #include <cstdint>

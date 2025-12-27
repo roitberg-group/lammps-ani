@@ -40,7 +40,10 @@ target_link_libraries(ani ${Python_LIBRARIES})
 target_link_libraries(ani OpenMP::OpenMP_CXX)
 target_link_libraries(ani -Wl,--no-as-needed cuaev)
 # Link NVTX library for profiling functions (nvtxMarkA, nvtxRangePushA, etc.)
-target_link_libraries(ani CUDA::nvToolsExt)
+# In CUDA 12+, nvToolsExt was removed - NVTX3 is now header-only (no linking needed)
+if(TARGET CUDA::nvToolsExt)
+  target_link_libraries(ani CUDA::nvToolsExt)
+endif()
 
 # test_model
 add_executable(test_model test_model.cpp)

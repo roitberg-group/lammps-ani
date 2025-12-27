@@ -22,6 +22,17 @@ cd lammps-ani/examples/water && ./run.sh
 
 **Note**: Pre-built containers support Kokkos for Ada GPUs (L4, RTX 4090). For other GPUs, see [Container Guide](docs/container.md#re-build-within-container) to re-build within the container. For multi-GPU, recommend build from source.
 
+
+## Examples
+
+- [water](examples/water/) - Simple water simulation
+- [alanine-dipeptide](examples/alanine-dipeptide/) - Alanine dipeptide simulation
+- [benchmark](examples/benchmark/) - Performance benchmark with water box
+- [combustion](examples/combustion/) - Combustion reaction
+- [early_earth](examples/early_earth/) - Early Earth chemistry simulation
+
+Set environment before running: `source ./build-env.sh`
+
 ## Installation
 
 ### Requirements
@@ -63,16 +74,6 @@ cd examples/water/
 # Run a water box simulation
 bash run.sh
 ```
-
-## Examples
-
-- [water](examples/water/) - Simple water simulation
-- [alanine-dipeptide](examples/alanine-dipeptide/) - Alanine dipeptide simulation
-- [benchmark](examples/benchmark/) - Performance benchmark with water box
-- [combustion](examples/combustion/) - Combustion reaction
-- [early_earth](examples/early_earth/) - Early Earth chemistry simulation
-
-Set environment before running: `source ./build-env.sh`
 
 ## Usage
 

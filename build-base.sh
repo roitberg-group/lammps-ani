@@ -26,7 +26,11 @@ set -e
 
 # build torchani
 cd external/torchani_sandbox
-rm -rf build && python setup.py develop --ext $install_option
+# rm -rf build && pip install -e . --config-settings=--global-option=ext --no-build-isolation --no-deps -v $install_option
+# Force extension build through environment variable instead of command line arg
+export TORCHANI_BUILD_EXTENSIONS=1
+# export TORCHANI_BUILD_ALL_EXTENSIONS=1
+rm -rf build && pip install -e . --no-build-isolation -v $install_option
 pip install h5py ase pytest pyyaml --upgrade $install_option
 cd ../../
 
@@ -59,6 +63,7 @@ echo Building KOKKOS for ${KOKKOS_ARCH}
 # kokkos does not support compiling for multiple GPU archs
 # -DKokkos_ARCH_TURING75=yes -DKokkos_ARCH_PASCAL60=yes
 cmake -DCMAKE_C_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" \
+-DCMAKE_CXX_STANDARD=17 \
 -DCMAKE_INSTALL_PREFIX=${INSTALL_DIR}/ -DCMAKE_INSTALL_LIBDIR=lib \
 -DBUILD_SHARED_LIBS=yes -DKokkos_ENABLE_CUDA=yes -DKokkos_ENABLE_OPENMP=yes -DKokkos_ENABLE_SERIAL=yes \
 -DKokkos_ARCH_HOSTARCH=yes -DKokkos_ARCH_GPUARCH=on \
@@ -71,6 +76,7 @@ cd ..
 # build lammps with unittest
 rm -rf build-test; mkdir -p build-test; cd build-test
 cmake -DCMAKE_C_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DLAMMPS_INSTALL_RPATH=yes \
+-DCMAKE_CXX_STANDARD=17 \
 -DCMAKE_PREFIX_PATH=${INSTALL_DIR}/ \
 -DPKG_PLUGIN=yes -DPKG_EXTRA-DUMP=yes -DBUILD_MPI=yes -DBUILD_SHARED_LIBS=yes -DLAMMPS_MACHINE=mpi \
 -DPKG_EXTRA-PAIR=yes -DPKG_MOLECULE=yes -DENABLE_TESTING=yes -DLAMMPS_EXCEPTIONS=yes \
@@ -91,10 +97,13 @@ if [ -f "build/install_manifest.txt" ]; then
 fi
 rm -rf build; mkdir -p build; cd build
 # D_GLIBCXX_USE_CXX11_ABI: https://stackoverflow.com/a/50873329/9581569
-cmake -DCMAKE_C_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DLAMMPS_INSTALL_RPATH=yes \
+# Ensure conda libs are in library path for PLUMED dependencies (gsl, mkl, zlib)
+export LD_LIBRARY_PATH="${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH}"
+cmake -DCMAKE_C_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" \
+-DCMAKE_CXX_STANDARD=17 -DLAMMPS_INSTALL_RPATH=yes \
 -DCMAKE_INSTALL_PREFIX=${INSTALL_DIR}/ -DCMAKE_PREFIX_PATH="${INSTALL_DIR}/;${CONDA_PREFIX}/lib;${CONDA_PREFIX}/include" -DCMAKE_INSTALL_LIBDIR=lib \
 -DPKG_PLUGIN=yes -DPKG_EXTRA-DUMP=yes -DBUILD_MPI=yes -DBUILD_SHARED_LIBS=yes -DLAMMPS_MACHINE=mpi \
--DPKG_EXTRA-PAIR=no -DPKG_MOLECULE=yes -DPKG_RIGID=yes -DPKG_KSPACE=yes -DPKG_COLVARS=yes -DPKG_PLUMED=yes -DDOWNLOAD_PLUMED=yes \
+-DPKG_EXTRA-PAIR=no -DPKG_MOLECULE=yes -DPKG_RIGID=yes -DPKG_KSPACE=yes -DPKG_COLVARS=yes -DPKG_PLUMED=no -DDOWNLOAD_PLUMED=yes \
 -DENABLE_TESTING=no -DLAMMPS_EXCEPTIONS=yes \
 -DPKG_OPENMP=yes \
 $KOKKOS_FLAGS \

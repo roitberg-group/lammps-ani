@@ -1,3 +1,4 @@
+import os
 import time
 import argparse
 from simple_slurm import Slurm
@@ -32,13 +33,12 @@ def setup_and_run_job(num_gpus, data_file, submit=False):
         nodes=nodes,
         ntasks_per_node=ntasks_per_node,
         cpus_per_task=1,
-        partition="hpg-ai",
-        reservation="roitberg2",
+        partition="hpg-turin",
         qos="roitberg",
         account="roitberg",
         gres=gres,
         mem_per_cpu="100gb",
-        time="120:00:00",
+        time="2:00:00",
         output=output_filename,
     )
 
@@ -52,14 +52,14 @@ def setup_and_run_job(num_gpus, data_file, submit=False):
         'echo "Number of Tasks Allocated      = $SLURM_NTASKS"',
         'echo "Number of Cores/Task Allocated = $SLURM_CPUS_PER_TASK"',
         # module load and setup environment variables
-        "module load cuda/11.4.3 gcc/9.3.0 openmpi/4.0.5 cmake/3.21.3 git/2.30.1",
-        'export LAMMPS_ANI_ROOT="/blue/roitberg/apps/lammps-ani"',
+        "module load cuda/12.8.1  gcc/14.2.0 openmpi/5.0.7 cmake/3.21.3",
+        f'export LAMMPS_ANI_ROOT="{os.environ.get("LAMMPS_ANI_ROOT")}"',
         "export LAMMPS_ROOT=${LAMMPS_ANI_ROOT}/external/lammps/",
         "export LAMMPS_PLUGIN_PATH=${LAMMPS_ANI_ROOT}/build/",
         # setup conda in the subshell and activate the environment
         # check issue: https://github.com/conda/conda/issues/7980
         "source $(conda info --base)/etc/profile.d/conda.sh",
-        "conda activate /blue/roitberg/apps/torch1121",
+        "conda activate /blue/roitberg/apps/torch28",
         "echo using python: $(which python)",
         # run the job commands
         # "python run_one.py --help",

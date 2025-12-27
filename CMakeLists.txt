@@ -6,13 +6,23 @@
 
 cmake_minimum_required(VERSION 3.10)
 
+# C++17 is required (PyTorch 2.5+ requires C++17)
+# Set BEFORE project() to ensure it applies to all languages
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CUDA_STANDARD 17)
+set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+set(Kokkos_CXX_STANDARD 17) # ensure nvcc_wrapper uses C++17 once
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CUDA_EXTENSIONS OFF)
+
 # enforce out-of-source build
 if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
   message(FATAL_ERROR "In-source builds are not allowed. You must create and use a build directory. "
     "Please remove CMakeCache.txt and CMakeFiles first.")
 endif()
 
-project(plugins VERSION 1.0 LANGUAGES CXX)
+project(plugins VERSION 1.0 LANGUAGES CXX CUDA)
 
 # when this file is included as subdirectory in the LAMMPS build, many settings are directly imported
 if(LAMMPS_DIR)
@@ -30,10 +40,6 @@ else()
     set(CMAKE_INSTALL_PREFIX "$ENV{HOME}/.local" CACHE PATH "Default install path" FORCE)
   endif()
 endif()
-
-# C++14 is required
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Need -restrict with Intel compilers
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")

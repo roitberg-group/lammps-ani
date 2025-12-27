@@ -4,8 +4,8 @@ set -ex
 # export environment
 source build-env.sh
 
-# copy source files to ani_csrc
-cp external/torchani_sandbox/torchani/csrc/* src/ani_csrc/
+# copy source files to ani_csrc (only files, not directories)
+cp external/torchani_sandbox/torchani/csrc/*.{cu,h,cpp,cuh} src/ani_csrc/
 
 # build lammps-ani
 # remove old building files
@@ -19,6 +19,7 @@ rm -rf build; mkdir -p build; cd build
 # For debugging symbols, please add: -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake -DCMAKE_C_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${CXX11_ABI}" \
 -DPython_EXECUTABLE=$(which python) \
+-DCMAKE_CXX_STANDARD=17 -DCMAKE_CUDA_STANDARD=17 \
 -DLAMMPS_HEADER_DIR=${LAMMPS_ROOT}/src -DCMAKE_PREFIX_PATH="$(python -c 'import torch.utils; print(torch.utils.cmake_prefix_path)');${INSTALL_DIR}/" \
 -DCMAKE_INSTALL_LIBDIR=lib \
 ${CUDNN_FLAGS} ..

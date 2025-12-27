@@ -2,13 +2,13 @@
 
 # environment
 # Paths
-export LAMMPS_ANI_ROOT=${LAMMPS_ANI_ROOT:=${PWD}}  # default as PWD
+export LAMMPS_ANI_ROOT=${PWD}  # use current directory
 export LAMMPS_ROOT=${LAMMPS_ANI_ROOT}/external/lammps/
 export LAMMPS_PLUGIN_PATH=${LAMMPS_ANI_ROOT}/build/
 # Install Dir
 export INSTALL_DIR=${INSTALL_DIR:=${HOME}/.local}  # default as $HOME/.local
 # CUDA_ARCH
-export CMAKE_CUDA_ARCHITECTURES=${CMAKE_CUDA_ARCHITECTURES:="6.0+PTX;7.0;7.5;8.0"}
+export CMAKE_CUDA_ARCHITECTURES=${CMAKE_CUDA_ARCHITECTURES:="6.0+PTX;7.0;7.5;8.0;9.0;10.0"}
 export TORCH_CUDA_ARCH_LIST=${CMAKE_CUDA_ARCHITECTURES}
 # NGC PyTorch needs CXX11_ABI
 export CXX11_ABI=${CXX11_ABI:=$(python -c "import torch; print(int(torch._C._GLIBCXX_USE_CXX11_ABI))")}

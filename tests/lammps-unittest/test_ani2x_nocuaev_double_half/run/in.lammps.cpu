@@ -13,7 +13,7 @@ newton         off off
 read_data      ${lammps_ani_root}/tests/water-0.8nm.data
 change_box     all boundary p p p
 
-pair_style     ani 5.1 ${lammps_ani_root}/tests/ani2x.pt cpu -1 pyaev half double
+pair_style     ani 5.1 ${lammps_ani_root}/models/ani2x.pt cpu -1 pyaev half double
 pair_coeff     * *
 
 # Settings: temperature at 300 K, timestep (0.5 fs)

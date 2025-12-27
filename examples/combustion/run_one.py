@@ -110,7 +110,7 @@ if __name__ == "__main__":
     parser.add_argument("--nsys", action="store_true", help="If specified, run nsight profiling.")
 
     args = parser.parse_args()
-    args.ani_model_file = os.path.join(os.getenv("LAMMPS_ANI_ROOT"), "tests", args.ani_model_file)
+    args.ani_model_file = os.path.join(os.getenv("LAMMPS_ANI_ROOT"), "models", args.ani_model_file)
 
     var_dict = {
         # configuration

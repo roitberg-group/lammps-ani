@@ -20,7 +20,7 @@ cp -r /lammps-ani ./lammps-ani
 cd lammps-ani/examples/water && ./run.sh
 ```
 
-**Note**: Pre-built containers support Kokkos for Ada GPUs (L4, RTX 4090). For other GPUs, see [Container Guide](docs/container.md#re-build-within-container) to re-build within the container. For multi-GPU, recommend build from source.
+**Note**: The pre-built container only supports Kokkos for Ada GPUs (L4, RTX 4090). For other GPUs, see [Container Guide](docs/container.md#re-build-within-container) to re-build within the container. For multi-GPU, recommend to build from source.
 
 
 ## Examples
@@ -91,7 +91,7 @@ pair_coeff     * *
 
 ### Models
 
-Available in `/lammps-ani/tests/` (container) or export with `pytest tests/test_models.py -s -v`:
+Available in `/lammps-ani/models/` (container) or export with `pytest models/test_models.py -s -v`:
 - `ani2x.pt` - Standard ANI-2x
 - `ani2x_repulsion.pt` - ANI-2x with repulsion
 - `ani2x_ext0_repulsion.pt` - Extended ANI-2x with repulsion

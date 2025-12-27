@@ -14,7 +14,7 @@
 #include "pair_ani.h"
 
 #include <cuda_runtime.h>
-#include <nvToolsExt.h>
+#include <nvtx3/nvToolsExt.h>
 #include <cmath>
 #include <cstring>
 #include <vector>

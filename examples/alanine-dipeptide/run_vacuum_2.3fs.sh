@@ -16,8 +16,8 @@ NUM_MODELS=1
 DATA_FILE=alanine-dipeptide.vacuum.data
 TIMESTEP=2.3
 # choose ani2x.pt or ani2x_repulsion.pt
-MODEL_FILE=${LAMMPS_ANI_ROOT}/tests/ani2x_repulsion.pt
-# MODEL_FILE=${LAMMPS_ANI_ROOT}/tests/ani2x_solvated_alanine_dipeptide.pt
+MODEL_FILE=${LAMMPS_ANI_ROOT}/models/ani2x_repulsion.pt
+# MODEL_FILE=${LAMMPS_ANI_ROOT}/models/ani2x_solvated_alanine_dipeptide.pt
 
 # create logs folder
 mkdir -p logs

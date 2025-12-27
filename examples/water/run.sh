@@ -13,7 +13,7 @@ NUM_MODELS=1
 DATA_FILE=20k/water.data
 TIMESTEP=0.5
 # choose ani2x.pt or ani2x_repulsion.pt
-MODEL_FILE=${LAMMPS_ANI_ROOT}/tests/ani2x.pt
+MODEL_FILE=${LAMMPS_ANI_ROOT}/models/ani2x.pt
 
 #################################################################################
 

@@ -5,7 +5,7 @@ import pytest
 import torchani
 from ase.io import read
 from torchani.models import Ensemble
-from .models import all_models, save_models
+from .ani_models import all_models, save_models
 
 hartree2kcalmol = torchani.units.hartree2kcalmol(1)
 
@@ -154,7 +154,7 @@ def run_one_test(
     verbose=False,
     virial_flag=False,
 ):
-    input_file = "water-0.8nm.pdb"
+    input_file = "../tests/water-0.8nm.pdb"
     mol = read(input_file)
 
     species_periodic_table = torch.tensor(

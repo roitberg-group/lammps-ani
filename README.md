@@ -56,6 +56,7 @@ conda install -c conda-forge libopenblas gsl -y
 Following example is for HiPerGator L4 GPU node, adjust as needed for other systems.
 ```bash
 srun --partition=hpg-turin --cpus-per-task=30 --gres=gpu:2 --mem=200gb -t 2:00:00 --pty /bin/bash -i
+export conda_env_path=/blue/roitberg/apps/torch28/
 conda activate $conda_env_path
 module load cuda/12.8.1 gcc/14.2.0 openmpi/5.0.7 cmake/3.21.3
 

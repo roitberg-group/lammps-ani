@@ -55,6 +55,8 @@ cd lammps-ani && ./build.sh
 source ./build-env.sh
 ```
 
+For additional build notes, see [Build Instructions](docs/build.md).
+
 ## Usage
 
 ```lammps
@@ -85,6 +87,8 @@ Available in `/lammps-ani/tests/` (container) or export with `pytest tests/test_
 - [early_earth](examples/early_earth/) - Early Earth chemistry simulation
 
 Set environment before running: `source ./build-env.sh`
+
+For more usage details, see [Usage Instructions](docs/usage.md).
 
 ## Troubleshooting
 

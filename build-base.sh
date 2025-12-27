@@ -34,6 +34,11 @@ rm -rf build && pip install -e . --no-build-isolation -v $install_option
 pip install h5py ase pytest pyyaml --upgrade $install_option
 cd ../../
 
+# install ani_engine
+cd external/ani_engine
+pip install -e . $install_option
+cd ../..
+
 # save model
 cd models/
 pytest test_models.py -s -v

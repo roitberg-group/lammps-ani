@@ -1,6 +1,7 @@
 name: build_singularity
 
 on:
+  workflow_dispatch:  # Manual trigger from GitHub UI
   push:
     branches: [ "master" ]
   pull_request:
@@ -8,11 +9,11 @@ on:
 
 jobs:
   build_singularity:
-    runs-on: self-hosted  # use ubuntu-latest for github servers
+    runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
-        token: ${{ secrets.PAT }}
+        token: ${{ secrets.PAT || github.token }}
         submodules: recursive
     - uses: eWaterCycle/setup-singularity@v7
       with:

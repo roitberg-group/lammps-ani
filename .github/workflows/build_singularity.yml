@@ -1,6 +1,7 @@
 name: build_singularity
 
 on:
+  workflow_dispatch:  # Manual trigger from GitHub UI
   push:
     branches: [ "master" ]
   pull_request:
@@ -8,9 +9,9 @@ on:
 
 jobs:
   build_singularity:
-    runs-on: self-hosted  # use ubuntu-latest for github servers
+    runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         token: ${{ secrets.PAT }}
         submodules: recursive
@@ -18,9 +19,8 @@ jobs:
       with:
         singularity-version: 3.8.3
     - name: Build Singularity Image
-      run: rm -rf ../lammps-ani.sif && singularity build --nv --fakeroot -B $PWD:/tmp/host_pwd ../lammps-ani.sif Singularity.def
-    - name: Test
-      run: singularity exec --cleanenv -H $PWD:/home --pwd /home --nv ../lammps-ani.sif /bin/bash -c "nvidia-smi && cd external/torchani_sandbox && python setup.py install --ext --user && cd ../../ && pytest models/test_models.py -s -v && cd tests/ && ./test_all.sh"
+      run: rm -rf ../lammps-ani.sif && singularity build --fakeroot ../lammps-ani.sif Singularity.def
+    # Note: GPU tests skipped on GitHub runners (no GPU available)
 
 concurrency:
   group: build_singularity-${{ github.event.pull_request.number || github.sha }}

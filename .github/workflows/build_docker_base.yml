@@ -1,9 +1,19 @@
 name: build_docker_base
 
 on:
+  workflow_dispatch:  # Manual trigger from GitHub UI
+    inputs:
+      kokkos_arch:
+        description: 'Kokkos GPU architecture'
+        required: false
+        default: 'Kokkos_ARCH_ADA89'
+        type: choice
+        options:
+          - Kokkos_ARCH_VOLTA70
+          - Kokkos_ARCH_AMPERE80
+          - Kokkos_ARCH_ADA89
+          - Kokkos_ARCH_HOPPER90
   push:
-    branches: [ "master" ]
-  pull_request:
     branches: [ "master" ]
     paths:
       - 'build*'
@@ -17,14 +27,14 @@ env:
 
 jobs:
   build_docker_base:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           token: ${{ secrets.PAT }}
           submodules: recursive
@@ -60,14 +70,13 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           context: .
-          # push: ${{ github.event_name != 'pull_request' }}
           push: true
           pull: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-base:latest
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             MAKE_J_THREADS=5
-            OVERRIDE_KOKKOS_ARCH=Kokkos_ARCH_AMPERE80
+            OVERRIDE_KOKKOS_ARCH=${{ inputs.kokkos_arch || 'Kokkos_ARCH_ADA89' }}
           target: base
 
       - name: Remove image

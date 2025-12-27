@@ -15,7 +15,7 @@ cd /lammps-ani/examples/water && ./run.sh
 ```bash
 module load singularity
 singularity pull -F docker://ghcr.io/roitberg-group/lammps-ani:latest
-SINGULARITYENV_CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES singularity exec --cleanenv -H ./:/home --nv lammps-ani_master.sif /bin/bash
+SINGULARITYENV_CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES singularity exec --cleanenv -H ./:/home --nv lammps-ani_latest.sif /bin/bash
 cp -r /lammps-ani ./lammps-ani
 cd lammps-ani/examples/water && ./run.sh
 ```

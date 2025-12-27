@@ -1,7 +1,0 @@
-# Distribution / packaging
-build/
-develop-eggs/
-*.egg-info/
-.installed.cfg
-*.egg
-

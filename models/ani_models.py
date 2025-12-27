@@ -64,12 +64,39 @@ def ANI1x_NR_Model(use_repulsion):
         model.rep_calc = None
     return model
 
+def ANI2x_Solvated_Alanine_Dipeptide_Model():
+    try:
+        import ani_engine.utils
+    except ImportError:
+        raise RuntimeError("ani_engine is not installed, cannot export ANI2x_Solvated_Alanine_Dipeptide_Model")
+    engine = ani_engine.utils.load_engine("../external/ani_engine_models/20230913_131808-zdy6gco1-2x-with-solvated-alanine-dipeptide-b973c-def2-mtzvp")
+    model = engine.model.to_builtins(engine.self_energies, use_cuaev_interface=True)
+    model.rep_calc = None
+    return model
+
+
+def ANI2x_B973c():
+    """
+    ANI2x model with B973c dataset, no new solvated alanine dipeptide data
+    """
+    try:
+        import ani_engine.utils
+    except ImportError:
+        raise RuntimeError("ani_engine is not installed, cannot export ANI2x_B973c")
+    engine = ani_engine.utils.load_engine("../external/ani_engine_models/20230906_120322-7avzat0g-2x-energy-force-b973c-no_new_data")
+    model = engine.model.to_builtins(engine.self_energies, use_cuaev_interface=True)
+    model.rep_calc = None
+    return model
+
+
 all_models_ = {
     "ani2x.pt": {"model": ANI2x_Model, "unittest": True},
     "ani1x_nr.pt": {"model": ANI1x_NR_Model, "unittest": True, "kwargs": {"use_repulsion": False}},
-    # Pre-exported models (trained with energy+force, B973c/def2-mTZVP level of theory):
+    # trained with energy+force, B973c/def2-mTZVP level of theory
     # - ani2x_solvated_alanine_dipeptide.pt: WITH solvated alanine dipeptide data
+    "ani2x_solvated_alanine_dipeptide.pt": {"model": ANI2x_Solvated_Alanine_Dipeptide_Model, "unittest": True},
     # - ani2x_b973c.pt: WITHOUT solvated alanine dipeptide data
+    "ani2x_b973c.pt": {"model": ANI2x_B973c, "unittest": True},
 }
 all_models = {}
 

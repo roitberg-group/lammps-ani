@@ -12,7 +12,7 @@ LAMMPS_INPUT=in.shake.lammps
 RUN_KOKKOS=yes
 NUM_GPUS=1
 NUM_MODELS=1
-DATA_FILE=alanine-dipeptide-bonds.npt.data
+DATA_FILE=alanine-dipeptide-bonds.data
 TIMESTEP=2
 # choose ani2x.pt or ani2x_repulsion.pt
 MODEL_FILE=${LAMMPS_ANI_ROOT}/tests/ani2x_repulsion.pt

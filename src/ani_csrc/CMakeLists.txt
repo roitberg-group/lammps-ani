@@ -1,4 +1,11 @@
-cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
+
+# Ensure all targets here use C++17 (required by newer PyTorch) and CUDA C++17
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CUDA_STANDARD 17)
+set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-extended-lambda --expt-relaxed-constexpr")
 
 # speed up mathmatics
@@ -12,7 +19,6 @@ string(APPEND CMAKE_CUDA_FLAGS " -DCUB_NS_QUALIFIER=::cuaev::cub")
 string(APPEND CMAKE_CUDA_FLAGS " -DCUB_NS_PREFIX='namespace cuaev {'")
 string(APPEND CMAKE_CUDA_FLAGS " -DCUB_NS_POSTFIX=}")
 
-set(CMAKE_CXX_STANDARD 14)
 project(cuaev LANGUAGES CXX CUDA)
 
 find_package(Torch REQUIRED)
@@ -26,7 +32,6 @@ target_link_libraries(cuaev ${TORCH_LIBRARIES})
 target_link_libraries(cuaev ${Python_LIBRARIES})
 
 # ani interface lib
-project(ani LANGUAGES CXX)
 find_package(OpenMP REQUIRED)
 add_library(ani SHARED mnp.cpp ani.cpp)
 target_include_directories(ani PRIVATE ./)
@@ -34,9 +39,10 @@ target_link_libraries(ani ${TORCH_LIBRARIES})
 target_link_libraries(ani ${Python_LIBRARIES})
 target_link_libraries(ani OpenMP::OpenMP_CXX)
 target_link_libraries(ani -Wl,--no-as-needed cuaev)
+# Link NVTX library for profiling functions (nvtxMarkA, nvtxRangePushA, etc.)
+target_link_libraries(ani CUDA::nvToolsExt)
 
 # test_model
-project(test_model LANGUAGES CXX)
 add_executable(test_model test_model.cpp)
 target_include_directories(test_model PRIVATE ./)
 target_link_libraries(test_model PRIVATE ${TORCH_LIBRARIES})

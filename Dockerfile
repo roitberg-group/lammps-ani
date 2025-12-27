@@ -1,4 +1,7 @@
 # Usage:
+# 0. Optionally set build args:
+#    export MAKE_J_THREADS=20: number of threads for make -j
+#    export OVERRIDE_KOKKOS_ARCH=Kokkos_ARCH_ADA89: override Kokkos architecture setting, e.g Kokkos_ARCH_VOLTA70, Kokkos_ARCH_ADA89
 # 1. build base image, with lammps, kokkos and torchani
 #     docker build --target base -t ghcr.io/roitberg-group/lammps-ani-base:latest -f Dockerfile .
 # 2. build from a base image
@@ -6,7 +9,7 @@
 # 3. build from scratch
 #     docker build --target lammps-ani-build_from_scratch -t ghcr.io/roitberg-group/lammps-ani:latest -f Dockerfile .
 
-ARG PYT_VER=22.08
+ARG PYT_VER=25.06
 # ==================== pytorch ====================
 FROM nvcr.io/nvidia/pytorch:$PYT_VER-py3 AS pytorch
 
@@ -18,7 +21,7 @@ ENV LAMMPS_ROOT=${LAMMPS_ANI_ROOT}/external/lammps/
 ENV LAMMPS_PLUGIN_PATH=${LAMMPS_ANI_ROOT}/build/
 ENV INSTALL_DIR=/usr/local
 # CUDA_ARCH
-ENV CMAKE_CUDA_ARCHITECTURES="6.0+PTX;7.0;7.5;8.0"
+ENV CMAKE_CUDA_ARCHITECTURES="6.0+PTX;7.0;7.5;8.0;8.9;9.0;10.0"
 ENV TORCH_CUDA_ARCH_LIST=${CMAKE_CUDA_ARCHITECTURES}
 # NGC PyTorch needs CXX11_ABI
 ENV CXX11_ABI=1

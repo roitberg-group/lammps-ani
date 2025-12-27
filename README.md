@@ -6,21 +6,21 @@ LAMMPS-ANI interface for large scale molecular dynamics simulation with ANI neur
 
 ### Docker
 ```bash
-docker pull ghcr.io/roitberg-group/lammps-ani:master
-docker run --gpus all -it ghcr.io/roitberg-group/lammps-ani:master
+docker pull ghcr.io/roitberg-group/lammps-ani:latest
+docker run --gpus all -it ghcr.io/roitberg-group/lammps-ani:latest
 cd /lammps-ani/examples/water && ./run.sh
 ```
 
 ### Singularity (HPC)
 ```bash
 module load singularity
-singularity pull -F docker://ghcr.io/roitberg-group/lammps-ani:master
+singularity pull -F docker://ghcr.io/roitberg-group/lammps-ani:latest
 SINGULARITYENV_CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES singularity exec --cleanenv -H ./:/home --nv lammps-ani_master.sif /bin/bash
 cp -r /lammps-ani ./lammps-ani
 cd lammps-ani/examples/water && ./run.sh
 ```
 
-**Note**: Pre-built containers only support Kokkos for A100 GPUs. For other GPUs or multi-GPU, build from source.
+**Note**: Pre-built containers support Kokkos for Ada GPUs (L4, RTX 4090). For other GPUs, see [Container Guide](docs/container.md#re-build-within-container) to re-build within the container. For multi-GPU, recommend build from source.
 
 ## Installation
 
@@ -57,6 +57,23 @@ source ./build-env.sh
 
 For additional build notes, see [Build Instructions](docs/build.md).
 
+### Test
+```bash
+cd examples/water/
+# Run a water box simulation
+bash run.sh
+```
+
+## Examples
+
+- [water](examples/water/) - Simple water simulation
+- [alanine-dipeptide](examples/alanine-dipeptide/) - Alanine dipeptide simulation
+- [benchmark](examples/benchmark/) - Performance benchmark with water box
+- [combustion](examples/combustion/) - Combustion reaction
+- [early_earth](examples/early_earth/) - Early Earth chemistry simulation
+
+Set environment before running: `source ./build-env.sh`
+
 ## Usage
 
 ```lammps
@@ -77,16 +94,6 @@ Available in `/lammps-ani/tests/` (container) or export with `pytest tests/test_
 - `ani2x.pt` - Standard ANI-2x
 - `ani2x_repulsion.pt` - ANI-2x with repulsion
 - `ani2x_ext0_repulsion.pt` - Extended ANI-2x with repulsion
-
-## Examples
-
-- [water](examples/water/) - Simple water simulation
-- [alanine-dipeptide](examples/alanine-dipeptide/) - Alanine dipeptide simulation
-- [benchmark](examples/benchmark/) - Performance benchmark with water box
-- [combustion](examples/combustion/) - Combustion reaction
-- [early_earth](examples/early_earth/) - Early Earth chemistry simulation
-
-Set environment before running: `source ./build-env.sh`
 
 For more usage details, see [Usage Instructions](docs/usage.md).
 

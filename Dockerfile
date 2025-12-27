@@ -1,13 +1,13 @@
 # Usage:
-# 0. Optionally set build args:
-#    export MAKE_J_THREADS=20: number of threads for make -j
-#    export OVERRIDE_KOKKOS_ARCH=Kokkos_ARCH_ADA89: override Kokkos architecture setting, e.g Kokkos_ARCH_VOLTA70, Kokkos_ARCH_ADA89
+# 0. Set build args variable:
+#    export DOCKER_BUILD_ARGS="--build-arg MAKE_J_THREADS=20 --build-arg MAX_JOBS=20 --build-arg OVERRIDE_KOKKOS_ARCH=Kokkos_ARCH_ADA89"
+#    Options for OVERRIDE_KOKKOS_ARCH: Kokkos_ARCH_VOLTA70, Kokkos_ARCH_AMPERE80, Kokkos_ARCH_ADA89, Kokkos_ARCH_HOPPER90, etc.
 # 1. build base image, with lammps, kokkos and torchani
-#     docker build --target base -t ghcr.io/roitberg-group/lammps-ani-base:latest -f Dockerfile .
+#     docker build --progress=plain $DOCKER_BUILD_ARGS --target base -t ghcr.io/roitberg-group/lammps-ani-base:latest -f Dockerfile .
 # 2. build from a base image
-#     docker build --target lammps-ani-build_from_base -t ghcr.io/roitberg-group/lammps-ani:latest -f Dockerfile .
+#     docker build --progress=plain $DOCKER_BUILD_ARGS --target lammps-ani-build_from_base -t ghcr.io/roitberg-group/lammps-ani:latest -f Dockerfile .
 # 3. build from scratch
-#     docker build --target lammps-ani-build_from_scratch -t ghcr.io/roitberg-group/lammps-ani:latest -f Dockerfile .
+#     docker build --progress=plain $DOCKER_BUILD_ARGS --target lammps-ani-build_from_scratch -t ghcr.io/roitberg-group/lammps-ani:latest -f Dockerfile .
 
 ARG PYT_VER=25.06
 # ==================== pytorch ====================
@@ -33,6 +33,8 @@ ENV TORCH_ALLOW_TF32_CUBLAS_OVERRIDE=0
 # Flags needed for CI
 ARG MAKE_J_THREADS=""
 ENV MAKE_J_THREADS=${MAKE_J_THREADS}
+ARG MAX_JOBS=""
+ENV MAX_JOBS=${MAX_JOBS}
 ARG OVERRIDE_KOKKOS_ARCH=""
 ENV OVERRIDE_KOKKOS_ARCH=${OVERRIDE_KOKKOS_ARCH}
 

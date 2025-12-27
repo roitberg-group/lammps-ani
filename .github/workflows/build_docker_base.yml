@@ -35,18 +35,16 @@ jobs:
       packages: write
 
     steps:
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.PAT || github.token }}
           submodules: recursive
-
-      # To avoid docker login and post login have race conditions because of multiple jobs running
-      # on the same machine.
-      - name: Set DOCKER_CONFIG
-        run: |
-          mkdir -p $HOME/.github_action_docker/${GITHUB_RUN_ID}/.docker
-          echo "DOCKER_CONFIG=$HOME/.github_action_docker/${GITHUB_RUN_ID}/.docker" >> $GITHUB_ENV
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v2

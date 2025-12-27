@@ -45,7 +45,7 @@ pip install -e . $install_option
 cd ../../
 
 # save model
-cd tests/
+cd models/
 pytest test_models.py -s -v
 cd ../
 

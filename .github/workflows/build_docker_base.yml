@@ -15,6 +15,8 @@ on:
           - Kokkos_ARCH_HOPPER90
   push:
     branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
     paths:
       - 'build*'
       - 'external/**'
@@ -36,7 +38,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.PAT }}
+          token: ${{ secrets.PAT || github.token }}
           submodules: recursive
 
       # To avoid docker login and post login have race conditions because of multiple jobs running

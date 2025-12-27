@@ -13,14 +13,15 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        token: ${{ secrets.PAT }}
+        token: ${{ secrets.PAT || github.token }}
         submodules: recursive
     - uses: eWaterCycle/setup-singularity@v7
       with:
         singularity-version: 3.8.3
     - name: Build Singularity Image
-      run: rm -rf ../lammps-ani.sif && singularity build --fakeroot ../lammps-ani.sif Singularity.def
-    # Note: GPU tests skipped on GitHub runners (no GPU available)
+      run: rm -rf ../lammps-ani.sif && singularity build --nv --fakeroot -B $PWD:/tmp/host_pwd ../lammps-ani.sif Singularity.def
+    - name: Test
+      run: singularity exec --cleanenv -H $PWD:/home --pwd /home --nv ../lammps-ani.sif /bin/bash -c "nvidia-smi && cd external/torchani_sandbox && python setup.py install --ext --user && cd ../../ && pytest models/test_models.py -s -v && cd tests/ && ./test_all.sh"
 
 concurrency:
   group: build_singularity-${{ github.event.pull_request.number || github.sha }}

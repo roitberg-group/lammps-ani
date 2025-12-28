@@ -28,3 +28,10 @@ docker push ${REGISTRY}/lammps-ani:latest-${ARCH_SHORT}
 echo "Done! Pushed:"
 echo "  ${REGISTRY}/lammps-ani-base:latest-${ARCH_SHORT}"
 echo "  ${REGISTRY}/lammps-ani:latest-${ARCH_SHORT}"
+
+echo ""
+echo "To also tag as 'latest', run:"
+echo "  docker tag ${REGISTRY}/lammps-ani-base:latest-${ARCH_SHORT} ${REGISTRY}/lammps-ani-base:latest"
+echo "  docker tag ${REGISTRY}/lammps-ani:latest-${ARCH_SHORT} ${REGISTRY}/lammps-ani:latest"
+echo "  docker push ${REGISTRY}/lammps-ani-base:latest"
+echo "  docker push ${REGISTRY}/lammps-ani:latest"

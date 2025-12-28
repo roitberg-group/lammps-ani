@@ -94,8 +94,7 @@ pair_coeff     * *
 
 Available in `/lammps-ani/models/` (container) or export with `pytest models/test_models.py -s -v`:
 - `ani2x.pt` - Standard ANI-2x
-- `ani2x_repulsion.pt` - ANI-2x with repulsion
-- `ani2x_ext0_repulsion.pt` - Extended ANI-2x with repulsion
+- `ani1x_nr.pt` - ANI-1xnr Model ([ani-1xnr](https://github.com/atomistic-ml/ani-1xnr))
 
 For more usage details, see [Usage Instructions](docs/usage.md).
 

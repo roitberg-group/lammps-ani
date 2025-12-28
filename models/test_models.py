@@ -4,10 +4,15 @@ import torch
 import pytest
 import torchani
 from ase.io import read
+from pathlib import Path
 from torchani.models import Ensemble
 from .ani_models import all_models, save_models
 
 hartree2kcalmol = torchani.units.hartree2kcalmol(1)
+
+# Get the directory where this module is located
+_MODULE_DIR = Path(__file__).parent.absolute()
+_TESTS_DIR = _MODULE_DIR.parent / "tests"
 
 # pytest parameter and id
 runpbc_params = [
@@ -154,7 +159,7 @@ def run_one_test(
     verbose=False,
     virial_flag=False,
 ):
-    input_file = "../tests/water-0.8nm.pdb"
+    input_file = str(_TESTS_DIR / "water-0.8nm.pdb")
     mol = read(input_file)
 
     species_periodic_table = torch.tensor(

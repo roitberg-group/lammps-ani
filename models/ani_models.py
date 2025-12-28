@@ -5,6 +5,11 @@ from torchani.nn import ANIModel
 from torchani.models import Ensemble
 from .lammps_ani import LammpsANI
 from torchani.potentials.repulsion import RepulsionXTB
+from pathlib import Path
+
+# Get the directory where this module is located
+_MODULE_DIR = Path(__file__).parent.absolute()
+_EXTERNAL_DIR = _MODULE_DIR.parent / "external"
 
 
 def ANI2x_Model():
@@ -21,7 +26,6 @@ def ANI2x_Model():
 
 def ANI1x_NR_Model(use_repulsion):
     from torchani.models import BuiltinModel, _load_ani_model
-    from pathlib import Path
 
     def ANI1x_NR(**kwargs) -> BuiltinModel:
         """
@@ -35,7 +39,7 @@ def ANI1x_NR_Model(use_repulsion):
         of Chemistry with a General Reactive Machine Learning Potential. 2022.
         https://doi.org/10.26434/chemrxiv-2022-15ct6-v2.
         """
-        info_file = Path('../external/ani-1xnr/model/ani-1xnr.info').absolute()
+        info_file = _EXTERNAL_DIR / "ani-1xnr" / "model" / "ani-1xnr.info"
         state_dict_file = None
         return _load_ani_model(state_dict_file, info_file, use_neurochem_source=True, **kwargs)
 
@@ -69,8 +73,10 @@ def ANI2x_Solvated_Alanine_Dipeptide_Model():
         import ani_engine.utils
     except ImportError:
         raise RuntimeError("ani_engine is not installed, cannot export ANI2x_Solvated_Alanine_Dipeptide_Model")
-    engine = ani_engine.utils.load_engine("../external/ani_engine_models/20230913_131808-zdy6gco1-2x-with-solvated-alanine-dipeptide-b973c-def2-mtzvp")
-    model = engine.model.to_builtins(engine.self_energies, use_cuaev_interface=True)
+    engine = ani_engine.utils.load_engine(str(_EXTERNAL_DIR / "ani_engine_models/20230913_131808-zdy6gco1-2x-with-solvated-alanine-dipeptide-b973c-def2-mtzvp"))
+    # Use cuaev if CUDA available, otherwise fall back to CPU-compatible export
+    use_cuaev = torch.cuda.is_available()
+    model = engine.model.to_builtins(engine.self_energies, use_cuaev_interface=use_cuaev)
     model.rep_calc = None
     return model
 
@@ -83,8 +89,10 @@ def ANI2x_B973c():
         import ani_engine.utils
     except ImportError:
         raise RuntimeError("ani_engine is not installed, cannot export ANI2x_B973c")
-    engine = ani_engine.utils.load_engine("../external/ani_engine_models/20230906_120322-7avzat0g-2x-energy-force-b973c-no_new_data")
-    model = engine.model.to_builtins(engine.self_energies, use_cuaev_interface=True)
+    engine = ani_engine.utils.load_engine(str(_EXTERNAL_DIR / "ani_engine_models/20230906_120322-7avzat0g-2x-energy-force-b973c-no_new_data"))
+    # Use cuaev if CUDA available, otherwise fall back to CPU-compatible export
+    use_cuaev = torch.cuda.is_available()
+    model = engine.model.to_builtins(engine.self_energies, use_cuaev_interface=use_cuaev)
     model.rep_calc = None
     return model
 

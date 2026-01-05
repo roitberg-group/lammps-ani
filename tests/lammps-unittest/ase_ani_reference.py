@@ -1,4 +1,3 @@
-import ase
 import torch
 import torchani
 import numpy as np
@@ -22,9 +21,8 @@ def run(pbc=False, use_double=True, use_cuaev=False):
     ani2x = torchani.models.ANI2x(
         periodic_table_index=True,
         model_index=None,
-        cell_list=False,
-        use_cuaev_interface=use_cuaev,
-        use_cuda_extension=use_cuaev,
+        neighborlist="all-pairs",
+        strategy="cuaev",
     )
     # TODO It is IMPORTANT to set cutoff as 7.1 to match lammps nbr cutoff
     ani2x.aev_computer.neighborlist.cutoff = 7.1

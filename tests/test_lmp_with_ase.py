@@ -268,7 +268,6 @@ def test_lmp_with_ase(
         ref_model.aev_computer.neighborlist.cutoff = 7.1
     use_double = precision == "double"
     dtype = torch.float64 if use_double else torch.float32
-    # calculator = ref_model.to(dtype).to(device).ase()
     calculator = ANICalculator(ref_model.to(dtype).to(device))
 
     # run ase

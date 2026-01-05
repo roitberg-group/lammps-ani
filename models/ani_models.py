@@ -3,7 +3,7 @@ from pathlib import Path
 
 import torch
 from torchani.potentials import RepulsionXTB
-from torchani.models import ANI2x, BuiltinModel, _load_ani_model
+from torchani.models import ANI2x, load_model_from_info_file
 
 from .lammps_ani import LammpsANI
 
@@ -13,17 +13,14 @@ _EXTERNAL_DIR = _MODULE_DIR.parent / "external"
 
 
 def ANI2x_Model():
-    model = ANI2x(
-        neighborlist="all_pairs",
-        strategy="cuaev",
-    )
+    model = ANI2x(neighborlist="all_pairs", strategy="cuaev")
     model.rep_calc = None
     return model
 
 
 def ANI1x_NR_Model(use_repulsion):
 
-    def ANI1x_NR(**kwargs) -> BuiltinModel:
+    def ANI1x_NR(**kwargs):
         """
         Machine learning interatomic potential for condensed-phase reactive chemistry
 
@@ -36,22 +33,9 @@ def ANI1x_NR_Model(use_repulsion):
         https://doi.org/10.26434/chemrxiv-2022-15ct6-v2.
         """
         info_file = _EXTERNAL_DIR / "ani-1xnr" / "model" / "ani-1xnr.info"
-        state_dict_file = None
-        return _load_ani_model(state_dict_file, info_file, use_neurochem_source=True, **kwargs)
+        return load_model_from_info_file(info_file, **kwargs)
 
-    model = ANI1x_NR(
-        neighborlist="all_pairs",
-        strategy="cuaev",
-        # [TODO] we would need to set repulsion if we need to run ANI1x_NR with ASE calculator
-        # pretrained=False,
-        # repulsion=use_repulsion,
-        # # The repulsion cutoff is set to 5.1, but ANIdr model actually uses a cutoff of 5.3
-        # repulsion_kwargs={
-        #     "symbols": ("H", "C", "N", "O"),
-        #     "cutoff": 5.1,
-        #     "cutoff_fn": "smooth2",
-        # },
-    )
+    model = ANI1x_NR(strategy="cuaev")
 
     # The ANI1x_NR model does not have repulsion calculator, so the repulsion calculator here is
     # an external potential added on top of the ANI1x_NR model to prevent atoms from collapsing.
@@ -123,6 +107,6 @@ def save_models():
         else:
             kwargs = {}
         model = info["model"](**kwargs)
-        ani2x = LammpsANI(model)
-        script_module = torch.jit.script(ani2x)
+        m = LammpsANI(model)
+        script_module = torch.jit.script(m)
         script_module.save(output_file)

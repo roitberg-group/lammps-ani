@@ -1,11 +1,12 @@
+import argparse
+
 import torch
-import torchani
 import numpy as np
 import pandas as pd
 from ase.io import read
 from ase.md.verlet import VelocityVerlet
 from ase import units
-import argparse
+from torchani.models import ANI2x
 
 torch.set_printoptions(precision=15)
 np.set_printoptions(precision=15)
@@ -18,10 +19,10 @@ def run(pbc=False, use_double=True, use_cuaev=False):
 
     # use cpu for reference result if not for cuaev
     device = torch.device("cuda") if use_cuaev else torch.device("cpu")
-    ani2x = torchani.models.ANI2x(
+    ani2x = ANI2x(
         periodic_table_index=True,
         model_index=None,
-        neighborlist="all-pairs",
+        neighborlist="all_pairs",
         strategy="cuaev",
     )
     # TODO It is IMPORTANT to set cutoff as 7.1 to match lammps nbr cutoff

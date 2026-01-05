@@ -1,18 +1,20 @@
-import torch
-import torchani
 import re
 import os
-import ase
-import pytest
-import yaml
 import subprocess
+from typing import Dict
+
+import yaml
+import torch
+import pytest
 import numpy as np
 import pandas as pd
-from typing import Dict
+import ase
 from ase.io import read
 from ase.md.verlet import VelocityVerlet
 from ase.io.trajectory import Trajectory
 from ase import units
+from torchani.ase import Calculator as ANICalculator
+
 from .models import all_models
 
 np.set_printoptions(precision=12)
@@ -41,7 +43,7 @@ class LammpsRunner:
         self.var_dict = var_dict
 
     def run(self):
-        stdout = subprocess.run(
+        subprocess.run(
             self.run_commands, shell=True, check=True, stdout=subprocess.DEVNULL
         )
         df_thermo = self.read_thermo_from_log(self.var_dict["logfile"])
@@ -168,11 +170,8 @@ num_tasks_params = [
     pytest.param(2, id="num_tasks_2"),
 ]
 
-modelfile_params = all_models.keys()
 # remove modelfiles that have unittest as False
-modelfile_params = [
-    modelfile for modelfile in modelfile_params if all_models[modelfile]["unittest"]
-]
+modelfile_params = [k for k, value in all_models.items() if value["unittest"]]
 
 
 @pytest.mark.parametrize("pbc", pbc_params)
@@ -209,8 +208,8 @@ def test_lmp_with_ase(
     modelfile: str,
 ):
     # SKIP: compiled kokkos only work on Ampere GPUs
-    SM = torch.cuda.get_device_capability(0)
-    SM = int(f"{SM[0]}{SM[1]}")
+    _SM = torch.cuda.get_device_capability(0)
+    SM = int(f"{_SM[0]}{_SM[1]}")
     if kokkos and SM < 80:
         pytest.skip("compiled kokkos only work on Ampere GPUs")
 
@@ -270,7 +269,7 @@ def test_lmp_with_ase(
     use_double = precision == "double"
     dtype = torch.float64 if use_double else torch.float32
     # calculator = ref_model.to(dtype).to(device).ase()
-    calculator = torchani.ase.Calculator(ref_model.to(dtype).to(device))
+    calculator = ANICalculator(ref_model.to(dtype).to(device))
 
     # run ase
     aserunner = AseRunner("water-0.8nm.pdb", calculator=calculator, pbc=pbc)

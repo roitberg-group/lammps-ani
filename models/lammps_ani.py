@@ -1,13 +1,11 @@
-import torch
 import warnings
-import torchani
-from typing import Tuple, Optional
+from typing import Optional
+
+import torch
 from torch import Tensor
-from torchani.nn import SpeciesEnergies
-from torchani.infer import BmmEnsemble
-from torchani.models import Ensemble
+from torchani.nn import BmmEnsemble, Ensemble
 from torchani.neighbors import NeighborData
-from torchani.potentials.repulsion import RepulsionXTB
+from torchani.potentials import RepulsionXTB
 
 # disable tensorfloat32
 torch.backends.cuda.matmul.allow_tf32 = False

@@ -1,11 +1,11 @@
-import torch
-import torchani
 import warnings
-from torchani.nn import ANIModel
-from torchani.models import Ensemble
-from .lammps_ani import LammpsANI
-from torchani.potentials.repulsion import RepulsionXTB
 from pathlib import Path
+
+import torch
+from torchani.potentials import RepulsionXTB
+from torchani.models import ANI2x, BuiltinModel, _load_ani_model
+
+from .lammps_ani import LammpsANI
 
 # Get the directory where this module is located
 _MODULE_DIR = Path(__file__).parent.absolute()
@@ -13,19 +13,15 @@ _EXTERNAL_DIR = _MODULE_DIR.parent / "external"
 
 
 def ANI2x_Model():
-    model = torchani.models.ANI2x(
-        periodic_table_index=True,
-        model_index=None,
-        cell_list=False,
-        use_cuaev_interface=True,
-        use_cuda_extension=True,
+    model = ANI2x(
+        neighborlist="all_pairs",
+        strategy="cuaev",
     )
     model.rep_calc = None
     return model
 
 
 def ANI1x_NR_Model(use_repulsion):
-    from torchani.models import BuiltinModel, _load_ani_model
 
     def ANI1x_NR(**kwargs) -> BuiltinModel:
         """
@@ -44,11 +40,8 @@ def ANI1x_NR_Model(use_repulsion):
         return _load_ani_model(state_dict_file, info_file, use_neurochem_source=True, **kwargs)
 
     model = ANI1x_NR(
-        periodic_table_index=True,
-        model_index=None,
-        cell_list=False,
-        use_cuaev_interface=True,
-        use_cuda_extension=True,
+        neighborlist="all_pairs",
+        strategy="cuaev",
         # [TODO] we would need to set repulsion if we need to run ANI1x_NR with ASE calculator
         # pretrained=False,
         # repulsion=use_repulsion,
@@ -63,10 +56,11 @@ def ANI1x_NR_Model(use_repulsion):
     # The ANI1x_NR model does not have repulsion calculator, so the repulsion calculator here is
     # an external potential added on top of the ANI1x_NR model to prevent atoms from collapsing.
     if use_repulsion:
-        model.rep_calc = RepulsionXTB(cutoff=5.1, symbols=("H", "C", "N", "O"), cutoff_fn="smooth2")
+        model.rep_calc = RepulsionXTB(cutoff=5.1, symbols=("H", "C", "N", "O"), cutoff_fn="smooth")
     else:
         model.rep_calc = None
     return model
+
 
 def ANI2x_Solvated_Alanine_Dipeptide_Model():
     try:
@@ -119,6 +113,7 @@ for output_file, info in all_models_.items():
         all_models[output_file] = info
     except Exception as e:
         warnings.warn(f"Failed to export {output_file}: {str(e)}")
+
 
 def save_models():
     for output_file, info in all_models.items():

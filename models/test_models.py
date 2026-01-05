@@ -1,14 +1,17 @@
-import ase
 import copy
-import torch
-import pytest
-import torchani
-from ase.io import read
 from pathlib import Path
-from torchani.models import Ensemble
+
+import ase
+from ase.io import read
+import pytest
+import torch
+import torchani
+from torchani.units import hartree2kcalpermol
+from torchani.nn import Ensemble
+
 from .ani_models import all_models, save_models
 
-hartree2kcalmol = torchani.units.hartree2kcalmol(1)
+hartree2kcalmol = hartree2kcalpermol(1)
 
 # Get the directory where this module is located
 _MODULE_DIR = Path(__file__).parent.absolute()
@@ -39,11 +42,8 @@ virial_flag_params = [
     pytest.param(True, id="virial_true"),
     pytest.param(False, id="virial_false"),
 ]
-modelfile_params = all_models.keys()
 # remove modelfiles that have unittest as False
-modelfile_params = [
-    modelfile for modelfile in modelfile_params if all_models[modelfile]["unittest"]
-]
+modelfile_params = [k for k, value in all_models.items() if value["unittest"]]
 
 
 # Save all models by using session-scoped "autouse" fixture, this will run ahead of all tests.

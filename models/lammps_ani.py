@@ -97,7 +97,7 @@ class LammpsANI(LammpsModelBase):
         else:
             # We need to create a dummy repulsion model because the `compute_repulsion()`
             # method needs the repulsion forward functions are exposed.
-            self.rep_calc = RepulsionXTB()
+            self.rep_calc = RepulsionXTB(symbols=("H"))
 
         # num_models
         self.num_models = len(model.neural_networks)
@@ -170,9 +170,9 @@ class LammpsANI(LammpsModelBase):
         if virial_flag:
             diff_vector.requires_grad_()
 
-        torch.ops.mnp.nvtx_range_push("AEV forward")
+        # torch.ops.mnp.nvtx_range_push("AEV forward")
         aev = self.compute_aev(species, coordinates, para1, para2, para3, fullnbr_diff_vector=diff_vector)
-        torch.ops.mnp.nvtx_range_pop()
+        # torch.ops.mnp.nvtx_range_pop()
 
         if atomic:
             energies, atomic_energies = self.forward_atomic(
@@ -184,27 +184,27 @@ class LammpsANI(LammpsModelBase):
             )
 
         if self.use_repulsion:
-            torch.ops.mnp.nvtx_range_push("Repulsion forward")
+            # torch.ops.mnp.nvtx_range_push("Repulsion forward")
             ghost_flags = species_ghost_as_padding == -1
             rep_energies = self.compute_repulsion(
                 species, coordinates, para1, para2, para3, ghost_flags, fullnbr_diff_vector=diff_vector
             )
             energies += rep_energies
-            torch.ops.mnp.nvtx_range_pop()
+            # torch.ops.mnp.nvtx_range_pop()
 
         if virial_flag:
-            torch.ops.mnp.nvtx_range_push("Force and Stress")
+            # torch.ops.mnp.nvtx_range_push("Force and Stress")
             force, dEdR = torch.autograd.grad([energies.sum()], [coordinates, diff_vector], create_graph=True, retain_graph=True)
             assert dEdR is not None
             virial = dEdR.transpose(0, 1) @ diff_vector
             virial = (virial.t() + virial) / 2
-            torch.ops.mnp.nvtx_range_pop()
+            # torch.ops.mnp.nvtx_range_pop()
         else:
-            torch.ops.mnp.nvtx_range_push("Force")
+            # torch.ops.mnp.nvtx_range_push("Force")
             force = torch.autograd.grad(
                 [energies.sum()], [coordinates], create_graph=True, retain_graph=True
             )[0]
-            torch.ops.mnp.nvtx_range_pop()
+            # torch.ops.mnp.nvtx_range_pop()
             # When using cuaev and lammps needs to calculate pressure thermo property,
             # although we force the vflag here is False, the flag is on internally.
             # That is why these zeros are needed.
@@ -224,11 +224,11 @@ class LammpsANI(LammpsModelBase):
         aev: Tensor,
     ):
         # run neural networks
-        torch.ops.mnp.nvtx_range_push(f"NN ({self.use_num_models}) forward")
+        # torch.ops.mnp.nvtx_range_push(f"NN ({self.use_num_models}) forward")
         energies = self.neural_networks(species_ghost_as_padding, aev)
         # TODO force is independent of energy_shifter?
         energies += self.energy_shifter(species_ghost_as_padding)
-        torch.ops.mnp.nvtx_range_pop()
+        # torch.ops.mnp.nvtx_range_pop()
 
         return energies, torch.empty(0)
 
@@ -245,14 +245,14 @@ class LammpsANI(LammpsModelBase):
         nlocal = ntotal - nghost
 
         # run neural networks
-        torch.ops.mnp.nvtx_range_push("NN ({self.use_num_models}) forward_atomic")
+        # torch.ops.mnp.nvtx_range_push("NN ({self.use_num_models}) forward_atomic")
         atomic_energies = self.neural_networks(species_ghost_as_padding, aev, atomic=True)
         atomic_energies += self.energy_shifter(species_ghost_as_padding, atomic=True)
         # when using ANI ensemble (not batchmm), atomic_energies shape is [models, C, A]
         if len(atomic_energies.shape) > 2:
             atomic_energies = atomic_energies.mean(0)
         energies = atomic_energies.sum(dim=1)
-        torch.ops.mnp.nvtx_range_pop()
+        # torch.ops.mnp.nvtx_range_pop()
 
         return energies, atomic_energies[:, :nlocal]
 
@@ -323,19 +323,20 @@ class LammpsANI(LammpsModelBase):
         # else:
         #     distances = diff_vector.norm(2, -1)
         neighbors = Neighbors(atom_index12, distances, diff_vector)
-        repulsion_energies = self.rep_calc(
-            species, neighbors, ghost_flags=ghost_flags
-        )
+        repulsion_energies = self.rep_calc.compute_from_neighbors(
+            species, coordinates, neighbors, charge=0,
+            atomic=False, ensemble_values=False, ghost_flags=ghost_flags
+        ).energies
         return repulsion_energies
 
     @torch.jit.export
     def select_models(self, use_num_models: Optional[int] = None):
-        if self.using_bmmensemble:
-            raise RuntimeError("select_models method only works for BmmEnsemble")
-        elif use_num_models is None or use_num_models == self.num_models:
+        if use_num_models is None or use_num_models == self.num_models:
             pass
             # We don't need to do anything in this case, even if it is not using
             # BmmEnsemble.
+        elif self.using_bmmensemble:
+            raise RuntimeError("select_models method only works for BmmEnsemble")
         else:
             self.neural_networks.set_active_members(list(range(use_num_models)))
             self.use_num_models = self.neural_networks.get_active_members_num()

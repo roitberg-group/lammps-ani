@@ -15,7 +15,7 @@ from ase.io.trajectory import Trajectory
 from ase import units
 from torchani.ase import Calculator as ANICalculator
 
-from .models import all_models
+from models.ani_models import all_models, save_models
 
 np.set_printoptions(precision=12)
 LAMMPS_PATH = os.path.join(os.environ["LAMMPS_ROOT"], "build/lmp_mpi")
@@ -155,6 +155,13 @@ def compare_lmp_ase(lmp_data, ase_traj, high_prec, using_cuaev):
         # compare stress for pyaev, cuaev currently does not support stress
         if not using_cuaev:
             assert np.allclose(ase_stress, lmp_stress, rtol, atol)
+
+
+# Save all models by using session-scoped "autouse" fixture, this will run ahead of all tests.
+@pytest.fixture(scope="session", autouse=True)
+def session_start():
+    print("Pytest session started, saving all models")
+    save_models()
 
 
 pbc_params = [

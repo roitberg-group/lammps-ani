@@ -19,7 +19,7 @@ def run(pbc=False, use_double=True, use_cuaev=False):
 
     # use cpu for reference result if not for cuaev
     device = torch.device("cuda") if use_cuaev else torch.device("cpu")
-    ani2x = ANI2x(neighborlist="all_pairs", strategy="cuaev")
+    ani2x = ANI2x(neighborlist="all_pairs", strategy="cuaev" if use_cuaev else "pyaev")
     # TODO It is IMPORTANT to set cutoff as 7.1 to match lammps nbr cutoff (why?)
     ani2x.cutoff = 7.1
     # double precision
@@ -50,7 +50,7 @@ def run(pbc=False, use_double=True, use_cuaev=False):
         print(f"forces: \n{df}")
 
     dyn = VelocityVerlet(
-        atoms, dt=0.1 * units.fs, trajectory="md.traj", logfile="md.log"
+        atoms, timestep=0.1 * units.fs, trajectory="md.traj", logfile="md.log"
     )
     dyn.attach(printenergy, interval=1)
     print("Beginning dynamics...")

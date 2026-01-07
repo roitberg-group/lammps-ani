@@ -141,6 +141,9 @@ def run_one_test(
     if not runpbc:
         mol.set_pbc([False, False, False])
     pbc = torch.tensor(mol.pbc, device=device)
+    if not runpbc:
+        pbc = None
+        cell = None
     atom_index12, distances, diff_vector = model_ref.neighborlist(
         model_ref.cutoff, species, coordinates, cell, pbc
     )

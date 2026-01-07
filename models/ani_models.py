@@ -3,7 +3,8 @@ from pathlib import Path
 
 import torch
 from torchani.potentials import RepulsionXTB
-from torchani.models import ANI2x, load_model_from_info_file
+from torchani.models import ANI2x
+from torchani.neurochem import load_model_from_info_file
 
 from .lammps_ani import LammpsANI
 

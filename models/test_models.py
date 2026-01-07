@@ -5,7 +5,6 @@ import ase
 from ase.io import read
 import pytest
 import torch
-import torchani
 from torchani.units import hartree2kcalpermol
 from torchani.nn import Ensemble
 
@@ -61,7 +60,9 @@ def session_start():
 @pytest.mark.parametrize("use_fullnbr", use_fullnbr_params)
 @pytest.mark.parametrize("modelfile", modelfile_params)
 @pytest.mark.parametrize("virial_flag", virial_flag_params)
-def test_models(runpbc, device, use_double, use_cuaev, use_fullnbr, modelfile, virial_flag):
+def test_models(
+    runpbc, device, use_double, use_cuaev, use_fullnbr, modelfile, virial_flag
+):
     # when pbc is on, full nbrlist converted from half nbrlist is not correct
     if use_fullnbr and runpbc:
         pytest.skip("Does not support full neighbor list using pyaev when pbc is on")
@@ -80,57 +81,24 @@ def test_models(runpbc, device, use_double, use_cuaev, use_fullnbr, modelfile, v
     model_loaded.init(use_cuaev, use_fullnbr)
     use_repulsion = model_loaded.use_repulsion
 
-    def set_ref_cuda_aev(model, use_cuaev):
-        model.aev_computer.use_cuaev_interface = use_cuaev
-        model.aev_computer.use_cuda_extension = use_cuaev
-        return model
-
-    def select_ref_num_models(model, use_num_models):
-        newmodel = copy.deepcopy(model)
-        # BuiltinModelPairInteractions needs to change AEVPotential.neural_networks
-        if isinstance(model, torchani.models.BuiltinModelPairInteractions):
-            assert isinstance(model.neural_networks, torch.nn.ModuleList)
-            assert use_num_models <= len(model.neural_networks)
-            newmodel.neural_networks = Ensemble(
-                newmodel.neural_networks[:use_num_models]
-            )
-            for i, pot in enumerate(model.potentials):
-                if isinstance(pot, torchani.models.AEVPotential):
-                    nn = newmodel.potentials[i].neural_networks
-                    assert isinstance(nn, torch.nn.ModuleList)
-                    assert use_num_models <= len(nn)
-                    newmodel.potentials[i].neural_networks = Ensemble(
-                        nn[:use_num_models]
-                    )
-        elif isinstance(model, torchani.models.BuiltinModel):
-            assert isinstance(model.neural_networks, torch.nn.ModuleList)
-            assert use_num_models <= len(model.neural_networks)
-            newmodel.neural_networks = Ensemble(
-                newmodel.neural_networks[:use_num_models]
-            )
-        return newmodel
-
     model_info = all_models[modelfile]
     if "kwargs" in model_info:
         kwargs = model_info["kwargs"]
     else:
         kwargs = {}
     model_ref_all_models = model_info["model"](**kwargs).to(dtype).to(device)
-    model_ref_all_models = set_ref_cuda_aev(model_ref_all_models, use_cuaev)
+    model_ref_all_models.set_strategy("cuaev" if use_cuaev else "pyaev")
 
-    if virial_flag and not isinstance(model_ref_all_models, torchani.models.BuiltinModel):
-        pytest.skip("we only test virial for torchani.models.BuiltinModel")
+    if virial_flag and not len(model_ref_all_models.potentials) > 1:
+        pytest.skip("we only test virial for simple ANI models")
 
     # we need a fewer iterations to tigger the fuser
-    total_num_models = len(model_ref_all_models.neural_networks)
-    test_num_models_list = []
-    if total_num_models <= 4:
-        test_num_models_list = [total_num_models]
-    else:
-        test_num_models_list = [4, total_num_models]
+    test_num_models_list = [len(model_ref_all_models.neural_networks)]
     for num_models in test_num_models_list:
         print(f"test num_models == {num_models}")
-        model_ref = select_ref_num_models(model_ref_all_models, num_models)
+        model_ref = copy.deepcopy(model_ref_all_models)
+        assert isinstance(model_ref.neural_networks, Ensemble)
+        model_ref.set_active_members(list(range(num_models)))
         model_loaded.select_models(num_models)
         for i in range(5):
             run_one_test(
@@ -168,15 +136,14 @@ def run_one_test(
     coordinates = torch.tensor(
         mol.get_positions(), dtype=dtype, requires_grad=True, device=device
     ).unsqueeze(0)
-    species, coordinates = model_ref.species_converter(
-        (species_periodic_table, coordinates)
-    )
+    species = model_ref.species_converter(species_periodic_table)
     cell = torch.tensor(mol.cell.array, device=device, dtype=dtype)
     if not runpbc:
         mol.set_pbc([False, False, False])
     pbc = torch.tensor(mol.pbc, device=device)
-
-    atom_index12, distances, diff_vector = model_ref.aev_computer.neighborlist(species, coordinates, cell, pbc)
+    atom_index12, distances, diff_vector = model_ref.neighborlist(
+        model_ref.cutoff, species, coordinates, cell, pbc
+    )
 
     if use_fullnbr:
         ilist_unique, jlist, numneigh = model_ref.aev_computer._half_to_full_nbrlist(
@@ -202,10 +169,21 @@ def run_one_test(
 
     # test forward_atomic API
     energy_, force_, atomic_energies, virial_ = model_loaded(
-        species, coordinates, para1, para2, para3, species_ghost_as_padding, atomic=True, virial_flag=virial_flag
+        species,
+        coordinates,
+        para1,
+        para2,
+        para3,
+        species_ghost_as_padding,
+        atomic=True,
+        virial_flag=virial_flag,
     )
 
-    energy, force, virial = energy * hartree2kcalmol, force * hartree2kcalmol, virial * hartree2kcalmol
+    energy, force, virial = (
+        energy * hartree2kcalmol,
+        force * hartree2kcalmol,
+        virial * hartree2kcalmol,
+    )
     energy_, atomic_energies, force_, virial_ = (
         energy_ * hartree2kcalmol,
         atomic_energies * hartree2kcalmol,

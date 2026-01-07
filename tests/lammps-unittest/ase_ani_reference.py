@@ -19,14 +19,9 @@ def run(pbc=False, use_double=True, use_cuaev=False):
 
     # use cpu for reference result if not for cuaev
     device = torch.device("cuda") if use_cuaev else torch.device("cpu")
-    ani2x = ANI2x(
-        periodic_table_index=True,
-        model_index=None,
-        neighborlist="all_pairs",
-        strategy="cuaev",
-    )
-    # TODO It is IMPORTANT to set cutoff as 7.1 to match lammps nbr cutoff
-    ani2x.aev_computer.neighborlist.cutoff = 7.1
+    ani2x = ANI2x(neighborlist="all_pairs", strategy="cuaev")
+    # TODO It is IMPORTANT to set cutoff as 7.1 to match lammps nbr cutoff (why?)
+    ani2x.cutoff = 7.1
     # double precision
     if use_double:
         ani2x = ani2x.double()

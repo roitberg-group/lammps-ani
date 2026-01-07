@@ -246,11 +246,6 @@ def test_lmp_with_ase(
     lmprunner = LammpsRunner(LAMMPS_PATH, "in.lammps", var_dict, kokkos, num_tasks)
     lmp_data = lmprunner.run()
 
-    def set_ref_cuda_aev(model, use_cuaev):
-        model.aev_computer.use_cuaev_interface = use_cuaev
-        model.aev_computer.use_cuda_extension = use_cuaev
-        return model
-
     # setup ase calculator
     model_info = all_models[modelfile]
     if "kwargs" in model_info:
@@ -259,13 +254,15 @@ def test_lmp_with_ase(
         kwargs = {}
     ref_model = model_info["model"](**kwargs)
 
-    ref_model = set_ref_cuda_aev(ref_model, use_cuaev)
-    # When using half nbrlist, we have to set the cutoff as 7.1 to match lammps nbr cutoff.
+    ref_model.set_strategy("cuaev" if use_cuaev else "pyaev")
+    # When using half nbrlist, we have to set the cutoff as 7.1 to match lammps nbr
+    # cutoff
+    # TODO: Why??
     # When using full nbrlist with nocuaev, it is actually still using half_nbr, we also need 7.1 cutoff.
     # Full nbrlist still uses 5.1, which is fine.
     half_nbr = nbr == "half"
     if half_nbr or (not half_nbr and not use_cuaev):
-        ref_model.aev_computer.neighborlist.cutoff = 7.1
+        ref_model.cutoff = 7.1
     use_double = precision == "double"
     dtype = torch.float64 if use_double else torch.float32
     calculator = ANICalculator(ref_model.to(dtype).to(device))

@@ -1,12 +1,12 @@
-import ase
+import argparse
+
 import torch
-import torchani
 import numpy as np
 import pandas as pd
 from ase.io import read
 from ase.md.verlet import VelocityVerlet
 from ase import units
-import argparse
+from torchani.models import ANI2x
 
 torch.set_printoptions(precision=15)
 np.set_printoptions(precision=15)
@@ -19,15 +19,9 @@ def run(pbc=False, use_double=True, use_cuaev=False):
 
     # use cpu for reference result if not for cuaev
     device = torch.device("cuda") if use_cuaev else torch.device("cpu")
-    ani2x = torchani.models.ANI2x(
-        periodic_table_index=True,
-        model_index=None,
-        cell_list=False,
-        use_cuaev_interface=use_cuaev,
-        use_cuda_extension=use_cuaev,
-    )
-    # TODO It is IMPORTANT to set cutoff as 7.1 to match lammps nbr cutoff
-    ani2x.aev_computer.neighborlist.cutoff = 7.1
+    ani2x = ANI2x(neighborlist="all_pairs", strategy="cuaev" if use_cuaev else "pyaev")
+    # TODO It is IMPORTANT to set cutoff as 7.1 to match lammps nbr cutoff (why?)
+    ani2x.cutoff = 7.1
     # double precision
     if use_double:
         ani2x = ani2x.double()
@@ -56,7 +50,7 @@ def run(pbc=False, use_double=True, use_cuaev=False):
         print(f"forces: \n{df}")
 
     dyn = VelocityVerlet(
-        atoms, dt=0.1 * units.fs, trajectory="md.traj", logfile="md.log"
+        atoms, timestep=0.1 * units.fs, trajectory="md.traj", logfile="md.log"
     )
     dyn.attach(printenergy, interval=1)
     print("Beginning dynamics...")

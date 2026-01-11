@@ -43,3 +43,5 @@ examples/early_earth/logs-big
 examples/early_earth/test_analyze/
 examples/water/logs/
 external/ani_engine_models/backup/
+
+.mypy_cache/

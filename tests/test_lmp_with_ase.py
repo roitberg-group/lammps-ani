@@ -1,19 +1,21 @@
-import torch
-import torchani
 import re
 import os
-import ase
-import pytest
-import yaml
 import subprocess
+from typing import Dict
+
+import yaml
+import torch
+import pytest
 import numpy as np
 import pandas as pd
-from typing import Dict
+import ase
 from ase.io import read
 from ase.md.verlet import VelocityVerlet
 from ase.io.trajectory import Trajectory
 from ase import units
-from .models import all_models
+from torchani.ase import Calculator as ANICalculator
+
+from models.ani_models import all_models, save_models
 
 np.set_printoptions(precision=12)
 LAMMPS_PATH = os.path.join(os.environ["LAMMPS_ROOT"], "build/lmp_mpi")
@@ -41,7 +43,7 @@ class LammpsRunner:
         self.var_dict = var_dict
 
     def run(self):
-        stdout = subprocess.run(
+        subprocess.run(
             self.run_commands, shell=True, check=True, stdout=subprocess.DEVNULL
         )
         df_thermo = self.read_thermo_from_log(self.var_dict["logfile"])
@@ -155,6 +157,13 @@ def compare_lmp_ase(lmp_data, ase_traj, high_prec, using_cuaev):
             assert np.allclose(ase_stress, lmp_stress, rtol, atol)
 
 
+# Save all models by using session-scoped "autouse" fixture, this will run ahead of all tests.
+@pytest.fixture(scope="session", autouse=True)
+def session_start():
+    print("Pytest session started, saving all models")
+    save_models()
+
+
 pbc_params = [
     pytest.param(True, id="pbc_true"),
     pytest.param(False, id="pbc_false"),
@@ -168,11 +177,8 @@ num_tasks_params = [
     pytest.param(2, id="num_tasks_2"),
 ]
 
-modelfile_params = all_models.keys()
 # remove modelfiles that have unittest as False
-modelfile_params = [
-    modelfile for modelfile in modelfile_params if all_models[modelfile]["unittest"]
-]
+modelfile_params = [k for k, value in all_models.items() if value["unittest"]]
 
 
 @pytest.mark.parametrize("pbc", pbc_params)
@@ -209,8 +215,8 @@ def test_lmp_with_ase(
     modelfile: str,
 ):
     # SKIP: compiled kokkos only work on Ampere GPUs
-    SM = torch.cuda.get_device_capability(0)
-    SM = int(f"{SM[0]}{SM[1]}")
+    _SM = torch.cuda.get_device_capability(0)
+    SM = int(f"{_SM[0]}{_SM[1]}")
     if kokkos and SM < 80:
         pytest.skip("compiled kokkos only work on Ampere GPUs")
 
@@ -247,11 +253,6 @@ def test_lmp_with_ase(
     lmprunner = LammpsRunner(LAMMPS_PATH, "in.lammps", var_dict, kokkos, num_tasks)
     lmp_data = lmprunner.run()
 
-    def set_ref_cuda_aev(model, use_cuaev):
-        model.aev_computer.use_cuaev_interface = use_cuaev
-        model.aev_computer.use_cuda_extension = use_cuaev
-        return model
-
     # setup ase calculator
     model_info = all_models[modelfile]
     if "kwargs" in model_info:
@@ -260,17 +261,18 @@ def test_lmp_with_ase(
         kwargs = {}
     ref_model = model_info["model"](**kwargs)
 
-    ref_model = set_ref_cuda_aev(ref_model, use_cuaev)
-    # When using half nbrlist, we have to set the cutoff as 7.1 to match lammps nbr cutoff.
+    ref_model.set_strategy("cuaev" if use_cuaev else "pyaev")
+    # When using half nbrlist, we have to set the cutoff as 7.1 to match lammps nbr
+    # cutoff
+    # TODO: Why??
     # When using full nbrlist with nocuaev, it is actually still using half_nbr, we also need 7.1 cutoff.
     # Full nbrlist still uses 5.1, which is fine.
     half_nbr = nbr == "half"
     if half_nbr or (not half_nbr and not use_cuaev):
-        ref_model.aev_computer.neighborlist.cutoff = 7.1
+        ref_model.cutoff = 7.1
     use_double = precision == "double"
     dtype = torch.float64 if use_double else torch.float32
-    # calculator = ref_model.to(dtype).to(device).ase()
-    calculator = torchani.ase.Calculator(ref_model.to(dtype).to(device))
+    calculator = ANICalculator(ref_model.to(dtype).to(device))
 
     # run ase
     aserunner = AseRunner("water-0.8nm.pdb", calculator=calculator, pbc=pbc)

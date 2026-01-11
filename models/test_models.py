@@ -92,8 +92,14 @@ def test_models(
     if virial_flag and not len(model_ref_all_models.potentials) > 1:
         pytest.skip("we only test virial for simple ANI models")
 
+    total_num_models = len(model_ref_all_models.neural_networks)
+    test_num_models_list = []
+    if total_num_models <= 4:
+        test_num_models_list = [total_num_models]
+    else:
+        test_num_models_list = [4, total_num_models]
+
     # we need a fewer iterations to tigger the fuser
-    test_num_models_list = [len(model_ref_all_models.neural_networks)]
     for num_models in test_num_models_list:
         print(f"test num_models == {num_models}")
         model_ref = copy.deepcopy(model_ref_all_models)

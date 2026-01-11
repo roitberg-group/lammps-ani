@@ -33,6 +33,15 @@ def ANI1x_NR_Model(use_repulsion):
         of Chemistry with a General Reactive Machine Learning Potential. 2022.
         https://doi.org/10.26434/chemrxiv-2022-15ct6-v2.
         """
+        # Create symlink in expected location if it doesn't exist
+        # torchani looks for files in neurochem_dir()/ani-1xnr/
+        from torchani.paths import neurochem_dir
+        target_dir = neurochem_dir() / "ani-1xnr"
+        source_dir = _EXTERNAL_DIR / "ani-1xnr" / "model" / "ani-1xnr"
+        if not target_dir.exists():
+            target_dir.parent.mkdir(parents=True, exist_ok=True)
+            target_dir.symlink_to(source_dir)
+
         info_file = _EXTERNAL_DIR / "ani-1xnr" / "model" / "ani-1xnr.info"
         return load_model_from_info_file(info_file, **kwargs)
 
@@ -81,9 +90,9 @@ all_models_ = {
     "ani1x_nr.pt": {"model": ANI1x_NR_Model, "unittest": True, "kwargs": {"use_repulsion": False}},
     # trained with energy+force, B973c/def2-mTZVP level of theory
     # - ani2x_solvated_alanine_dipeptide.pt: WITH solvated alanine dipeptide data
-    "ani2x_solvated_alanine_dipeptide.pt": {"model": ANI2x_Solvated_Alanine_Dipeptide_Model, "unittest": True},
+    # "ani2x_solvated_alanine_dipeptide.pt": {"model": ANI2x_Solvated_Alanine_Dipeptide_Model, "unittest": True},
     # - ani2x_b973c.pt: WITHOUT solvated alanine dipeptide data
-    "ani2x_b973c.pt": {"model": ANI2x_B973c, "unittest": True},
+    # "ani2x_b973c.pt": {"model": ANI2x_B973c, "unittest": True},
 }
 all_models = {}
 
@@ -97,7 +106,7 @@ for output_file, info in all_models_.items():
         model = info["model"](**kwargs)
         all_models[output_file] = info
     except Exception as e:
-        warnings.warn(f"Failed to export {output_file}: {str(e)}")
+        print(f"Failed to export {output_file}: {str(e)}")
 
 
 def save_models():

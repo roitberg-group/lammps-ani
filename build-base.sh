@@ -25,12 +25,9 @@ fi
 set -e
 
 # build torchani
-cd external/torchani_sandbox
-# rm -rf build && pip install -e . --config-settings=--global-option=ext --no-build-isolation --no-deps -v $install_option
-# Force extension build through environment variable instead of command line arg
-export TORCHANI_BUILD_EXTENSIONS=1
-# export TORCHANI_BUILD_ALL_EXTENSIONS=1
-rm -rf build && pip install -e . --no-build-isolation -v $install_option
+cd external/torchani
+pip install packaging --upgrade $install_option
+rm -rf build && pip install -e . --config-settings=--global-option=ext --no-build-isolation --no-deps -v $install_option
 pip install h5py ase pytest pyyaml --upgrade $install_option
 cd ../../
 

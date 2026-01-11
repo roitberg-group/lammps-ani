@@ -5,7 +5,7 @@ set -ex
 source build-env.sh
 
 # copy source files to ani_csrc (only files, not directories)
-cp external/torchani_sandbox/torchani/csrc/*.{cu,h,cpp,cuh} src/ani_csrc/
+cp external/torchani/torchani/csrc/*.{cu,h,cpp,cuh} src/ani_csrc/
 
 # build lammps-ani
 # remove old building files

@@ -25,3 +25,11 @@ fi
 # Build Options
 export MAKE_J_THREADS=${MAKE_J_THREADS:=""}  # default as all threads
 export OVERRIDE_KOKKOS_ARCH=${OVERRIDE_KOKKOS_ARCH:=""}  # default as null
+
+# Blackwell (SM 100/120) nodes require UCX_NET_DEVICES=mlx5_0:1 to avoid IB crash
+# Auto-detect and set only on Blackwell GPUs; users can still override manually
+_GPU_SM=$(python -c "import torch; print(''.join(map(str, torch.cuda.get_device_capability(0))))" 2>/dev/null || echo "")
+if [[ "$_GPU_SM" == "100" || "$_GPU_SM" == "120" ]]; then
+    export UCX_NET_DEVICES=${UCX_NET_DEVICES:=mlx5_0:1}
+fi
+unset _GPU_SM

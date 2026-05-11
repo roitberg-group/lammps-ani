@@ -15,6 +15,7 @@
 
 #include "atom_kokkos.h"
 #include "atom_masks.h"
+#include "comm.h"
 #include "error.h"
 #include "force.h"
 #include "kokkos.h"
@@ -187,8 +188,16 @@ void PairANIKokkos<DeviceType>::compute(int eflag_in, int vflag_in) {
       eflag_atom,
       vflag);
 
+  // Copy GPU forces to CPU PairANI::out_force, do manual reverse_comm (newton off),
+  // then add corrected forces back — mirrors the non-Kokkos pair_ani.cpp approach.
+  auto out_force_cpu = out_force.contiguous().to(torch::kCPU).to(torch::kDouble).reshape({ntotal * 3});
+  PairANI::out_force.resize(ntotal * 3);
+  std::copy(out_force_cpu.data_ptr<double>(), out_force_cpu.data_ptr<double>() + ntotal * 3, PairANI::out_force.begin());
+  comm->reverse_comm(this);
+  auto corrected = torch::from_blob(PairANI::out_force.data(), {1, ntotal, 3},
+      torch::TensorOptions().dtype(torch::kDouble)).to(tensor_kokkos_force_option);
   torch::Tensor d_force_tensor = torch::from_blob(f.data(), {1, ntotal, 3}, tensor_kokkos_force_option);
-  d_force_tensor += out_force.to(kokkos_device);
+  d_force_tensor += corrected;
 
   if (eflag) {
     eng_vdwl += out_energy.item<double>();
@@ -230,8 +239,8 @@ void PairANIKokkos<DeviceType>::init_style() {
   // TODO requires full neighbor list and newton on
   if (neighflag != FULL)
     error->all(FLERR, "Pair style ANI requires full neighbor list when using kokkos");
-  if (force->newton_pair == 0)
-    error->all(FLERR, "Pair style ANI requires newton pair on when using kokkos");
+  if (force->newton_pair == 1)
+    error->all(FLERR, "Pair style ANI requires newton pair off when using kokkos");
 }
 /* ---------------------------------------------------------------------- */
 

@@ -247,7 +247,7 @@ def test_lmp_with_ase(
     if not pbc:
         var_dict["change_box"] = "'all boundary f f f'"
     if kokkos:
-        var_dict["newton_pair"] = "on"
+        var_dict["newton_pair"] = "off"
 
     # run lammps
     lmprunner = LammpsRunner(LAMMPS_PATH, "in.lammps", var_dict, kokkos, num_tasks)

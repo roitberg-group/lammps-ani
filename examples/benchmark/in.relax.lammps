@@ -1,7 +1,7 @@
 # variables
 variable       lammps_ani_root getenv LAMMPS_ANI_ROOT
 variable       log_dir         index  logs
-# kokkos needs newton_pair on for reverse communication between gpus
+# kokkos needs newton_pair off (LAMMPS Kokkos requires newton off for full neighbor list)
 variable       newton_pair     index  off
 variable       timestamp       index  timestamp
 # configuration

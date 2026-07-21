@@ -331,13 +331,9 @@ class LammpsANI(LammpsModelBase):
 
     @torch.jit.export
     def select_models(self, use_num_models: Optional[int] = None):
-        if use_num_models is None:
-            use_num_models = self.num_models
-        if not self.using_bmmensemble:
-            if use_num_models != self.num_models:
-                raise RuntimeError("select_models method only works for BmmEnsemble")
-            # For non-BmmEnsemble, we can only use all models
-            return
-        # Always call set_active_members to properly reset the state
-        self.neural_networks.set_active_members(list(range(use_num_models)))
-        self.use_num_models = self.neural_networks.get_active_members_num()
+        # Only do something if use_num_models is different from the current num models,
+        # otherwise this is a no-op
+        # NOTE: This is currently supported for *both* BmmEnsemble and normal Ensemble
+        if (use_num models is not None) and (use_num_models != self.num_models):
+            self.neural_networks.set_active_members(list(range(use_num_models)))
+            self.use_num_models = self.neural_networks.get_active_members_num()
